@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>ExperimentalControlPlatform.Protocols</RootNamespace>
+    <AssemblyName>ExperimentalControlPlatform.Protocols</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ExperimentalControlPlatform.Core\ExperimentalControlPlatform.Core.csproj" />
+  </ItemGroup>
+</Project>

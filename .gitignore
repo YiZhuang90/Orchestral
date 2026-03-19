@@ -1,0 +1,47 @@
+# General
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors and IDEs
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build outputs
+bin/
+obj/
+out/
+
+# Test and coverage artifacts
+TestResults/
+coverage/
+*.coverage
+*.trx
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+
+# OS / sync artifacts
+~$*
+

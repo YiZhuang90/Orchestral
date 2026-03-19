@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>ExperimentalControlPlatform.App</RootNamespace>
+    <AssemblyName>ExperimentalControlPlatform.App</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ExperimentalControlPlatform.Core\ExperimentalControlPlatform.Core.csproj" />
+    <ProjectReference Include="..\ExperimentalControlPlatform.Runtime\ExperimentalControlPlatform.Runtime.csproj" />
+    <ProjectReference Include="..\ExperimentalControlPlatform.Devices\ExperimentalControlPlatform.Devices.csproj" />
+    <ProjectReference Include="..\ExperimentalControlPlatform.AI\ExperimentalControlPlatform.AI.csproj" />
+  </ItemGroup>
+</Project>
