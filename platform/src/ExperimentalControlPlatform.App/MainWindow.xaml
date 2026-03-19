@@ -1,0 +1,57 @@
+<Window x:Class="ExperimentalControlPlatform.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Orchestral"
+        Width="960"
+        Height="640"
+        MinWidth="720"
+        MinHeight="480">
+  <Grid Margin="24">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <StackPanel>
+      <TextBlock FontSize="28"
+                 FontWeight="SemiBold"
+                 Text="{Binding ProductName}" />
+      <TextBlock Margin="0,8,0,0"
+                 FontSize="16"
+                 Text="{Binding RuntimeStatus.CurrentState, StringFormat=Current runtime state: {0}}" />
+      <TextBlock Margin="0,4,0,0"
+                 Foreground="#5F6B7A"
+                 Text="{Binding RuntimeStatus.StateSummary}" />
+    </StackPanel>
+
+    <StackPanel Grid.Row="1"
+                Margin="0,24,0,24"
+                Orientation="Horizontal">
+      <Button Width="120"
+              Padding="12,6"
+              Click="StartButton_OnClick"
+              Content="Start"
+              IsEnabled="{Binding RuntimeStatus.CanStart}" />
+      <Button Width="120"
+              Margin="12,0,0,0"
+              Padding="12,6"
+              Click="StopButton_OnClick"
+              Content="Stop"
+              IsEnabled="{Binding RuntimeStatus.CanStop}" />
+    </StackPanel>
+
+    <Border Grid.Row="2"
+            Padding="20"
+            Background="#F6F8FA"
+            BorderBrush="#D0D7DE"
+            BorderThickness="1"
+            CornerRadius="8">
+      <TextBlock VerticalAlignment="Center"
+                 HorizontalAlignment="Center"
+                 Foreground="#5F6B7A"
+                 FontSize="16"
+                 Text="Future monitor panels will appear here." />
+    </Border>
+  </Grid>
+</Window>
