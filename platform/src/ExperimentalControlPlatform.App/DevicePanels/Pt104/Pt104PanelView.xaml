@@ -1,0 +1,273 @@
+<UserControl x:Class="ExperimentalControlPlatform.App.DevicePanels.Pt104.Pt104PanelView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:shells="clr-namespace:ExperimentalControlPlatform.App.Shell"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:widgets="clr-namespace:ExperimentalControlPlatform.App.Widgets">
+  <UserControl.Resources>
+    <DataTemplate x:Key="ChannelTabTemplate">
+      <TextBlock Text="{Binding StringFormat=Channel {0}}" />
+    </DataTemplate>
+  </UserControl.Resources>
+
+  <shells:DevicePanelShell PanelTitle="{Binding Title}"
+                           TabsSource="{Binding ChannelOptions}"
+                           SelectedTab="{Binding SelectedChannel}"
+                           TabItemTemplate="{StaticResource ChannelTabTemplate}">
+    <shells:DevicePanelShell.LeftRailContent>
+      <widgets:DeviceControlPanel>
+        <widgets:DeviceControlPanel.ConfigurationContent>
+          <StackPanel>
+            <TextBlock FontSize="{StaticResource FontBody}"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       Text="Sensor type" />
+            <Border Margin="0,6,0,0"
+                    Background="{StaticResource SurfaceBrush}"
+                    BorderBrush="{StaticResource SoftBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource RadiusControl}">
+              <ComboBox Style="{StaticResource ComboBoxStyle}"
+                        ItemsSource="{Binding MeasurementTypeOptions}"
+                        SelectedItem="{Binding SelectedMeasurementType}" />
+            </Border>
+
+            <TextBlock Margin="0,10,0,0"
+                       FontSize="{StaticResource FontBody}"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       Text="Wire count" />
+            <Border Margin="0,6,0,0"
+                    Background="{StaticResource SurfaceBrush}"
+                    BorderBrush="{StaticResource SoftBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource RadiusControl}">
+              <ComboBox Style="{StaticResource ComboBoxStyle}"
+                        ItemsSource="{Binding WireCountOptions}"
+                        SelectedItem="{Binding SelectedWireCount}" />
+            </Border>
+
+            <TextBlock Margin="0,10,0,0"
+                       FontSize="{StaticResource FontBody}"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       Text="Mains filter" />
+            <Border Margin="0,6,0,0"
+                    Background="{StaticResource SurfaceBrush}"
+                    BorderBrush="{StaticResource SoftBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource RadiusControl}">
+              <ComboBox Style="{StaticResource ComboBoxStyle}"
+                        ItemsSource="{Binding MainsFrequencyOptions}"
+                        SelectedItem="{Binding SelectedMainsFrequency}" />
+            </Border>
+
+            <CheckBox Margin="0,12,0,0"
+                      FontSize="{StaticResource FontBody}"
+                      Foreground="{StaticResource TextPrimaryBrush}"
+                      IsChecked="{Binding FilteredRead}">
+              <TextBlock Text="Filtered read" />
+            </CheckBox>
+          </StackPanel>
+        </widgets:DeviceControlPanel.ConfigurationContent>
+
+        <widgets:DeviceControlPanel.ActionsContent>
+          <StackPanel Margin="0,16,0,0">
+            <TextBlock FontSize="{StaticResource FontBody}"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       Text="Actions" />
+
+            <StackPanel Margin="0,6,0,0">
+              <Button Style="{StaticResource ConnectionToggleButtonStyle}"
+                      Tag="{Binding IsConnected}"
+                      Click="ToggleConnectionButton_OnClick"
+                      IsEnabled="{Binding CanToggleConnection}">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                  <iconPacks:PackIconMaterial Margin="0,0,8,0"
+                                              Kind="{Binding ConnectionToggleIconKind}"
+                                              Width="14"
+                                              Height="14"
+                                              VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding ConnectionToggleLabel}" />
+                </StackPanel>
+              </Button>
+
+              <Button Margin="0,6,0,0"
+                      Style="{StaticResource OutlineActionButtonStyle}"
+                      Click="ReadOnceButton_OnClick"
+                      IsEnabled="{Binding CanReadOnce}">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                  <iconPacks:PackIconMaterial Margin="0,0,8,0"
+                                              Kind="Refresh"
+                                              Width="14"
+                                              Height="14"
+                                              VerticalAlignment="Center" />
+                  <TextBlock Text="Read once" />
+                </StackPanel>
+              </Button>
+
+              <Button Margin="0,6,0,0"
+                      Style="{StaticResource LiveToggleButtonStyle}"
+                      Tag="{Binding IsLiveReading}"
+                      Click="ToggleLiveButton_OnClick"
+                      IsEnabled="{Binding CanToggleLive}">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                  <iconPacks:PackIconMaterial Margin="0,0,8,0"
+                                              Kind="{Binding LiveToggleIconKind}"
+                                              Width="14"
+                                              Height="14"
+                                              VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding LiveToggleLabel}" />
+                </StackPanel>
+              </Button>
+            </StackPanel>
+          </StackPanel>
+        </widgets:DeviceControlPanel.ActionsContent>
+
+        <widgets:DeviceControlPanel.DiagnosticsContent>
+          <Button Style="{StaticResource SoftActionButtonStyle}"
+                  Click="DiagnosticsButton_OnClick"
+                  HorizontalAlignment="Stretch">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+              <iconPacks:PackIconMaterial Margin="0,0,8,0"
+                                          Kind="Cog"
+                                          Width="14"
+                                          Height="14"
+                                          VerticalAlignment="Center" />
+              <TextBlock Text="Diagnostics" />
+            </StackPanel>
+          </Button>
+        </widgets:DeviceControlPanel.DiagnosticsContent>
+      </widgets:DeviceControlPanel>
+    </shells:DevicePanelShell.LeftRailContent>
+
+    <shells:DevicePanelShell.WorkspaceContent>
+      <widgets:SerialDataPanel>
+        <widgets:SerialDataPanel.HeaderContent>
+          <widgets:RealTimeValueHeader Label="{Binding PrimaryValueLabel}"
+                                       Value="{Binding LatestTemperature}" />
+        </widgets:SerialDataPanel.HeaderContent>
+
+        <widgets:SerialDataPanel.ToolbarContent>
+          <StackPanel Orientation="Horizontal">
+            <Button Margin="0,0,8,0"
+                    Style="{StaticResource ChartActionButtonStyle}"
+                    Padding="9,4"
+                    Background="{StaticResource MutedSurfaceBrush}"
+                    BorderThickness="0"
+                    Click="ClearDataButton_OnClick"
+                    IsEnabled="{Binding CanClearData}">
+              <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <iconPacks:PackIconMaterial Margin="0,0,8,0"
+                                            Kind="TrashCanOutline"
+                                            Width="14"
+                                            Height="14"
+                                            VerticalAlignment="Center" />
+                <TextBlock Text="Clear data" />
+              </StackPanel>
+            </Button>
+            <Button Style="{StaticResource ChartActionButtonStyle}"
+                    Padding="9,4"
+                    Background="{StaticResource TextMutedBrush}"
+                    BorderThickness="0"
+                    Click="ExportDataButton_OnClick"
+                    Foreground="#FAF7F6"
+                    IsEnabled="{Binding CanExportData}">
+              <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <iconPacks:PackIconMaterial Margin="0,0,8,0"
+                                            Kind="FileExportOutline"
+                                            Width="14"
+                                            Height="14"
+                                            VerticalAlignment="Center" />
+                <TextBlock Text="Export CSV" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+        </widgets:SerialDataPanel.ToolbarContent>
+
+        <widgets:SerialDataPanel.PlotContent>
+          <widgets:PlottingWindow PlotWidth="504"
+                                  PlotHeight="280"
+                                  PlotMinLabel="{Binding PlotMinLabel}"
+                                  PlotLowerMidLabel="{Binding PlotLowerMidLabel}"
+                                  PlotMidLabel="{Binding PlotMidLabel}"
+                                  PlotUpperMidLabel="{Binding PlotUpperMidLabel}"
+                                  PlotMaxLabel="{Binding PlotMaxLabel}"
+                                  XAxisStartLabel="{Binding XAxisStartLabel}"
+                                  XAxisMidLeftLabel="{Binding XAxisMidLeftLabel}"
+                                  XAxisMidRightLabel="{Binding XAxisMidRightLabel}"
+                                  XAxisEndLabel="{Binding XAxisEndLabel}"
+                                  PlotPoints="{Binding PlotPoints}"
+                                  PlotFillPoints="{Binding PlotFillPoints}" />
+        </widgets:SerialDataPanel.PlotContent>
+
+        <widgets:SerialDataPanel.StatsContent>
+          <widgets:StatisticsPanel ItemsSource="{Binding StatisticsCards}"
+                                   Columns="4" />
+        </widgets:SerialDataPanel.StatsContent>
+      </widgets:SerialDataPanel>
+    </shells:DevicePanelShell.WorkspaceContent>
+
+    <shells:DevicePanelShell.FooterContent>
+      <widgets:FooterStatusBar>
+        <widgets:FooterStatusBar.LeftContent>
+          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock FontFamily="{StaticResource BodyFontFamily}"
+                       FontSize="{StaticResource FontBody}"
+                       Foreground="{StaticResource AccentBrush}"
+                       Text="&#x2022;" />
+            <TextBlock Margin="8,0,0,0"
+                       FontFamily="{StaticResource BodyFontFamily}"
+                       FontSize="{StaticResource FontBody}"
+                       Foreground="{StaticResource AccentBrush}"
+                       Text="{Binding FooterConnectionLabel}" />
+            <TextBlock Margin="24,0,0,0"
+                       FontFamily="{StaticResource BodyFontFamily}"
+                       FontSize="{StaticResource FontBody}"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       Text="{Binding FooterChannelLabel}" />
+            <TextBlock Margin="24,0,0,0"
+                       FontFamily="{StaticResource BodyFontFamily}"
+                       FontSize="{StaticResource FontBody}"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       Text="{Binding FooterSensorLabel}" />
+            <TextBlock Margin="24,0,0,0"
+                       FontFamily="{StaticResource BodyFontFamily}"
+                       FontSize="{StaticResource FontBody}"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       Text="{Binding FooterWireLabel}" />
+            <TextBlock Margin="24,0,0,0"
+                       FontFamily="{StaticResource BodyFontFamily}"
+                       FontSize="{StaticResource FontBody}"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       Text="{Binding FooterMainsLabel}" />
+            <TextBlock Margin="24,0,0,0"
+                       FontFamily="{StaticResource BodyFontFamily}"
+                       FontSize="{StaticResource FontBody}"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       Text="{Binding FooterFilterLabel}" />
+          </StackPanel>
+        </widgets:FooterStatusBar.LeftContent>
+
+        <widgets:FooterStatusBar.RightContent>
+          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock FontFamily="{StaticResource BodyFontFamily}"
+                       FontSize="{StaticResource FontBody}"
+                       Foreground="{StaticResource AccentBrush}"
+                       Text="{Binding FooterSystemStateLabel}" />
+            <Border Margin="10,0,0,0"
+                    Width="18"
+                    Height="18"
+                    CornerRadius="9"
+                    BorderBrush="{StaticResource AccentBrush}"
+                    BorderThickness="2">
+              <iconPacks:PackIconMaterial HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          Kind="Check"
+                                          Width="12"
+                                          Height="12"
+                                          Foreground="{StaticResource AccentBrush}" />
+            </Border>
+          </StackPanel>
+        </widgets:FooterStatusBar.RightContent>
+      </widgets:FooterStatusBar>
+    </shells:DevicePanelShell.FooterContent>
+  </shells:DevicePanelShell>
+</UserControl>

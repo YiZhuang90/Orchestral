@@ -13,4 +13,8 @@
     <ProjectReference Include="..\ExperimentalControlPlatform.Devices\ExperimentalControlPlatform.Devices.csproj" />
     <ProjectReference Include="..\ExperimentalControlPlatform.AI\ExperimentalControlPlatform.AI.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MahApps.Metro.IconPacks.Material" Version="6.2.1" />
+  </ItemGroup>
 </Project>

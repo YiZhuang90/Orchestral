@@ -1,0 +1,40 @@
+<UserControl x:Class="ExperimentalControlPlatform.App.Widgets.CameraDataPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="CameraDataRoot">
+  <Border Background="{StaticResource SurfaceBrush}"
+          CornerRadius="{StaticResource RadiusPanel}">
+    <Grid>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+
+      <Grid Margin="12,10,12,6">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <ContentPresenter VerticalAlignment="Center"
+                          Content="{Binding HeaderContent, ElementName=CameraDataRoot}"
+                          DataContext="{Binding DataContext, ElementName=CameraDataRoot}" />
+
+        <ContentPresenter Grid.Column="1"
+                          Content="{Binding ToolbarContent, ElementName=CameraDataRoot}"
+                          DataContext="{Binding DataContext, ElementName=CameraDataRoot}" />
+      </Grid>
+
+      <ContentPresenter Grid.Row="1"
+                        Margin="12,0,12,0"
+                        Content="{Binding ImageContent, ElementName=CameraDataRoot}"
+                        DataContext="{Binding DataContext, ElementName=CameraDataRoot}" />
+
+      <ContentPresenter Grid.Row="2"
+                        Margin="12,0,12,12"
+                        Content="{Binding MetadataContent, ElementName=CameraDataRoot}"
+                        DataContext="{Binding DataContext, ElementName=CameraDataRoot}" />
+    </Grid>
+  </Border>
+</UserControl>

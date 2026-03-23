@@ -1,0 +1,35 @@
+<UserControl x:Class="ExperimentalControlPlatform.App.Widgets.DataPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="DataPanelRoot">
+  <Border Background="{StaticResource SurfaceBrush}"
+          BorderBrush="Transparent"
+          BorderThickness="0"
+          CornerRadius="{StaticResource RadiusPanel}">
+    <Grid>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+      </Grid.RowDefinitions>
+
+      <Grid Margin="12,10,12,6">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <ContentPresenter VerticalAlignment="Center"
+                          Content="{Binding HeaderContent, ElementName=DataPanelRoot}"
+                          DataContext="{Binding DataContext, ElementName=DataPanelRoot}" />
+
+        <ContentPresenter Grid.Column="1"
+                          Content="{Binding ToolbarContent, ElementName=DataPanelRoot}"
+                          DataContext="{Binding DataContext, ElementName=DataPanelRoot}" />
+      </Grid>
+
+      <ContentPresenter Grid.Row="1"
+                        Content="{Binding PlotContent, ElementName=DataPanelRoot}"
+                        DataContext="{Binding DataContext, ElementName=DataPanelRoot}" />
+    </Grid>
+  </Border>
+</UserControl>

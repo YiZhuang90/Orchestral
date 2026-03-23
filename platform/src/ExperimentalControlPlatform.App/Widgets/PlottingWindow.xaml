@@ -1,0 +1,138 @@
+<UserControl x:Class="ExperimentalControlPlatform.App.Widgets.PlottingWindow"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="PlotRoot">
+  <Grid Margin="12,0,12,10">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="Auto" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <Grid Margin="0,6,10,12">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="*" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="*" />
+      </Grid.RowDefinitions>
+      <TextBlock FontSize="{StaticResource FontMicro}"
+                 Foreground="{StaticResource TextSecondaryBrush}"
+                 Text="{Binding PlotMaxLabel, ElementName=PlotRoot}" />
+      <TextBlock Grid.Row="1"
+                 VerticalAlignment="Center"
+                 FontSize="{StaticResource FontMicro}"
+                 Foreground="{StaticResource TextSecondaryBrush}"
+                 Opacity="0.75"
+                 Text="{Binding PlotUpperMidLabel, ElementName=PlotRoot}" />
+      <TextBlock Grid.Row="2"
+                 VerticalAlignment="Center"
+                 FontSize="{StaticResource FontMicro}"
+                 Foreground="{StaticResource TextSecondaryBrush}"
+                 Opacity="0.75"
+                 Text="{Binding PlotMidLabel, ElementName=PlotRoot}" />
+      <TextBlock Grid.Row="3"
+                 VerticalAlignment="Center"
+                 FontSize="{StaticResource FontMicro}"
+                 Foreground="{StaticResource TextSecondaryBrush}"
+                 Opacity="0.75"
+                 Text="{Binding PlotLowerMidLabel, ElementName=PlotRoot}" />
+      <TextBlock Grid.Row="4"
+                 VerticalAlignment="Bottom"
+                 FontSize="{StaticResource FontMicro}"
+                 Foreground="{StaticResource TextSecondaryBrush}"
+                 Text="{Binding PlotMinLabel, ElementName=PlotRoot}" />
+    </Grid>
+
+    <Grid Grid.Column="1">
+      <Border Margin="0,6,0,12"
+              Background="{StaticResource PlotSurfaceBrush}"
+              BorderBrush="{StaticResource PlotBorderBrush}"
+              BorderThickness="1"
+              CornerRadius="{StaticResource RadiusPanel}">
+        <Viewbox Stretch="Fill" StretchDirection="Both">
+          <Grid Width="{Binding PlotWidth, ElementName=PlotRoot}"
+                Height="{Binding PlotHeight, ElementName=PlotRoot}"
+                Loaded="PlotClipHost_OnLoaded"
+                SizeChanged="PlotClipHost_OnSizeChanged">
+            <Canvas Width="{Binding PlotWidth, ElementName=PlotRoot}"
+                    Height="{Binding PlotHeight, ElementName=PlotRoot}">
+              <Line X1="0"
+                    Y1="0"
+                    X2="{Binding PlotWidth, ElementName=PlotRoot}"
+                    Y2="0"
+                    Stroke="{StaticResource GridEdgeBrush}"
+                    StrokeThickness="1" />
+              <Line X1="0"
+                    Y1="{Binding QuarterHeight, ElementName=PlotRoot}"
+                    X2="{Binding PlotWidth, ElementName=PlotRoot}"
+                    Y2="{Binding QuarterHeight, ElementName=PlotRoot}"
+                    Stroke="{StaticResource GridLineBrush}"
+                    StrokeDashArray="4,4"
+                    StrokeThickness="1" />
+              <Line X1="0"
+                    Y1="{Binding HalfHeight, ElementName=PlotRoot}"
+                    X2="{Binding PlotWidth, ElementName=PlotRoot}"
+                    Y2="{Binding HalfHeight, ElementName=PlotRoot}"
+                    Stroke="{StaticResource GridLineBrush}"
+                    StrokeDashArray="4,4"
+                    StrokeThickness="1" />
+              <Line X1="0"
+                    Y1="{Binding ThreeQuarterHeight, ElementName=PlotRoot}"
+                    X2="{Binding PlotWidth, ElementName=PlotRoot}"
+                    Y2="{Binding ThreeQuarterHeight, ElementName=PlotRoot}"
+                    Stroke="{StaticResource GridLineBrush}"
+                    StrokeDashArray="4,4"
+                    StrokeThickness="1" />
+              <Line X1="0"
+                    Y1="{Binding PlotHeight, ElementName=PlotRoot}"
+                    X2="{Binding PlotWidth, ElementName=PlotRoot}"
+                    Y2="{Binding PlotHeight, ElementName=PlotRoot}"
+                    Stroke="{StaticResource GridEdgeBrush}"
+                    StrokeThickness="1" />
+              <Polygon Points="{Binding PlotFillPoints, ElementName=PlotRoot}"
+                       Fill="{StaticResource PlotFillBrush}" />
+              <Polyline Points="{Binding PlotPoints, ElementName=PlotRoot}"
+                        Stroke="{StaticResource AccentBrush}"
+                        StrokeThickness="3"
+                        StrokeLineJoin="Round"
+                        StrokeStartLineCap="Round"
+                        StrokeEndLineCap="Round" />
+            </Canvas>
+          </Grid>
+        </Viewbox>
+      </Border>
+
+      <Grid VerticalAlignment="Bottom">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <TextBlock FontSize="{StaticResource FontMicro}"
+                   Foreground="{StaticResource TextSecondaryBrush}"
+                   Text="{Binding XAxisStartLabel, ElementName=PlotRoot}" />
+        <TextBlock Grid.Column="1"
+                   HorizontalAlignment="Center"
+                   FontSize="{StaticResource FontMicro}"
+                   Foreground="{StaticResource TextSecondaryBrush}"
+                   Text="{Binding XAxisMidLeftLabel, ElementName=PlotRoot}" />
+        <TextBlock Grid.Column="2"
+                   HorizontalAlignment="Center"
+                   FontSize="{StaticResource FontMicro}"
+                   Foreground="{StaticResource TextSecondaryBrush}"
+                   Text="{Binding XAxisMidRightLabel, ElementName=PlotRoot}" />
+        <TextBlock Grid.Column="3"
+                   HorizontalAlignment="Right"
+                   FontSize="{StaticResource FontMicro}"
+                   Foreground="{StaticResource TextSecondaryBrush}"
+                   Text="{Binding XAxisEndLabel, ElementName=PlotRoot}" />
+      </Grid>
+    </Grid>
+  </Grid>
+</UserControl>

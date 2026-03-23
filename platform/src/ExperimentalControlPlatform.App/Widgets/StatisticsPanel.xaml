@@ -1,0 +1,25 @@
+<UserControl x:Class="ExperimentalControlPlatform.App.Widgets.StatisticsPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:widgets="clr-namespace:ExperimentalControlPlatform.App.Widgets">
+  <ItemsControl ItemsSource="{Binding ItemsSource, RelativeSource={RelativeSource AncestorType=UserControl}}">
+    <ItemsControl.ItemsPanel>
+      <ItemsPanelTemplate>
+        <UniformGrid Columns="{Binding Columns, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+      </ItemsPanelTemplate>
+    </ItemsControl.ItemsPanel>
+    <ItemsControl.ItemTemplate>
+      <DataTemplate DataType="{x:Type widgets:ValueCardItem}">
+        <Border Margin="0,0,10,0"
+                Background="Transparent">
+          <widgets:ValueCard Title="{Binding Title}" Value="{Binding Value}" />
+        </Border>
+      </DataTemplate>
+    </ItemsControl.ItemTemplate>
+    <ItemsControl.ItemContainerStyle>
+      <Style TargetType="ContentPresenter">
+        <Setter Property="Margin" Value="0" />
+      </Style>
+    </ItemsControl.ItemContainerStyle>
+  </ItemsControl>
+</UserControl>

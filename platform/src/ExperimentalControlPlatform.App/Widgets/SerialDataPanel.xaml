@@ -1,0 +1,21 @@
+<UserControl x:Class="ExperimentalControlPlatform.App.Widgets.SerialDataPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:widgets="clr-namespace:ExperimentalControlPlatform.App.Widgets"
+             x:Name="SerialPanelRoot">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="*" />
+      <RowDefinition Height="8" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <widgets:DataPanel HeaderContent="{Binding HeaderContent, ElementName=SerialPanelRoot}"
+                       ToolbarContent="{Binding ToolbarContent, ElementName=SerialPanelRoot}"
+                       PlotContent="{Binding PlotContent, ElementName=SerialPanelRoot}" />
+
+    <ContentPresenter Grid.Row="2"
+                      Content="{Binding StatsContent, ElementName=SerialPanelRoot}"
+                      DataContext="{Binding DataContext, ElementName=SerialPanelRoot}" />
+  </Grid>
+</UserControl>

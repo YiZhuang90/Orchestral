@@ -1,6 +1,31 @@
 <Application x:Class="ExperimentalControlPlatform.App.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:camera="clr-namespace:ExperimentalControlPlatform.App.DevicePanels.Camera"
+             xmlns:integrated="clr-namespace:ExperimentalControlPlatform.App.DevicePanels.Integrated"
+             xmlns:huateng="clr-namespace:ExperimentalControlPlatform.App.DevicePanels.HuaTeng"
+             xmlns:pt104="clr-namespace:ExperimentalControlPlatform.App.DevicePanels.Pt104"
+             xmlns:scalar="clr-namespace:ExperimentalControlPlatform.App.DevicePanels.Scalar">
   <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="Theme/Colors.xaml" />
+        <ResourceDictionary Source="Theme/Typography.xaml" />
+        <ResourceDictionary Source="Theme/Radii.xaml" />
+        <ResourceDictionary Source="Theme/Controls.xaml" />
+      </ResourceDictionary.MergedDictionaries>
+
+      <DataTemplate DataType="{x:Type pt104:Pt104PanelViewModel}">
+        <scalar:ScalarSensorPanelTemplate />
+      </DataTemplate>
+
+      <DataTemplate DataType="{x:Type huateng:HuaTengPanelViewModel}">
+        <camera:CameraPanelTemplate />
+      </DataTemplate>
+
+      <DataTemplate DataType="{x:Type integrated:IntegratedCameraPanelViewModel}">
+        <camera:CameraPanelTemplate />
+      </DataTemplate>
+    </ResourceDictionary>
   </Application.Resources>
 </Application>
