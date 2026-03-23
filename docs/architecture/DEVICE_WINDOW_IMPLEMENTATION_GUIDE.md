@@ -8,9 +8,7 @@ It is the practical bridge between:
 
 - [DESIGN_SYSTEM.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/DESIGN_SYSTEM.md)
 - [DEVICE_PANEL_CONTRACT.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/DEVICE_PANEL_CONTRACT.md)
-- [DEVICE_PANEL_VISUAL_TEMPLATE.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/DEVICE_PANEL_VISUAL_TEMPLATE.md)
 - [WIDGET_CATALOG.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/WIDGET_CATALOG.md)
-- [DEVICE_WIDGET_EXPANSION.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/DEVICE_WIDGET_EXPANSION.md)
 
 The goal is to make new device windows reusable by composition, not by cloning PT-104 markup.
 
@@ -46,8 +44,8 @@ Current shell:
 Responsibilities:
 
 - top banner
-- device title
-- channel or instance tabs
+- device selector
+- subcontext selector
 - window controls
 - left rail slot
 - workspace slot
@@ -127,6 +125,26 @@ DeviceTestWindow
 
 This is the default pattern for scalar sensor devices.
 
+The visual order should stay:
+
+1. top shell
+2. left rail
+3. main workspace
+4. footer
+
+Within the left rail:
+
+1. configuration
+2. actions
+3. spacer
+4. diagnostics
+
+Within the main workspace:
+
+1. main metric or primary state
+2. main content card
+3. compact summary strip when applicable
+
 ## Build Sequence For A New Device Window
 
 Build new device windows in this order.
@@ -171,8 +189,10 @@ If no composite fits, create a new composite widget before building a large one-
 Every device implementation should provide:
 
 - panel title
-- tab list
-- selected tab
+- device selector items
+- selected device
+- subcontext label and items
+- selected subcontext
 - footer status values
 
 These are shell inputs, not ad hoc text blocks.
@@ -207,6 +227,22 @@ Use `FooterStatusBar` for:
 - system state summary
 
 The footer should summarize operational state, not repeat descriptive labels already visible elsewhere.
+
+### Step 8. Bind the panel outputs
+
+Every implementation should expose structured panel outputs, not only display bindings.
+
+Use:
+
+- [INTEGRATION_PANEL_IO_CONTRACT.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/INTEGRATION_PANEL_IO_CONTRACT.md)
+
+At minimum bind:
+
+- data output
+- applied-settings output
+- status output
+- diagnostics output
+- session-end output
 
 ## Widget Reuse Rules
 

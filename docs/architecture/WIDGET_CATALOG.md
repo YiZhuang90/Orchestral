@@ -14,9 +14,7 @@ It exists to make the UI reusable by composition rather than by copying PT-104 m
 This catalog should be read together with:
 
 - [DESIGN_SYSTEM.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/DESIGN_SYSTEM.md)
-- [FONT_DESIGN_GUIDE.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/FONT_DESIGN_GUIDE.md)
 - [DEVICE_PANEL_CONTRACT.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/DEVICE_PANEL_CONTRACT.md)
-- [DEVICE_PANEL_VISUAL_TEMPLATE.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/DEVICE_PANEL_VISUAL_TEMPLATE.md)
 
 ## Token Baseline
 
@@ -679,3 +677,23 @@ A reusable lifecycle action for safe panel termination after configuration.
 - bottom status bar
 
 This means the visual language and composition rules now exist, but the code still needs another pass of extraction if the goal is a true widget library rather than a shared shell plus one concrete device view.
+
+## Future Widget Roadmap
+
+The next reusable widgets likely needed to expand beyond scalar sensors and current camera panels are:
+
+- `ROI editor`
+- `ROI list`
+- `Histogram panel`
+- `Waveform panel`
+- `Spectrum panel`
+- `Actuator control panel`
+- `State timeline`
+- `Command history panel`
+- `Protocol monitor panel`
+- `Connection trace panel`
+- `Calibration panel`
+- `Recording panel`
+- `Alarm or event timeline`
+
+These should stay inside the current token system and should not create a second visual language.

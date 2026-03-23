@@ -9,7 +9,6 @@ The goal is to prevent future device UIs from being built by copying PT-104 mark
 The reusable widget vocabulary for those panels is defined in:
 
 - [WIDGET_CATALOG.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/WIDGET_CATALOG.md)
-- [DEVICE_WIDGET_EXPANSION.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/DEVICE_WIDGET_EXPANSION.md)
 - [INTEGRATION_PANEL_IO_CONTRACT.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/INTEGRATION_PANEL_IO_CONTRACT.md)
 
 ## Scope
@@ -96,6 +95,13 @@ Rules:
 - when multiple same-class devices are available, it should become a dropdown trigger without changing its visual role
 - it should look like a title label first, not like a boxed form control
 
+Long identity strings should be shortened for the banner surface.
+
+Examples:
+
+- show `Integrated camera` instead of a raw record dump
+- show `PT-104 (HS337/004)` instead of a long transport-prefixed identity string when space is limited
+
 ### Middle region
 
 The middle region should only represent subcontext within the selected device.
@@ -130,6 +136,13 @@ The left rail should contain:
 - editable configuration controls
 - primary actions
 - diagnostics access
+
+The preferred left-rail order is:
+
+1. configuration
+2. actions
+3. flexible spacer
+4. diagnostics
 
 ### Required sections
 
@@ -171,6 +184,15 @@ Settings should also be tagged by ownership:
 
 The panel should make that ownership legible, either by grouping or by placement.
 
+Panels should also keep the default parameter surface small.
+
+High-value parameters belong here.
+Advanced, unstable, or rarely changed settings should move into:
+
+- `More settings`
+- diagnostics
+- secondary dialogs
+
 ## Main Workspace Contract
 
 The right workspace should communicate the current live behavior of the device.
@@ -179,6 +201,10 @@ The right workspace should communicate the current live behavior of the device.
 
 - main metric or primary state
 - main content card
+
+The main metric line should be strong and concise.
+
+Only add a second line if it carries live operational meaning. Dead helper text should not remain in the visible panel by default.
 
 ### Optional content depending on device type
 
@@ -192,6 +218,10 @@ The right workspace should communicate the current live behavior of the device.
 The workspace should reflect endpoint state, not only the currently visible UI state.
 
 If background acquisition continues on non-visible endpoints, the contract should still preserve that endpoint state internally.
+
+If the device naturally produces summary metrics, the workspace should also expose a compact stat strip below the main content card.
+
+If it does not, this region may be replaced with a more suitable summary surface.
 
 ## Stats Contract
 
@@ -332,8 +362,7 @@ The contract exists to make this order practical and enforceable.
 
 Each device panel must follow the Orchestral design system:
 
-- typography from [FONT_DESIGN_GUIDE.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/FONT_DESIGN_GUIDE.md)
-- layout and tokens from [DESIGN_SYSTEM.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/DESIGN_SYSTEM.md)
+- typography, layout, and tokens from [DESIGN_SYSTEM.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/DESIGN_SYSTEM.md)
 
 That includes:
 
@@ -385,6 +414,14 @@ That role belongs to:
 - the high-level shell contract,
 - the IO contract,
 - and the device-class templates built on top of them.
+
+PT-104 remains the visual and behavioral reference for:
+
+- scalar-sensor shell composition
+- left-rail order
+- main metric plus data-card pattern
+- stat-strip pattern
+- footer summary pattern
 
 The next device panel should reuse this contract instead of copying PT-104 screen code directly.
 

@@ -9,7 +9,6 @@ The PT-104 hardware integration window is the first reference implementation. Th
 Detailed widget definitions and future expansion planning are captured in:
 
 - [WIDGET_CATALOG.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/WIDGET_CATALOG.md)
-- [DEVICE_WIDGET_EXPANSION.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/DEVICE_WIDGET_EXPANSION.md)
 
 ## Design Intent
 
@@ -54,14 +53,16 @@ The PT-104 layout is not a one-off screen. It is the first instance of the stand
 
 ## Typography
 
-Typography is defined in [FONT_DESIGN_GUIDE.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/FONT_DESIGN_GUIDE.md) and implemented in:
+Typography is implemented in:
 
 - [Typography.xaml](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/platform/src/ExperimentalControlPlatform.App/Theme/Typography.xaml)
 
-Summary:
+Primary font pair:
 
-- `Manrope` for shell identity and main live metrics
-- `Inter` for controls, labels, body copy, telemetry, and status text
+- `Manrope`
+  - use for product identity, device title, major headers, major live values, section hierarchy, and navigation emphasis
+- `Inter`
+  - use for controls, labels, helper text, telemetry, diagnostics text, footer text, and dense technical copy
 
 ### Type Roles
 
@@ -70,6 +71,20 @@ Summary:
 - `SectionHeader = 16 px`
 - `Body = 12 px`
 - `Micro = 12 px`
+
+Weight guidance:
+
+- `Manrope`
+  - regular by default in operational UI
+  - stronger weights only when hierarchy is unclear without them
+- `Inter`
+  - `400` for normal body and control text
+  - avoid unnecessary bold emphasis in forms and telemetry
+
+Practical rule:
+
+- if the text is about identity, hierarchy, or emphasis, prefer `Manrope`
+- if the text is about operation, data, or repeated reading, prefer `Inter`
 
 ## Text Case Rules
 
@@ -91,6 +106,11 @@ Use a two-radius system:
   - side panels
   - stat cards
   - grouped surfaces
+
+Practical rule:
+
+- if the element is a direct control the user clicks or edits, use `Radius S`
+- if the element is a container that groups information or content, use `Radius L`
 
 The outer window shell may use the large-radius family, but should not create a second competing language.
 
@@ -212,8 +232,8 @@ Checkboxes should be visually quiet and align with `Inter` body text.
 Every device panel should fit into this shell anatomy:
 
 1. top shell bar
-   - device identity on the left
-   - instance/channel tabs in the center
+   - device selector on the left
+   - subcontext selector in the center
    - window controls on the right
 2. left control rail
    - configuration
@@ -234,6 +254,36 @@ PT-104 is the first consumer:
 
 - [Pt104PanelView.xaml](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/platform/src/ExperimentalControlPlatform.App/DevicePanels/Pt104/Pt104PanelView.xaml)
 - [Pt104PanelView.xaml.cs](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/platform/src/ExperimentalControlPlatform.App/DevicePanels/Pt104/Pt104PanelView.xaml.cs)
+
+The preferred visual anatomy is:
+
+```text
++--------------------------------------------------------------------+
+| Top Shell: device selector | subcontext | window controls          |
++-----------------+--------------------------------------------------+
+| Left Rail       | Main Workspace                                   |
+|                 |                                                  |
+| Configuration   | Main metric                                      |
+| Actions         | Main data card                                   |
+| Diagnostics     | Stat-card strip                                  |
++-----------------+--------------------------------------------------+
+| Fixed Footer: connection/config summary | system state             |
++--------------------------------------------------------------------+
+```
+
+The left rail should follow this default order:
+
+1. configuration
+2. actions
+3. flexible spacer
+4. diagnostics
+
+The workspace should use:
+
+- one strong main metric line
+- no second line unless it carries live operational meaning
+- one dominant main data card
+- one compact summary strip when the device naturally produces summary metrics
 
 ## Resize Behavior
 

@@ -19,6 +19,16 @@ The first-class archetypes are:
 - protocol or debug device
 - hybrid device
 
+The current system is already strong for:
+
+- temperature sensors
+- pressure sensors
+- flow meters
+- scalar DAQ channels
+- simple serial output devices
+
+These are naturally served by the current scalar-sensor and serial-data-panel patterns.
+
 ## 3. Scalar Sensor
 
 Use when:
@@ -127,6 +137,7 @@ Typical widgets:
 Optional widgets:
 
 - ROI editor
+- ROI list
 - histogram panel
 - recording panel
 - image analysis strip
@@ -201,6 +212,12 @@ Examples:
 - serial debug instrument
 - packet-oriented controller
 
+Optional widgets:
+
+- connection trace panel
+- command tester
+- capability panel
+
 ## 7. Hybrid Device
 
 Use when:
@@ -223,6 +240,20 @@ Examples:
 - camera with deep hardware-control workflow
 - DAQ with both waveform capture and active output control
 
+## 7A. Future expansion families
+
+The next major reusable families likely to be needed are:
+
+- imaging analysis
+- waveform and spectrum acquisition
+- actuator and motion control
+- protocol and integration tooling
+- calibration and setup workflows
+- recording and storage workflows
+- alarm and interlock workflows
+
+These should be added by extending existing archetypes first, and only then by introducing a new archetype if the interaction family truly cannot fit.
+
 ## 8. Widget-Selection Rule
 
 When mapping a new device, Orchestral should decide:
@@ -234,6 +265,14 @@ When mapping a new device, Orchestral should decide:
 - which settings should be moved into `More settings`
 - which scopes own those settings
 - which outputs the panel must emit
+
+When a new widget family is needed, it should:
+
+- reuse the same typography
+- reuse the same color roles
+- reuse the same radii
+- reuse the same shell and footer behavior
+- compose with current widgets where possible
 
 ## 9. Parameter-Surface Rule
 
@@ -260,3 +299,15 @@ For each integrated device, Orchestral should record:
 - panel output model
 - optional widget families left for later
 - and why this mapping was selected
+
+Common future widget candidates across archetypes include:
+
+- `Live image window`
+- `ROI editor`
+- `Waveform panel`
+- `Spectrum panel`
+- `Actuator control panel`
+- `Protocol monitor panel`
+- `Calibration panel`
+- `Recording panel`
+- `Alarm or event timeline`
