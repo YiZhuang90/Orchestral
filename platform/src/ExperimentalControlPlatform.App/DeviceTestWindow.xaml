@@ -1,0 +1,44 @@
+<Window x:Class="ExperimentalControlPlatform.App.DeviceTestWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="{Binding HeaderTitle}"
+        Width="1044"
+        Height="660"
+        MinWidth="1040"
+        MinHeight="560"
+        Background="Transparent"
+        FontFamily="{StaticResource BodyFontFamily}"
+        ResizeMode="CanResize"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        AllowsTransparency="True"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None">
+  <Window.Resources>
+  </Window.Resources>
+
+  <shell:WindowChrome.WindowChrome>
+    <shell:WindowChrome CaptionHeight="0"
+                        CornerRadius="18"
+                        GlassFrameThickness="0"
+                        ResizeBorderThickness="8"
+                        UseAeroCaptionButtons="False" />
+  </shell:WindowChrome.WindowChrome>
+
+  <Grid>
+    <Border Background="{StaticResource WindowBackgroundBrush}"
+            BorderBrush="#CCCCCC"
+            BorderThickness="1"
+            CornerRadius="{StaticResource RadiusWindowOuter}">
+      <Border Margin="1"
+              Background="{StaticResource WindowBackgroundBrush}"
+              CornerRadius="{StaticResource RadiusWindowInner}"
+              ClipToBounds="True">
+        <ContentControl Content="{Binding CurrentDevicePanel}"
+                        HorizontalContentAlignment="Stretch"
+                        VerticalContentAlignment="Stretch" />
+      </Border>
+    </Border>
+  </Grid>
+</Window>

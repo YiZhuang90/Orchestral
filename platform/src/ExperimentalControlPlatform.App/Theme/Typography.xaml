@@ -1,0 +1,12 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+  <FontFamily x:Key="ShellFontFamily">Manrope, Segoe UI</FontFamily>
+  <FontFamily x:Key="BodyFontFamily">Inter, Segoe UI</FontFamily>
+
+  <sys:Double x:Key="FontShellTitle">16</sys:Double>
+  <sys:Double x:Key="FontDisplayValue">20</sys:Double>
+  <sys:Double x:Key="FontSectionHeader">16</sys:Double>
+  <sys:Double x:Key="FontBody">12</sys:Double>
+  <sys:Double x:Key="FontMicro">12</sys:Double>
+</ResourceDictionary>

@@ -1,0 +1,62 @@
+<UserControl x:Class="ExperimentalControlPlatform.App.Widgets.FrameMetadataStrip"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="FrameMetadataRoot">
+  <UniformGrid Columns="4"
+               Margin="0,8,0,0">
+    <Border Margin="0,0,8,0"
+            Background="{StaticResource MutedSurfaceBrush}"
+            CornerRadius="{StaticResource RadiusControl}"
+            Padding="10,8">
+      <StackPanel>
+        <TextBlock FontSize="{StaticResource FontBody}"
+                   Foreground="{StaticResource TextSecondaryBrush}"
+                   Text="Resolution" />
+        <TextBlock FontSize="{StaticResource FontSectionHeader}"
+                   Foreground="{StaticResource TextPrimaryBrush}"
+                   Text="{Binding ResolutionText, ElementName=FrameMetadataRoot}" />
+      </StackPanel>
+    </Border>
+
+    <Border Margin="0,0,8,0"
+            Background="{StaticResource MutedSurfaceBrush}"
+            CornerRadius="{StaticResource RadiusControl}"
+            Padding="10,8">
+      <StackPanel>
+        <TextBlock FontSize="{StaticResource FontBody}"
+                   Foreground="{StaticResource TextSecondaryBrush}"
+                   Text="Pixel format" />
+        <TextBlock FontSize="{StaticResource FontSectionHeader}"
+                   Foreground="{StaticResource TextPrimaryBrush}"
+                   Text="{Binding PixelFormatText, ElementName=FrameMetadataRoot}" />
+      </StackPanel>
+    </Border>
+
+    <Border Margin="0,0,8,0"
+            Background="{StaticResource MutedSurfaceBrush}"
+            CornerRadius="{StaticResource RadiusControl}"
+            Padding="10,8">
+      <StackPanel>
+        <TextBlock FontSize="{StaticResource FontBody}"
+                   Foreground="{StaticResource TextSecondaryBrush}"
+                   Text="Exposure" />
+        <TextBlock FontSize="{StaticResource FontSectionHeader}"
+                   Foreground="{StaticResource TextPrimaryBrush}"
+                   Text="{Binding ExposureText, ElementName=FrameMetadataRoot}" />
+      </StackPanel>
+    </Border>
+
+    <Border Background="{StaticResource MutedSurfaceBrush}"
+            CornerRadius="{StaticResource RadiusControl}"
+            Padding="10,8">
+      <StackPanel>
+        <TextBlock FontSize="{StaticResource FontBody}"
+                   Foreground="{StaticResource TextSecondaryBrush}"
+                   Text="Capture rate" />
+        <TextBlock FontSize="{StaticResource FontSectionHeader}"
+                   Foreground="{StaticResource TextPrimaryBrush}"
+                   Text="{Binding FrameRateText, ElementName=FrameMetadataRoot}" />
+      </StackPanel>
+    </Border>
+  </UniformGrid>
+</UserControl>

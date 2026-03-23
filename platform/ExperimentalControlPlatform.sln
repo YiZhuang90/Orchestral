@@ -19,6 +19,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExperimentalControlPlatform
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExperimentalControlPlatform.Runtime.Tests", "tests\ExperimentalControlPlatform.Runtime.Tests\ExperimentalControlPlatform.Runtime.Tests.csproj", "{4D1E57B4-BDAB-452C-A87E-0D33C258882A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExperimentalControlPlatform.Devices.Tests", "tests\ExperimentalControlPlatform.Devices.Tests\ExperimentalControlPlatform.Devices.Tests.csproj", "{ED7906F9-20AA-4F86-8557-BB449EA90FBB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -57,6 +59,10 @@ Global
 		{4D1E57B4-BDAB-452C-A87E-0D33C258882A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4D1E57B4-BDAB-452C-A87E-0D33C258882A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4D1E57B4-BDAB-452C-A87E-0D33C258882A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ED7906F9-20AA-4F86-8557-BB449EA90FBB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ED7906F9-20AA-4F86-8557-BB449EA90FBB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ED7906F9-20AA-4F86-8557-BB449EA90FBB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ED7906F9-20AA-4F86-8557-BB449EA90FBB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

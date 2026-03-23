@@ -1,0 +1,111 @@
+<UserControl x:Class="ExperimentalControlPlatform.App.Widgets.CameraImageWindow"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="CameraImageRoot"
+             SizeChanged="CameraImageRoot_OnSizeChanged"
+             MouseMove="CameraImageRoot_OnMouseMove"
+             MouseLeftButtonUp="CameraImageRoot_OnMouseLeftButtonUp"
+             LostMouseCapture="CameraImageRoot_OnLostMouseCapture">
+  <Border Background="{StaticResource PlotSurfaceBrush}"
+          BorderBrush="{StaticResource PlotBorderBrush}"
+          BorderThickness="1"
+          CornerRadius="{StaticResource RadiusPanel}">
+    <Grid>
+      <Image x:Name="BaseImage"
+             Stretch="Uniform"
+             Margin="16" />
+
+      <Canvas x:Name="OverlayCanvas"
+              Margin="16"
+              ClipToBounds="True">
+        <Image x:Name="LiveRoiImage"
+               Source="{Binding PreviewImage, ElementName=CameraImageRoot}"
+               Stretch="Fill"
+               Visibility="{Binding RoiLiveVisibility, ElementName=CameraImageRoot}" />
+        <Rectangle x:Name="TopMask"
+                   Fill="#80000000"
+                   Visibility="{Binding RoiPlaceholderVisible, ElementName=CameraImageRoot}" />
+        <Rectangle x:Name="LeftMask"
+                   Fill="#80000000"
+                   Visibility="{Binding RoiPlaceholderVisible, ElementName=CameraImageRoot}" />
+        <Rectangle x:Name="RightMask"
+                   Fill="#80000000"
+                   Visibility="{Binding RoiPlaceholderVisible, ElementName=CameraImageRoot}" />
+        <Rectangle x:Name="BottomMask"
+                   Fill="#80000000"
+                   Visibility="{Binding RoiPlaceholderVisible, ElementName=CameraImageRoot}" />
+        <Border x:Name="RoiBorder"
+                BorderBrush="{StaticResource AccentBrush}"
+                BorderThickness="2"
+                Background="#20B75B34"
+                CornerRadius="0"
+                Cursor="SizeAll"
+                Visibility="{Binding RoiPlaceholderVisible, ElementName=CameraImageRoot}"
+                MouseLeftButtonDown="RoiBorder_OnMouseLeftButtonDown" />
+        <primitives:Thumb x:Name="TopLeftThumb"
+                          Width="12"
+                          Height="12"
+                          Background="{StaticResource AccentBrush}"
+                          BorderBrush="{StaticResource SurfaceBrush}"
+                          BorderThickness="1"
+                          Cursor="SizeNWSE"
+                          Visibility="{Binding RoiHandleVisibility, ElementName=CameraImageRoot}"
+                          DragStarted="ResizeThumb_OnDragStarted"
+                          DragDelta="TopLeftThumb_OnDragDelta"
+                          DragCompleted="ResizeThumb_OnDragCompleted" />
+        <primitives:Thumb x:Name="TopRightThumb"
+                          Width="12"
+                          Height="12"
+                          Background="{StaticResource AccentBrush}"
+                          BorderBrush="{StaticResource SurfaceBrush}"
+                          BorderThickness="1"
+                          Cursor="SizeNESW"
+                          Visibility="{Binding RoiHandleVisibility, ElementName=CameraImageRoot}"
+                          DragStarted="ResizeThumb_OnDragStarted"
+                          DragDelta="TopRightThumb_OnDragDelta"
+                          DragCompleted="ResizeThumb_OnDragCompleted" />
+        <primitives:Thumb x:Name="BottomLeftThumb"
+                          Width="12"
+                          Height="12"
+                          Background="{StaticResource AccentBrush}"
+                          BorderBrush="{StaticResource SurfaceBrush}"
+                          BorderThickness="1"
+                          Cursor="SizeNESW"
+                          Visibility="{Binding RoiHandleVisibility, ElementName=CameraImageRoot}"
+                          DragStarted="ResizeThumb_OnDragStarted"
+                          DragDelta="BottomLeftThumb_OnDragDelta"
+                          DragCompleted="ResizeThumb_OnDragCompleted" />
+        <primitives:Thumb x:Name="BottomRightThumb"
+                          Width="12"
+                          Height="12"
+                          Background="{StaticResource AccentBrush}"
+                          BorderBrush="{StaticResource SurfaceBrush}"
+                          BorderThickness="1"
+                          Cursor="SizeNWSE"
+                          Visibility="{Binding RoiHandleVisibility, ElementName=CameraImageRoot}"
+                          DragStarted="ResizeThumb_OnDragStarted"
+                          DragDelta="BottomRightThumb_OnDragDelta"
+                          DragCompleted="ResizeThumb_OnDragCompleted" />
+      </Canvas>
+
+      <TextBlock HorizontalAlignment="Center"
+                 VerticalAlignment="Center"
+                 FontFamily="{StaticResource ShellFontFamily}"
+                 FontSize="{StaticResource FontSectionHeader}"
+                 Foreground="{StaticResource TextSecondaryBrush}"
+                 Text="{Binding EmptyStateText, ElementName=CameraImageRoot}">
+        <TextBlock.Style>
+          <Style TargetType="TextBlock">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding PreviewImage, ElementName=CameraImageRoot}" Value="{x:Null}">
+                <Setter Property="Visibility" Value="Visible" />
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </TextBlock.Style>
+      </TextBlock>
+    </Grid>
+  </Border>
+</UserControl>

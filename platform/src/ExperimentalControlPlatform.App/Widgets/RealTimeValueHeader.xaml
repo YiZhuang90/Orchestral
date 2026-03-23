@@ -1,0 +1,12 @@
+<UserControl x:Class="ExperimentalControlPlatform.App.Widgets.RealTimeValueHeader"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <TextBlock FontFamily="{StaticResource ShellFontFamily}"
+             FontSize="{StaticResource FontDisplayValue}"
+             Foreground="{StaticResource TextPrimaryBrush}"
+             VerticalAlignment="Center">
+    <Run Text="{Binding Label, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+    <Run Foreground="{StaticResource AccentBrush}"
+         Text="{Binding Value, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+  </TextBlock>
+</UserControl>

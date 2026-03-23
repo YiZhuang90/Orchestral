@@ -1,0 +1,18 @@
+<UserControl x:Class="ExperimentalControlPlatform.App.Widgets.ValueCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Border Padding="10"
+          Background="{StaticResource MutedSurfaceBrush}"
+          CornerRadius="{StaticResource RadiusPanel}">
+    <StackPanel>
+      <TextBlock FontSize="{StaticResource FontMicro}"
+                 Foreground="{StaticResource TextSecondaryBrush}"
+                 Text="{Binding Title, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+      <TextBlock Margin="0,6,0,0"
+                 FontFamily="{StaticResource ShellFontFamily}"
+                 FontSize="{StaticResource FontSectionHeader}"
+                 Foreground="{StaticResource TextPrimaryBrush}"
+                 Text="{Binding Value, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+    </StackPanel>
+  </Border>
+</UserControl>

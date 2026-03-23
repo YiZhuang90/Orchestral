@@ -1,0 +1,9 @@
+<UserControl x:Class="ExperimentalControlPlatform.App.Widgets.HeaderDeviceSelector"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <ComboBox Style="{StaticResource HeaderDeviceSelectorComboBoxStyle}"
+            ItemsSource="{Binding ItemsSource, RelativeSource={RelativeSource AncestorType=UserControl}}"
+            SelectedItem="{Binding SelectedItem, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
+            DisplayMemberPath="{Binding DisplayMemberPath, RelativeSource={RelativeSource AncestorType=UserControl}}"
+            ItemTemplate="{Binding ItemTemplate, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+</UserControl>
