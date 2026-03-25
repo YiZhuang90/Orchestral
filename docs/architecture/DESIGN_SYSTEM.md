@@ -10,6 +10,12 @@ Detailed widget definitions and future expansion planning are captured in:
 
 - [WIDGET_CATALOG.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/WIDGET_CATALOG.md)
 
+The planned migration path toward the newer `Orchestral_Design.md` visual direction is captured in:
+
+- [ORCHESTRAL_DESIGN_MIGRATION_DELTA.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/ORCHESTRAL_DESIGN_MIGRATION_DELTA.md)
+
+Until that migration is complete, this document remains the live implementation contract. Shared theme files and shared widgets must move first; concrete panels must not drift ahead of the system.
+
 ## Design Intent
 
 Orchestral should feel:
