@@ -17,10 +17,13 @@
   <SolidColorBrush x:Key="AccentHoverBrush" Color="#A44D2D" />
   <SolidColorBrush x:Key="AccentPressedBrush" Color="#7B341F" />
   <SolidColorBrush x:Key="AccentForegroundBrush" Color="#FBF5F2" />
+  <SolidColorBrush x:Key="ButtonPrimaryForegroundBrush" Color="#FAF7F6" />
   <SolidColorBrush x:Key="DarkButtonBrush" Color="#5F5E5E" />
   <SolidColorBrush x:Key="SoftButtonBrush" Color="#E4DED4" />
+  <SolidColorBrush x:Key="SoftButtonForegroundBrush" Color="#5A5A5A" />
   <SolidColorBrush x:Key="NeutralHoverBrush" Color="#ECE6DC" />
   <SolidColorBrush x:Key="NeutralPressedBrush" Color="#DDD6CA" />
+  <SolidColorBrush x:Key="ComboBoxChevronBrush" Color="#6A7170" />
   <SolidColorBrush x:Key="GridLineBrush" Color="#E7E0D5" />
   <SolidColorBrush x:Key="GridEdgeBrush" Color="#DDD6CA" />
   <SolidColorBrush x:Key="PlotFillBrush" Color="#1C9A462A" />

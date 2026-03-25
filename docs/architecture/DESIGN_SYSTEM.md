@@ -149,6 +149,7 @@ The live token set is implemented in:
 - `AccentHoverBrush = #A44D2D`
 - `AccentPressedBrush = #7B341F`
 - `AccentForegroundBrush = #FBF5F2`
+- `ButtonPrimaryForegroundBrush = #FAF7F6`
 - `PlotFillBrush = #1C9A462A`
 
 Accent usage rule:
@@ -160,8 +161,12 @@ Accent usage rule:
 
 - `DarkButtonBrush = #5F5E5E`
 - `SoftButtonBrush = #E4DED4`
+- `SoftButtonForegroundBrush = #5A5A5A`
 - `NeutralHoverBrush = #ECE6DC`
 - `NeutralPressedBrush = #DDD6CA`
+- `ComboBoxChevronBrush = #6A7170`
+- `GridLineBrush = #E7E0D5`
+- `GridEdgeBrush = #DDD6CA`
 
 ## Spacing System
 

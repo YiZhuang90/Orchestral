@@ -129,7 +129,7 @@
                   VerticalAlignment="Center"
                   Data="M 0 0 L 5 6 L 10 0"
                   Fill="Transparent"
-                  Stroke="#6A7170"
+                  Stroke="{StaticResource ComboBoxChevronBrush}"
                   StrokeThickness="2"
                   StrokeLineJoin="Round"
                   StrokeStartLineCap="Round"
@@ -267,7 +267,7 @@
 
   <Style x:Key="PrimaryActionButtonStyle" TargetType="Button">
     <Setter Property="Background" Value="{StaticResource DarkButtonBrush}" />
-    <Setter Property="Foreground" Value="#FAF7F6" />
+    <Setter Property="Foreground" Value="{StaticResource ButtonPrimaryForegroundBrush}" />
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="Padding" Value="10,6" />
     <Setter Property="Height" Value="42" />
@@ -303,7 +303,7 @@
 
   <Style x:Key="SoftActionButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryActionButtonStyle}">
     <Setter Property="Background" Value="{StaticResource SoftButtonBrush}" />
-    <Setter Property="Foreground" Value="#5A5A5A" />
+    <Setter Property="Foreground" Value="{StaticResource SoftButtonForegroundBrush}" />
   </Style>
 
   <Style x:Key="OutlineActionButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryActionButtonStyle}">
@@ -322,7 +322,7 @@
     <Style.Triggers>
       <Trigger Property="Tag" Value="True">
         <Setter Property="Background" Value="{StaticResource SoftButtonBrush}" />
-        <Setter Property="Foreground" Value="#5A5A5A" />
+        <Setter Property="Foreground" Value="{StaticResource SoftButtonForegroundBrush}" />
       </Trigger>
     </Style.Triggers>
   </Style>
@@ -331,7 +331,7 @@
     <Style.Triggers>
       <Trigger Property="Tag" Value="True">
         <Setter Property="Background" Value="{StaticResource DarkButtonBrush}" />
-        <Setter Property="Foreground" Value="#FAF7F6" />
+        <Setter Property="Foreground" Value="{StaticResource ButtonPrimaryForegroundBrush}" />
       </Trigger>
     </Style.Triggers>
   </Style>

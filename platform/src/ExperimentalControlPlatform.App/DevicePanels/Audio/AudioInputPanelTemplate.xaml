@@ -163,7 +163,7 @@
                     Background="{StaticResource DarkButtonBrush}"
                     BorderThickness="0"
                     Click="ExportDataButton_OnClick"
-                    Foreground="#FAF7F6"
+                    Foreground="{StaticResource ButtonPrimaryForegroundBrush}"
                     IsEnabled="{Binding CanExportData}">
               <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                 <iconPacks:PackIconMaterial Margin="0,0,8,0"

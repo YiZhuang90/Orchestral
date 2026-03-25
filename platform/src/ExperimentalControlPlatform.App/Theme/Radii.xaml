@@ -4,4 +4,5 @@
   <CornerRadius x:Key="RadiusPanel">10</CornerRadius>
   <CornerRadius x:Key="RadiusWindowOuter">12</CornerRadius>
   <CornerRadius x:Key="RadiusWindowInner">11</CornerRadius>
+  <CornerRadius x:Key="RadiusTitleBar">11,11,0,0</CornerRadius>
 </ResourceDictionary>

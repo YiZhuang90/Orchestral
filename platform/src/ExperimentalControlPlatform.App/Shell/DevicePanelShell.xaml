@@ -14,7 +14,7 @@
             Background="{StaticResource SurfaceBrush}"
             BorderBrush="{StaticResource ShellDividerBrush}"
             BorderThickness="0,0,0,1"
-            CornerRadius="11,11,0,0"
+            CornerRadius="{StaticResource RadiusTitleBar}"
             MouseLeftButtonDown="TitleBar_OnMouseLeftButtonDown">
       <Grid Margin="16,0,12,0">
         <Grid.ColumnDefinitions>
