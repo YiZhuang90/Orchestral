@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document defines the reusable widget set for first-generation Orchestral device panels.
+This document defines the reusable widget set for the current Orchestral device-panel generation after the shared v2 token, shell, and template migration.
 
 It exists to make the UI reusable by composition rather than by copying PT-104 markup. Each widget below is treated as a reusable module with:
 
@@ -11,14 +11,14 @@ It exists to make the UI reusable by composition rather than by copying PT-104 m
 - data/function contract
 - composition role
 
-This catalog should be read together with:
+Read with:
 
 - [DESIGN_SYSTEM.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/DESIGN_SYSTEM.md)
 - [DEVICE_PANEL_CONTRACT.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/DEVICE_PANEL_CONTRACT.md)
 
 ## Token Baseline
 
-These widget definitions use the current Orchestral token system implemented in:
+These widget definitions use the live token system implemented in:
 
 - [Colors.xaml](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/platform/src/ExperimentalControlPlatform.App/Theme/Colors.xaml)
 - [Typography.xaml](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/platform/src/ExperimentalControlPlatform.App/Theme/Typography.xaml)
@@ -27,37 +27,38 @@ These widget definitions use the current Orchestral token system implemented in:
 
 ### Current core tokens
 
-- `FontShellTitle = 16 px`
-- `FontDisplayValue = 20 px`
-- `FontSectionHeader = 16 px`
+- `FontShellTitle = 15 px`
+- `FontDisplayValue = 22 px`
+- `FontSectionHeader = 15 px`
 - `FontBody = 12 px`
-- `FontMicro = 12 px`
-- `RadiusControl = 8 px`
-- `RadiusPanel = 18 px`
-- `RadiusWindowOuter = 16 px`
-- `RadiusWindowInner = 15 px`
+- `FontMicro = 10 px`
+- `RadiusControl = 4 px`
+- `RadiusPanel = 10 px`
+- `RadiusWindowOuter = 12 px`
+- `RadiusWindowInner = 11 px`
 
 ### Current core colors
 
-- `WindowBackgroundBrush = #F9F9F6`
-- `RailBackgroundBrush = #F3F4F0`
-- `SurfaceBrush = #FFFFFF`
-- `MutedSurfaceBrush = #F3F4F0`
-- `PlotSurfaceBrush = #FCFCF9`
-- `TextPrimaryBrush = #2E3430`
-- `TextSecondaryBrush = #5A615C`
-- `TextMutedBrush = #5F5E5E`
+- `WindowBackgroundBrush = #F6F4EE`
+- `RailBackgroundBrush = #EEEBE3`
+- `SurfaceBrush = #FBF8F2`
+- `MutedSurfaceBrush = #F1EEE6`
+- `PlotSurfaceBrush = #F8F5EF`
+- `TextPrimaryBrush = #302F2C`
+- `TextSecondaryBrush = #666158`
+- `TextMutedBrush = #6B655D`
 - `AccentBrush = #9A462A`
-- `AccentHoverBrush = #AE532D`
-- `AccentPressedBrush = #7E351F`
-- `DarkButtonBrush = #6B6A69`
-- `SoftButtonBrush = #E9E7E7`
-- `SoftBorderBrush = #E8EBE5`
-- `PlotBorderBrush = #ECECE5`
+- `AccentHoverBrush = #A44D2D`
+- `AccentPressedBrush = #7B341F`
+- `AccentForegroundBrush = #FBF5F2`
+- `DarkButtonBrush = #5F5E5E`
+- `SoftButtonBrush = #E4DED4`
+- `SoftBorderBrush = #DED7CB`
+- `PlotBorderBrush = #E7E0D5`
 
 ## Widget Overview
 
-The current reusable widget set is organized into:
+The reusable widget set is organized into:
 
 - primitive widgets
 - composite widgets
@@ -70,15 +71,14 @@ The current reusable widget set is organized into:
 - checkbox
 - header text
 - header device selector
-- subcontext switcher
+- subcontext tab
 - value card
-- channel tab
 - mini/max/close buttons
 
 ### Composite widgets
 
 - control panel
-- action row
+- lifecycle action row
 - real-time value header
 - plotting window
 - data panel
@@ -101,8 +101,8 @@ A reusable action surface for commands such as connect, read once, start live, c
 - font: `Inter`
 - font size: `12 px`
 - default font weight: regular
-- default height: `40 px`
-- radius: `RadiusControl = 8 px`
+- default height: `42 px`
+- radius: `RadiusControl = 4 px`
 - icon size: `14 x 14` for content buttons
 - content alignment: centered horizontally and vertically
 
@@ -122,8 +122,8 @@ A reusable action surface for commands such as connect, read once, start live, c
   - background: `AccentHoverBrush`
   - foreground: `AccentForegroundBrush`
 - `ChartActionButtonStyle`
-  - height: `40 px`
-  - minimum width: `132 px`
+  - height: `38 px`
+  - minimum width: `124 px`
   - used for chart-toolbar actions
 
 ### Functionality
@@ -141,37 +141,31 @@ A reusable action surface for commands such as connect, read once, start live, c
 - diagnostics
 - clear data
 - export CSV
+- full-width `Apply` directly below the parameter section in the rail
 
 ## 2. Dropdown Box
 
 ### Purpose
 
-A reusable selection widget for discrete configuration parameters such as sensor type, wire count, mains filter, trigger mode, gain mode, or acquisition profile.
+A reusable selection widget for discrete configuration parameters such as sensor type, wire count, mains filter, trigger mode, gain mode, channel mode, or acquisition profile.
 
 ### Visual spec
 
 - font: `Inter`
 - font size: `12 px`
-- control height: `40 px`
+- control height: `42 px`
 - text vertically centered
 - outer container background: `SurfaceBrush`
 - border: `1 px` using `SoftBorderBrush`
-- radius: `RadiusControl = 8 px`
-- chevron stroke: `#6A7170`
+- radius: `RadiusControl = 4 px`
 - no default Windows chrome
 
 ### Functionality
 
-- opens list on click anywhere on the control, including chevron area
+- opens list on click anywhere on the control, including the chevron area
 - selects one item from a discrete list
 - updates a bound property
-- supports popup dropdown with same corner language
-
-### Current uses
-
-- sensor type
-- wire count
-- mains filter
+- supports popup dropdown with the same sharper corner language
 
 ## 3. Checkbox
 
@@ -184,16 +178,12 @@ A reusable boolean control for single binary options.
 - font: `Inter`
 - font size: `12 px`
 - low-contrast visual treatment
-- aligned with body text, not oversized
+- aligned with body text
 
 ### Functionality
 
 - toggles a boolean state
-- should be used only for true/false options where a binary button would be visually heavier than necessary
-
-### Current uses
-
-- filtered read
+- use only for true/false options where a binary button would be visually heavier than necessary
 
 ## 4. Header
 
@@ -203,21 +193,16 @@ A reusable textual identity or section-heading widget.
 
 ### Visual spec
 
-- shell/device identity: `Manrope`, `16 px`
-- major real-time value header: `Manrope`, `20 px`
-- section header: `Manrope`, `16 px`
+- shell/device identity: `Manrope`, `15 px`
+- primary live value: `Manrope`, `22 px`
+- section value/card value: `Manrope`, `15 px`
+- small labels and metadata: `Inter`, `10 px`
 - sentence case by default
 
 ### Functionality
 
 - presents structure, identity, or current primary value
-- not interactive by default
-
-### Current uses
-
-- device title in the top banner
-- real-time value header in the data panel
-- section labels such as `Sensor type`, `Wire count`, `Mains filter`, `Actions`
+- is not interactive by default
 
 ## 4A. Header Device Selector
 
@@ -231,17 +216,13 @@ A reusable header widget that shows the current device identity and becomes a dr
 - no boxed input chrome
 - same font and alignment as the device name label
 - optional subtle chevron only when multiple choices exist
+- default max width around `280 px` with ellipsis
 
 ### Functionality
 
 - shows the selected device
 - opens a device list on click when multiple device instances exist
 - should not be mistaken for a form control in the rail
-
-### Current uses
-
-- PT-104 header
-- integrated camera header
 
 ## 4B. Subcontext Switcher
 
@@ -251,44 +232,44 @@ A reusable middle-banner widget for switching endpoint or internal context withi
 
 ### Visual spec
 
-- static label such as `Channel:`
-- followed by compact tabs or context items
-- should occupy the middle banner region only when needed
+- static label such as `Channel:` or `Mode:`
+- followed by compact tabs
+- occupies the middle banner only when needed
 
 ### Functionality
 
-- switches channel, axis, view, or comparable device-internal context
+- switches channel, mode, view, or comparable device-internal context
 - does not switch between different hardware instances
 
 ### Current uses
 
 - `Channel: 2 4` on PT-104
 
-## 5. Channel Tab
+## 5. Subcontext Tab
 
 ### Purpose
 
-A reusable selector for multiple channels of the same device or multiple instances of the same device family.
+A reusable selector for device-internal contexts such as channels, modes, or views.
 
 ### Visual spec
 
 - font: `Manrope`
 - font size: `12 px`
-- padding: `16,7`
-- underline height: `2 px`
+- padding: `14,6`
+- underline height: `3 px`
 - selected text color: `AccentBrush`
 - idle text color: `TextMutedBrush`
 - hover background: `MutedSurfaceBrush`
 
 ### Functionality
 
-- switches current channel or current device instance
+- switches current channel, mode, or comparable device-internal context
 - updates the bound selected item
-- should not be used as a general device catalog
+- should not be used as a device catalog; device switching belongs to the left header selector
 
 ### Current uses
 
-- `Channel 1..4` on PT-104
+- `Channel: 2 4` on PT-104
 
 ## 6. Mini / Max / Close Buttons
 
@@ -298,8 +279,8 @@ Reusable custom window-control buttons for shell windows and Orchestral modals.
 
 ### Visual spec
 
-- size: `32 x 26`
-- radius: `RadiusControl = 8 px`
+- size: `30 x 24`
+- radius: `RadiusControl = 4 px`
 - icon size: `12 x 12`
 - foreground: `TextMutedBrush`
 - neutral hover: `NeutralHoverBrush`
@@ -314,11 +295,6 @@ Reusable custom window-control buttons for shell windows and Orchestral modals.
 - maximize/restore window
 - close window
 
-### Current uses
-
-- top banner in `DevicePanelShell`
-- close button in `OrchestralModalWindow`
-
 ## 7. Top Banner
 
 ### Purpose
@@ -331,23 +307,19 @@ A reusable shell widget that combines:
 
 ### Visual spec
 
-- height: `48 px`
-- background: `WindowBackgroundBrush`
+- height: `52 px`
+- background: `SurfaceBrush`
 - bottom divider: `1 px` using `ShellDividerBrush`
-- top corner radius: `15,15,0,0` inside shell
-- left and right content margin: `14 px`
+- top corner radius: `11,11,0,0`
+- left/right content margin: `16 px` left, `12 px` right
 
 ### Functionality
 
 - shows device identity
 - switches device instance from the left region
-- switches internal context from the middle region
+- switches device-internal context from the middle region
 - supports title-bar dragging
 - hosts native-like window controls
-
-### Current uses
-
-- [DevicePanelShell.xaml](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/platform/src/ExperimentalControlPlatform.App/Shell/DevicePanelShell.xaml)
 
 ## 8. Control Panel
 
@@ -359,26 +331,27 @@ A reusable left-rail module that groups configuration widgets and action widgets
 
 - dropdown box
 - checkbox
+- lifecycle action row
 - binary button
 - standard action button
 - diagnostics button
 
 ### Visual spec
 
-- background is provided by left rail
-- vertical spacing follows 6 to 16 px family
-- configuration labels use `Inter` `12 px`
-- buttons follow shared button family
+- background is provided by the left rail
+- vertical spacing follows the shared compact spacing family
+- configuration labels use `Inter` `10 px`
+- buttons follow the shared button family
 
 ### Functionality
 
 - edits device configuration
 - issues safe bring-up actions
 - exposes diagnostics
-- should make shared vs endpoint settings legible
-- should expose default parameters only and push advanced settings into secondary surfaces
+- makes shared vs endpoint settings legible
+- exposes default parameters only and pushes advanced settings into secondary surfaces
 
-## 8A. Action Row
+## 8A. Lifecycle Action Row
 
 ### Purpose
 
@@ -393,15 +366,17 @@ A reusable action cluster for panel lifecycle and operational commands.
 - `Stop live`
 - `Diagnostics`
 
+### Visual spec
+
+- `Apply` sits directly below the parameter block
+- `Apply` uses full available rail width
+- lifecycle actions should read as one ordered stack, not as loose floating buttons
+
 ### Functionality
 
 - groups actions by lifecycle meaning rather than arbitrary placement
-- should make the difference between apply, start, stop, and exit explicit
-- should emit structured lifecycle events, not only visual changes
-
-### Current uses
-
-- PT-104 left rail in [Pt104PanelView.xaml](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/platform/src/ExperimentalControlPlatform.App/DevicePanels/Pt104/Pt104PanelView.xaml)
+- makes the difference between apply, start, stop, and exit explicit
+- emits structured lifecycle events, not only visual changes
 
 ## 9. Value Card
 
@@ -411,25 +386,18 @@ A reusable card for presenting one summary metric.
 
 ### Visual spec
 
-- background: `MutedSurfaceBrush`
-- radius: `RadiusPanel = 18 px`
-- padding: `10 px`
-- border: none in current PT-104 direction
-- label font: `Inter` `12 px`
-- value font: `Manrope` `16 px`
+- background: `SurfaceBrush`
+- radius: `RadiusPanel = 10 px`
+- padding: `12,10`
+- border: `1 px` `SoftBorderBrush`
+- label font: `Inter` `10 px`
+- value font: `Manrope` `15 px`
 
 ### Functionality
 
 - presents one bound summary value
 - may update live during acquisition
 - should not expose direct controls
-
-### Current uses
-
-- `Peak high`
-- `Peak low`
-- `RMS variance`
-- `Samples`
 
 ## 10. Statistics Panel
 
@@ -440,11 +408,11 @@ A reusable summary strip composed of multiple value cards.
 ### Composition
 
 - 2 to 6 value cards
-- currently `UniformGrid`
+- currently a simple equal-width strip
 
 ### Visual spec
 
-- sits below the main data panel
+- sits below the main data surface
 - card gutters use the standard spacing scale
 - cards use `RadiusPanel`
 
@@ -452,10 +420,6 @@ A reusable summary strip composed of multiple value cards.
 
 - presents live or recent summary metrics
 - updates as the data stream updates
-
-### Current uses
-
-- PT-104 four-card summary strip
 
 ## 11. Real-Time Value Header
 
@@ -465,21 +429,17 @@ A reusable header that presents the primary current device value or device state
 
 ### Visual spec
 
-- font family: `Manrope`
-- font size: `20 px`
-- primary label color: `TextPrimaryBrush`
+- label font: `Inter` `12 px`
+- value font: `Manrope` `22 px`
+- label color: `TextSecondaryBrush`
 - live value color: `AccentBrush`
-- vertically aligned with data-panel toolbar buttons
+- aligned with data-panel toolbar buttons
 
 ### Functionality
 
 - shows one live value or one live state
 - updates continuously as readings change
-- should avoid redundant helper text unless strictly necessary
-
-### Current uses
-
-- `Precision temperature: ...`
+- avoids redundant helper text
 
 ## 12. Plotting Window
 
@@ -491,22 +451,19 @@ A reusable time-series plotting surface for scalar data streams.
 
 - surface background: `PlotSurfaceBrush`
 - border: `1 px` using `PlotBorderBrush`
-- radius: `RadiusPanel = 18 px`
+- radius: `RadiusPanel = 10 px`
 - fill color: `PlotFillBrush`
 - line color: `AccentBrush`
 - line thickness: `3 px`
 - grid lines: soft dashed neutral lines
+- axis labels use `FontMicro`
 
 ### Functionality
 
 - shows streaming scalar data over time
 - exposes x-axis and y-axis labels
-- clips plot content to rounded shape
-- resizes with main workspace
-
-### Current uses
-
-- PT-104 temperature plot
+- clips plot content to the rounded shape
+- resizes with the main workspace
 
 ## 13. Data Panel
 
@@ -516,48 +473,40 @@ A reusable composite for:
 
 - real-time value header
 - chart-toolbar buttons
-- plotting window
+- plotting or equivalent main surface
 
 ### Visual spec
 
 - background: `SurfaceBrush`
 - outer radius: `RadiusPanel`
 - main header and toolbar aligned in one row
-- plot area fills most of panel height
+- dominant content surface fills most of panel height
 
 ### Functionality
 
-- shows current primary value
+- shows the current primary value
 - allows data-surface actions such as clear/export
-- hosts the main live plot
-
-### Current uses
-
-- PT-104 main data surface
+- hosts the main live surface
 
 ## 14. Serial Data Panel
 
 ### Purpose
 
-A reusable composite for time-series acquisition and output devices that combines:
+A reusable composite for time-series acquisition devices that combines:
 
 - data panel
 - statistics panel
 
 ### Functionality
 
-- presents current live value
-- shows live plot
+- presents the current live value
+- shows a live plot
 - shows accumulated summary metrics
 - supports stream actions such as clear/export
 
-### Current uses
-
-- PT-104 panel is the first implementation
-
 ### Scope
 
-This pattern is suitable for:
+Suitable for:
 
 - temperature
 - pressure
@@ -574,12 +523,12 @@ A reusable shell widget for current configuration and system state.
 
 ### Visual spec
 
-- fixed height: `36 px`
-- background: `WindowBackgroundBrush`
+- fixed height family around `36 px`
+- background: `SurfaceBrush`
 - top divider: `1 px` using `FooterDividerBrush`
-- bottom corner radius: `0,0,15,15`
+- bottom corner radius: `0,0,11,11`
 - body font: `Inter` `12 px`
-- accent state text on both sides where needed
+- accent state text where needed
 
 ### Composition
 
@@ -589,14 +538,10 @@ A reusable shell widget for current configuration and system state.
 ### Functionality
 
 - shows connection state
-- shows active channel or instance
+- shows active context or mode
 - shows current operating configuration
 - shows high-level state such as `System ready`, `Streaming`, `Idle`, `Fault`
 - should be driven by structured status output, not handwritten display strings alone
-
-### Current uses
-
-- PT-104 footer summary
 
 ## 16. Binary Button
 
@@ -618,7 +563,7 @@ A reusable button pattern for two-state actions where separate buttons would add
 ### Functionality
 
 - one click performs the state transition
-- visual state should reflect current mode, not only next action
+- visual state should reflect the current mode, not only the next action
 
 ## 17. Apply And Exit Button
 
@@ -629,7 +574,7 @@ A reusable lifecycle action for safe panel termination after configuration.
 ### Visual spec
 
 - same family as `Apply`
-- should read as a primary lifecycle action, not a destructive close button
+- should read as a lifecycle action, not a destructive close button
 
 ### Functionality
 
@@ -639,23 +584,20 @@ A reusable lifecycle action for safe panel termination after configuration.
 - terminates live work cleanly
 - closes the panel
 
-### Current uses
-
-- planned universal action-row behavior
-
 ## Current Coverage Summary
 
-### Fully represented in code and style
+### Represented in code and style
 
 - button
 - dropdown box
 - checkbox
 - header
 - header device selector
-- subcontext switcher
-- channel tab
+- subcontext tab
 - mini/max/close buttons
 - top banner
+- control panel
+- lifecycle action row
 - value card
 - statistics panel
 - real-time value header
@@ -665,35 +607,21 @@ A reusable lifecycle action for safe panel termination after configuration.
 - bottom status bar
 - binary button
 
-### Present in composition but not yet extracted as independent `UserControl`s
-
-- control panel
-- value card
-- statistics panel
-- real-time value header
-- plotting window
-- data panel
-- serial data panel
-- bottom status bar
-
-This means the visual language and composition rules now exist, but the code still needs another pass of extraction if the goal is a true widget library rather than a shared shell plus one concrete device view.
-
 ## Future Widget Roadmap
 
-The next reusable widgets likely needed to expand beyond scalar sensors and current camera panels are:
+Likely next reusable widgets:
 
-- `ROI editor`
-- `ROI list`
-- `Histogram panel`
-- `Waveform panel`
-- `Spectrum panel`
-- `Actuator control panel`
-- `State timeline`
-- `Command history panel`
-- `Protocol monitor panel`
-- `Connection trace panel`
-- `Calibration panel`
-- `Recording panel`
-- `Alarm or event timeline`
+- ROI editor
+- histogram panel
+- waveform panel
+- spectrum panel
+- actuator control panel
+- state timeline
+- command history panel
+- protocol monitor panel
+- connection trace panel
+- calibration panel
+- recording panel
+- event timeline
 
 These should stay inside the current token system and should not create a second visual language.
