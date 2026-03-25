@@ -12,6 +12,8 @@ It is the practical bridge between:
 
 The goal is to make new device windows reusable by composition, not by cloning PT-104 markup.
 
+On the current v2 migration branch, shared theme tokens, the shell, and the first family templates have already been migrated to the sharper `Orchestral_Design.md` direction. New work should inherit those layers instead of restyling concrete panels locally.
+
 ## Layered Structure
 
 Every device implementation window should be organized in five layers.
@@ -28,7 +30,7 @@ Responsibilities:
 
 - OS window behavior
 - drag / resize / maximize
-- rounded outer frame
+- sharper outer frame
 - app-level content host
 
 Do not put device-specific UI logic here.
@@ -53,6 +55,14 @@ Responsibilities:
 
 The shell owns structure, not device content.
 
+Its current visual language should follow the sharper shared system:
+
+- warmer layered surfaces
+- reduced border dependence
+- sharper radii
+- stronger micro-label hierarchy
+- subcontext in the middle header, not hard-coded channel tabs
+
 ### 3. Composite widget layer
 
 Composite widgets are the reusable mid-level modules that assemble multiple atomic controls into a meaningful panel.
@@ -65,7 +75,7 @@ Current examples:
 - [StatisticsPanel.xaml](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/platform/src/ExperimentalControlPlatform.App/Widgets/StatisticsPanel.xaml)
 - [FooterStatusBar.xaml](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/platform/src/ExperimentalControlPlatform.App/Widgets/FooterStatusBar.xaml)
 
-These are the main reuse boundary for future device families.
+These are the main reuse boundary for future device families. When visual changes are needed, update this layer before touching concrete device panels.
 
 ### 4. Atomic widget layer
 
@@ -75,7 +85,7 @@ Current examples:
 
 - buttons
 - dropdown boxes
-- channel tabs
+- subcontext tabs
 - window control buttons
 - value cards
 - plotting window
@@ -104,28 +114,28 @@ It should not redefine shell layout or general styling.
 
 ## Composition Hierarchy
 
-The preferred composition hierarchy is:
+Preferred composition:
 
 ```text
 DeviceTestWindow
   -> DevicePanelShell
     -> Left rail
       -> DeviceControlPanel
-        -> dropdowns / checkboxes / binary buttons / diagnostics button
+        -> config fields
+        -> lifecycle row
+        -> action buttons
+        -> diagnostics button
     -> Workspace
-      -> DataPanel or SerialDataPanel or future device-specific workspace composite
+      -> Scalar / Camera / Audio family template
         -> RealTimeValueHeader
-        -> PlottingWindow or image canvas or waveform panel
-        -> chart/action buttons
-        -> StatisticsPanel
-          -> ValueCard x N
+        -> PlottingWindow or image surface or waveform panel
+        -> chart/data actions
+        -> StatisticsPanel or metadata strip
     -> Footer
       -> FooterStatusBar
 ```
 
-This is the default pattern for scalar sensor devices.
-
-The visual order should stay:
+Visual order:
 
 1. top shell
 2. left rail
@@ -135,19 +145,18 @@ The visual order should stay:
 Within the left rail:
 
 1. configuration
-2. actions
-3. spacer
-4. diagnostics
+2. apply / lifecycle
+3. actions
+4. spacer
+5. diagnostics
 
 Within the main workspace:
 
-1. main metric or primary state
-2. main content card
+1. primary live value or primary state
+2. dominant content surface
 3. compact summary strip when applicable
 
 ## Build Sequence For A New Device Window
-
-Build new device windows in this order.
 
 ### Step 1. Classify the device archetype
 
@@ -156,10 +165,11 @@ Decide which family the device belongs to:
 - scalar sensor
 - actuator / output device
 - imaging device
+- audio input device
 - protocol / diagnostics device
 - hybrid device
 
-This determines which composite workspace widget should be used.
+This determines which family template or workspace composite should be used.
 
 ### Step 2. Reuse the shell
 
@@ -173,16 +183,17 @@ Only fill these slots:
 
 Do not change shell geometry unless the design system itself is being updated.
 
-### Step 3. Choose the workspace composite
+### Step 3. Choose the family template or workspace composite
 
-For current device families:
+For current families:
 
-- scalar sensor: `SerialDataPanel`
+- scalar sensor: `ScalarSensorPanelTemplate`
+- camera device: `CameraPanelTemplate`
+- audio input device: `AudioInputPanelTemplate`
 - simpler live device: `DataPanel`
-- future camera device: camera panel composite
 - future actuator device: actuator control composite
 
-If no composite fits, create a new composite widget before building a large one-off device window.
+If no family template fits, create a new reusable family/template layer before building a large one-off device window.
 
 ### Step 4. Bind device metadata into the shell
 
@@ -195,6 +206,12 @@ Every device implementation should provide:
 - selected subcontext
 - footer status values
 
+Subcontext examples:
+
+- PT-104: `Channel: 2 4`
+- a microphone with truthful split modes: `Mode: ...`
+- a simple camera: empty middle header
+
 These are shell inputs, not ad hoc text blocks.
 
 ### Step 5. Bind the left rail
@@ -202,6 +219,7 @@ These are shell inputs, not ad hoc text blocks.
 Use `DeviceControlPanel` for:
 
 - configuration content
+- lifecycle content
 - actions content
 - diagnostics content
 
@@ -216,14 +234,14 @@ For scalar sensor-like devices, the workspace should provide:
 - chart action buttons
 - statistics panel
 
-For actuator or camera devices, keep the same shell but swap in a better-fitting workspace composite.
+For camera or audio devices, keep the same shell but swap in the correct family template before inventing a one-off workspace composite.
 
 ### Step 7. Bind the footer
 
 Use `FooterStatusBar` for:
 
 - connection summary
-- selected mode summary
+- selected mode or format summary
 - system state summary
 
 The footer should summarize operational state, not repeat descriptive labels already visible elsewhere.
@@ -266,7 +284,6 @@ Examples:
 
 Examples:
 
-- camera live view panel
 - ROI editor
 - waveform acquisition panel
 - actuator command panel
@@ -297,6 +314,7 @@ Follow these rules:
 - use `RadiusPanel` for grouped surfaces
 - do not invent one-off colors
 - do not reintroduce default Windows control chrome
+- do not reintroduce the older softer 8/18 radius language in new work
 
 ## Data-Binding Rules
 
@@ -308,8 +326,8 @@ Typical inputs:
 - selected values
 - enabled / disabled states
 - current value
-- plot points
-- statistic card items
+- plot points or preview source
+- statistic or metadata items
 - footer text segments
 
 The shell and widgets should be able to render from those bindings without PT-104-specific knowledge.
@@ -323,7 +341,7 @@ Device implementation windows should keep the current shell behavior:
 - left rail mostly fixed
 - diagnostics stays at the bottom of the left rail
 - workspace absorbs most resize pressure
-- plotting or preview area takes most vertical resize change
+- plotting, preview, or waveform area takes most vertical resize change
 
 Do not let every device redefine resize behavior independently.
 
@@ -335,7 +353,7 @@ Use:
 
 - `DevicePanelShell`
 - `DeviceControlPanel`
-- `SerialDataPanel`
+- `ScalarSensorPanelTemplate`
 - `FooterStatusBar`
 
 Examples:
@@ -343,6 +361,38 @@ Examples:
 - temperature
 - pressure
 - flow rate
+
+### Camera or imaging window
+
+Use:
+
+- `DevicePanelShell`
+- `DeviceControlPanel`
+- `CameraPanelTemplate`
+- `FooterStatusBar`
+
+Likely content:
+
+- live image
+- acquisition controls
+- frame metadata
+- ROI or mode controls when truthfully supported
+
+### Audio input window
+
+Use:
+
+- `DevicePanelShell`
+- `DeviceControlPanel`
+- `AudioInputPanelTemplate`
+- `FooterStatusBar`
+
+Likely content:
+
+- waveform
+- RMS/peak metrics
+- update-rate controls
+- diagnostics
 
 ### Actuator window
 
@@ -361,23 +411,6 @@ Likely content:
 - recent commands
 - state confirmation
 
-### Camera or imaging window
-
-Use:
-
-- `DevicePanelShell`
-- `DeviceControlPanel`
-- future camera workspace composite
-- `FooterStatusBar`
-
-Likely content:
-
-- live image
-- zoom/pan
-- ROI editor
-- acquisition controls
-- frame metadata
-
 ### Protocol or debug window
 
 Use:
@@ -394,13 +427,15 @@ Likely content:
 - parse status
 - connection diagnostics
 
-## Current Reference Implementation
+## Current Reference Implementations
 
-The current reference implementation is:
+Current family references:
 
-- [Pt104PanelView.xaml](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/platform/src/ExperimentalControlPlatform.App/DevicePanels/Pt104/Pt104PanelView.xaml)
+- scalar: [Pt104PanelView.xaml](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/platform/src/ExperimentalControlPlatform.App/DevicePanels/Pt104/Pt104PanelView.xaml)
+- camera: shared camera template consumers
+- audio: shared audio template consumers
 
-This should be used as proof that the widget stack works, not as a template to clone file-by-file.
+Use them as proof that the stack works, not as file-by-file cloning targets.
 
 ## Success Criterion
 
@@ -408,7 +443,7 @@ This guide is successful when a new device implementation window can be built by
 
 1. choosing the device archetype,
 2. reusing the shell,
-3. reusing existing composite widgets,
-4. creating only the missing device-specific content,
+3. reusing an existing family template or composite widget,
+4. creating only the missing device-specific bindings or surfaces,
 
-instead of copying the PT-104 panel and editing it by hand.
+instead of copying an existing panel and editing it by hand.

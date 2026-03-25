@@ -1,13 +1,14 @@
 using System.Collections;
 using System.Threading.Tasks;
 using System.Windows.Media;
+using ExperimentalControlPlatform.App.DevicePanels.Contracts;
 using ExperimentalControlPlatform.App.DevicePanels;
 using ExperimentalControlPlatform.App.Widgets;
 using MahApps.Metro.IconPacks;
 
 namespace ExperimentalControlPlatform.App.DevicePanels.Scalar;
 
-public interface IScalarSensorPanelViewModel : IDeviceTestPanelViewModel
+public interface IScalarSensorPanelViewModel : IDeviceTestPanelViewModel, IIntegrationPanelViewModel
 {
     IEnumerable DeviceOptions { get; }
     object? SelectedDeviceItem { get; set; }

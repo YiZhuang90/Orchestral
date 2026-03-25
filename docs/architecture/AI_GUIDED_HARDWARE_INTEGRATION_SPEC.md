@@ -353,6 +353,7 @@ This rule should apply:
 The detailed operational standard is defined in:
 
 - [TEST_BEFORE_HANDOVER.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/TEST_BEFORE_HANDOVER.md)
+- [REVIEW_PROTOCOL.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/collaboration/REVIEW_PROTOCOL.md) for file-backed reviewer and implementer communication when external review or testing is involved
 
 At the workflow level, the key requirement is:
 

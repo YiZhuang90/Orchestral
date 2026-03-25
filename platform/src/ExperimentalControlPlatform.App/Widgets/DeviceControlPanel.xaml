@@ -4,27 +4,42 @@
              x:Name="ControlPanelRoot">
   <Grid>
     <Grid.RowDefinitions>
-      <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
-    <Grid Grid.Row="1">
+    <Grid Grid.Row="0">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto" />
         <RowDefinition Height="Auto" />
-        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
       </Grid.RowDefinitions>
 
       <ContentPresenter Content="{Binding ConfigurationContent, ElementName=ControlPanelRoot}"
                         DataContext="{Binding DataContext, ElementName=ControlPanelRoot}" />
 
       <ContentPresenter Grid.Row="1"
+                        Margin="0,12,0,0"
+                        Content="{Binding LifecycleContent, ElementName=ControlPanelRoot}"
+                        DataContext="{Binding DataContext, ElementName=ControlPanelRoot}">
+        <ContentPresenter.Style>
+          <Style TargetType="ContentPresenter">
+            <Setter Property="Visibility" Value="Visible" />
+            <Style.Triggers>
+              <Trigger Property="Content" Value="{x:Null}">
+                <Setter Property="Visibility" Value="Collapsed" />
+              </Trigger>
+            </Style.Triggers>
+          </Style>
+        </ContentPresenter.Style>
+      </ContentPresenter>
+
+      <ContentPresenter Grid.Row="2"
                         Content="{Binding ActionsContent, ElementName=ControlPanelRoot}"
                         DataContext="{Binding DataContext, ElementName=ControlPanelRoot}" />
     </Grid>
 
-    <ContentPresenter Grid.Row="2"
+    <ContentPresenter Grid.Row="1"
                       Margin="0,12,0,0"
                       Content="{Binding DiagnosticsContent, ElementName=ControlPanelRoot}"
                       DataContext="{Binding DataContext, ElementName=ControlPanelRoot}" />

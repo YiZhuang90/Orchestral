@@ -9,15 +9,15 @@
              LostMouseCapture="CameraImageRoot_OnLostMouseCapture">
   <Border Background="{StaticResource PlotSurfaceBrush}"
           BorderBrush="{StaticResource PlotBorderBrush}"
-          BorderThickness="1"
+          BorderThickness="0"
           CornerRadius="{StaticResource RadiusPanel}">
     <Grid>
       <Image x:Name="BaseImage"
              Stretch="Uniform"
-             Margin="16" />
+             Margin="18" />
 
       <Canvas x:Name="OverlayCanvas"
-              Margin="16"
+              Margin="18"
               ClipToBounds="True">
         <Image x:Name="LiveRoiImage"
                Source="{Binding PreviewImage, ElementName=CameraImageRoot}"
