@@ -11,7 +11,7 @@
         <RowDefinition Height="Auto" />
       </Grid.RowDefinitions>
 
-      <Grid Margin="12,10,12,6">
+      <Grid Margin="14,12,14,8">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="Auto" />
@@ -27,12 +27,12 @@
       </Grid>
 
       <ContentPresenter Grid.Row="1"
-                        Margin="12,0,12,0"
+                        Margin="14,0,14,0"
                         Content="{Binding ImageContent, ElementName=CameraDataRoot}"
                         DataContext="{Binding DataContext, ElementName=CameraDataRoot}" />
 
       <ContentPresenter Grid.Row="2"
-                        Margin="12,0,12,12"
+                        Margin="14,0,14,14"
                         Content="{Binding MetadataContent, ElementName=CameraDataRoot}"
                         DataContext="{Binding DataContext, ElementName=CameraDataRoot}" />
     </Grid>
