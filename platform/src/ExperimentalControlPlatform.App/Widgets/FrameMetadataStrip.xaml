@@ -3,13 +3,15 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Name="FrameMetadataRoot">
   <UniformGrid Columns="4"
-               Margin="0,8,0,0">
+               Margin="0,10,0,0">
     <Border Margin="0,0,8,0"
-            Background="{StaticResource MutedSurfaceBrush}"
-            CornerRadius="{StaticResource RadiusControl}"
-            Padding="10,8">
+            Background="{StaticResource SurfaceBrush}"
+            BorderBrush="{StaticResource SoftBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource RadiusPanel}"
+            Padding="12,10">
       <StackPanel>
-        <TextBlock FontSize="{StaticResource FontBody}"
+        <TextBlock FontSize="{StaticResource FontMicro}"
                    Foreground="{StaticResource TextSecondaryBrush}"
                    Text="Resolution" />
         <TextBlock FontSize="{StaticResource FontSectionHeader}"
@@ -19,11 +21,13 @@
     </Border>
 
     <Border Margin="0,0,8,0"
-            Background="{StaticResource MutedSurfaceBrush}"
-            CornerRadius="{StaticResource RadiusControl}"
-            Padding="10,8">
+            Background="{StaticResource SurfaceBrush}"
+            BorderBrush="{StaticResource SoftBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource RadiusPanel}"
+            Padding="12,10">
       <StackPanel>
-        <TextBlock FontSize="{StaticResource FontBody}"
+        <TextBlock FontSize="{StaticResource FontMicro}"
                    Foreground="{StaticResource TextSecondaryBrush}"
                    Text="Pixel format" />
         <TextBlock FontSize="{StaticResource FontSectionHeader}"
@@ -33,11 +37,13 @@
     </Border>
 
     <Border Margin="0,0,8,0"
-            Background="{StaticResource MutedSurfaceBrush}"
-            CornerRadius="{StaticResource RadiusControl}"
-            Padding="10,8">
+            Background="{StaticResource SurfaceBrush}"
+            BorderBrush="{StaticResource SoftBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource RadiusPanel}"
+            Padding="12,10">
       <StackPanel>
-        <TextBlock FontSize="{StaticResource FontBody}"
+        <TextBlock FontSize="{StaticResource FontMicro}"
                    Foreground="{StaticResource TextSecondaryBrush}"
                    Text="Exposure" />
         <TextBlock FontSize="{StaticResource FontSectionHeader}"
@@ -46,11 +52,13 @@
       </StackPanel>
     </Border>
 
-    <Border Background="{StaticResource MutedSurfaceBrush}"
-            CornerRadius="{StaticResource RadiusControl}"
-            Padding="10,8">
+    <Border Background="{StaticResource SurfaceBrush}"
+            BorderBrush="{StaticResource SoftBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource RadiusPanel}"
+            Padding="12,10">
       <StackPanel>
-        <TextBlock FontSize="{StaticResource FontBody}"
+        <TextBlock FontSize="{StaticResource FontMicro}"
                    Foreground="{StaticResource TextSecondaryBrush}"
                    Text="Capture rate" />
         <TextBlock FontSize="{StaticResource FontSectionHeader}"

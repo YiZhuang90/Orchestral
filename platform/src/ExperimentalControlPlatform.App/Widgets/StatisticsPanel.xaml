@@ -10,7 +10,7 @@
     </ItemsControl.ItemsPanel>
     <ItemsControl.ItemTemplate>
       <DataTemplate DataType="{x:Type widgets:ValueCardItem}">
-        <Border Margin="0,0,10,0"
+        <Border Margin="0,0,8,0"
                 Background="Transparent">
           <widgets:ValueCard Title="{Binding Title}" Value="{Binding Value}" />
         </Border>

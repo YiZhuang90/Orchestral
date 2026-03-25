@@ -3,12 +3,13 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using ExperimentalControlPlatform.App.DevicePanels;
+using ExperimentalControlPlatform.App.DevicePanels.Contracts;
 using ExperimentalControlPlatform.App.Modals;
 using MahApps.Metro.IconPacks;
 
 namespace ExperimentalControlPlatform.App.DevicePanels.Camera;
 
-public interface ICameraPanelViewModel : IDeviceTestPanelViewModel
+public interface ICameraPanelViewModel : IDeviceTestPanelViewModel, IIntegrationPanelViewModel
 {
     IEnumerable CameraOptions { get; }
     object? SelectedCameraItem { get; set; }

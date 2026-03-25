@@ -36,4 +36,13 @@ public partial class DeviceControlPanel : UserControl
 
     public static readonly DependencyProperty ActionsContentProperty =
         DependencyProperty.Register(nameof(ActionsContent), typeof(object), typeof(DeviceControlPanel), new PropertyMetadata(null));
+
+    public object? LifecycleContent
+    {
+        get => GetValue(LifecycleContentProperty);
+        set => SetValue(LifecycleContentProperty, value);
+    }
+
+    public static readonly DependencyProperty LifecycleContentProperty =
+        DependencyProperty.Register(nameof(LifecycleContent), typeof(object), typeof(DeviceControlPanel), new PropertyMetadata(null));
 }

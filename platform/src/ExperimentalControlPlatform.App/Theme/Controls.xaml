@@ -5,9 +5,9 @@
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
-    <Setter Property="Width" Value="32" />
-    <Setter Property="Height" Value="26" />
-    <Setter Property="Margin" Value="4,0,0,0" />
+    <Setter Property="Width" Value="30" />
+    <Setter Property="Height" Value="24" />
+    <Setter Property="Margin" Value="2,0,0,0" />
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="Button">
@@ -56,8 +56,8 @@
   </Style>
 
   <Style x:Key="ChannelTabItemStyle" TargetType="ListBoxItem">
-    <Setter Property="Margin" Value="0,0,12,0" />
-    <Setter Property="Padding" Value="16,7" />
+    <Setter Property="Margin" Value="0,0,10,0" />
+    <Setter Property="Padding" Value="14,6" />
     <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
     <Setter Property="FontWeight" Value="Normal" />
     <Setter Property="FontSize" Value="{StaticResource FontBody}" />
@@ -73,11 +73,11 @@
                                 VerticalAlignment="Center" />
             </Border>
             <Border x:Name="Underline"
-                    Height="2"
-                    Margin="8,0,8,0"
+                    Height="3"
+                    Margin="6,0,6,0"
                     VerticalAlignment="Bottom"
                     Background="Transparent"
-                    CornerRadius="1" />
+                    CornerRadius="1.5" />
           </Grid>
           <ControlTemplate.Triggers>
             <Trigger Property="IsSelected" Value="True">
@@ -94,14 +94,14 @@
   </Style>
 
   <Style x:Key="ComboBoxStyle" TargetType="ComboBox">
-    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="Padding" Value="10,0" />
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderBrush" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="FontSize" Value="{StaticResource FontBody}" />
     <Setter Property="FontFamily" Value="{StaticResource BodyFontFamily}" />
     <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-    <Setter Property="Height" Value="40" />
+    <Setter Property="Height" Value="42" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
     <Setter Property="Template">
       <Setter.Value>
@@ -117,7 +117,7 @@
                           Focusable="False"
                           IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
                           ClickMode="Press" />
-            <ContentPresenter Margin="12,0,0,0"
+            <ContentPresenter Margin="10,0,0,0"
                               VerticalAlignment="Center"
                               HorizontalAlignment="Left"
                               Content="{TemplateBinding SelectionBoxItem}"
@@ -129,7 +129,7 @@
                   VerticalAlignment="Center"
                   Data="M 0 0 L 5 6 L 10 0"
                   Fill="Transparent"
-                  Stroke="#6A7170"
+                  Stroke="{StaticResource ComboBoxChevronBrush}"
                   StrokeThickness="2"
                   StrokeLineJoin="Round"
                   StrokeStartLineCap="Round"
@@ -139,7 +139,7 @@
                    AllowsTransparency="True"
                    Focusable="False"
                    PopupAnimation="Fade">
-              <Border Margin="0,4,0,0"
+              <Border Margin="0,6,0,0"
                       MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
                       Background="{StaticResource SurfaceBrush}"
                       BorderBrush="{StaticResource SoftBorderBrush}"
@@ -162,7 +162,7 @@
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="Padding" Value="0" />
     <Setter Property="MinWidth" Value="0" />
-    <Setter Property="MaxWidth" Value="320" />
+    <Setter Property="MaxWidth" Value="280" />
     <Setter Property="HorizontalContentAlignment" Value="Left" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
     <Setter Property="FontSize" Value="{StaticResource FontShellTitle}" />
@@ -234,21 +234,21 @@
   </Style>
 
   <Style x:Key="TextBoxStyle" TargetType="TextBox">
-    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="Padding" Value="10,0" />
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderBrush" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="FontSize" Value="{StaticResource FontBody}" />
     <Setter Property="FontFamily" Value="{StaticResource BodyFontFamily}" />
     <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-    <Setter Property="Height" Value="40" />
+    <Setter Property="Height" Value="42" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
   </Style>
 
   <Style x:Key="ChartActionButtonStyle" TargetType="Button">
-    <Setter Property="Height" Value="40" />
-    <Setter Property="MinWidth" Value="132" />
-    <Setter Property="Padding" Value="12,6" />
+    <Setter Property="Height" Value="38" />
+    <Setter Property="MinWidth" Value="124" />
+    <Setter Property="Padding" Value="10,6" />
     <Setter Property="FontSize" Value="{StaticResource FontBody}" />
     <Setter Property="FontWeight" Value="Normal" />
     <Setter Property="FontFamily" Value="{StaticResource BodyFontFamily}" />
@@ -267,10 +267,10 @@
 
   <Style x:Key="PrimaryActionButtonStyle" TargetType="Button">
     <Setter Property="Background" Value="{StaticResource DarkButtonBrush}" />
-    <Setter Property="Foreground" Value="#FAF7F6" />
+    <Setter Property="Foreground" Value="{StaticResource ButtonPrimaryForegroundBrush}" />
     <Setter Property="BorderThickness" Value="0" />
-    <Setter Property="Padding" Value="12,6" />
-    <Setter Property="Height" Value="40" />
+    <Setter Property="Padding" Value="10,6" />
+    <Setter Property="Height" Value="42" />
     <Setter Property="FontWeight" Value="Normal" />
     <Setter Property="FontSize" Value="{StaticResource FontBody}" />
     <Setter Property="FontFamily" Value="{StaticResource BodyFontFamily}" />
@@ -303,7 +303,7 @@
 
   <Style x:Key="SoftActionButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryActionButtonStyle}">
     <Setter Property="Background" Value="{StaticResource SoftButtonBrush}" />
-    <Setter Property="Foreground" Value="#5A5A5A" />
+    <Setter Property="Foreground" Value="{StaticResource SoftButtonForegroundBrush}" />
   </Style>
 
   <Style x:Key="OutlineActionButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryActionButtonStyle}">
@@ -322,7 +322,7 @@
     <Style.Triggers>
       <Trigger Property="Tag" Value="True">
         <Setter Property="Background" Value="{StaticResource SoftButtonBrush}" />
-        <Setter Property="Foreground" Value="#5A5A5A" />
+        <Setter Property="Foreground" Value="{StaticResource SoftButtonForegroundBrush}" />
       </Trigger>
     </Style.Triggers>
   </Style>
@@ -331,7 +331,7 @@
     <Style.Triggers>
       <Trigger Property="Tag" Value="True">
         <Setter Property="Background" Value="{StaticResource DarkButtonBrush}" />
-        <Setter Property="Foreground" Value="#FAF7F6" />
+        <Setter Property="Foreground" Value="{StaticResource ButtonPrimaryForegroundBrush}" />
       </Trigger>
     </Style.Triggers>
   </Style>

@@ -6,7 +6,7 @@
              xmlns:widgets="clr-namespace:ExperimentalControlPlatform.App.Widgets"
              Loaded="CameraPanelTemplate_OnLoaded">
   <shells:DevicePanelShell PanelTitle="{Binding Title}"
-                           LeftRailWidth="155">
+                           LeftRailWidth="160">
     <shells:DevicePanelShell.TitleContent>
       <widgets:HeaderDeviceSelector ItemsSource="{Binding CameraOptions}"
                                     SelectedItem="{Binding SelectedCameraItem, Mode=TwoWay}"
@@ -19,7 +19,7 @@
           <StackPanel>
             <StackPanel Margin="0,10,0,0"
                         Visibility="{Binding ExposureControlVisibility}">
-              <TextBlock FontSize="{StaticResource FontBody}"
+              <TextBlock FontSize="{StaticResource FontMicro}"
                          Foreground="{StaticResource TextSecondaryBrush}"
                          Text="Exposure (us)" />
               <Border Margin="0,4,0,0"
@@ -28,13 +28,12 @@
                       BorderThickness="1"
                       CornerRadius="{StaticResource RadiusControl}">
                 <TextBox Style="{StaticResource TextBoxStyle}"
-                         Height="30"
                          Text="{Binding ExposureInputDraft, UpdateSourceTrigger=PropertyChanged}" />
               </Border>
             </StackPanel>
 
             <TextBlock Margin="0,8,0,0"
-                       FontSize="{StaticResource FontBody}"
+                       FontSize="{StaticResource FontMicro}"
                        Foreground="{StaticResource TextSecondaryBrush}"
                        Text="Target frame rate (fps)" />
             <Border Margin="0,4,0,0"
@@ -43,12 +42,11 @@
                     BorderThickness="1"
                     CornerRadius="{StaticResource RadiusControl}">
               <TextBox Style="{StaticResource TextBoxStyle}"
-                       Height="30"
                        Text="{Binding FrameRateInputDraft, UpdateSourceTrigger=PropertyChanged}" />
             </Border>
 
             <TextBlock Margin="0,8,0,0"
-                       FontSize="{StaticResource FontBody}"
+                       FontSize="{StaticResource FontMicro}"
                        Foreground="{StaticResource TextSecondaryBrush}"
                        Text="Color" />
             <Border Margin="0,4,0,0"
@@ -57,27 +55,11 @@
                     BorderThickness="1"
                     CornerRadius="{StaticResource RadiusControl}">
               <ComboBox Style="{StaticResource ComboBoxStyle}"
-                        Height="30"
                         ItemsSource="{Binding ColorOptions}"
                         SelectedItem="{Binding SelectedColorOptionDraft}" />
             </Border>
 
-            <Button Margin="0,12,0,0"
-                    HorizontalAlignment="Stretch"
-                    Style="{StaticResource AccentActionButtonStyle}"
-                    Click="ApplySettingsButton_OnClick"
-                    IsEnabled="{Binding CanApplySettings}">
-              <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                <iconPacks:PackIconMaterial Margin="0,0,8,0"
-                                            Kind="CheckCircleOutline"
-                                            Width="14"
-                                            Height="14"
-                                            VerticalAlignment="Center" />
-                <TextBlock Text="Apply" />
-              </StackPanel>
-            </Button>
-
-            <Button Margin="0,6,0,0"
+            <Button Margin="0,10,0,0"
                     HorizontalAlignment="Stretch"
                     Style="{StaticResource OutlineActionButtonStyle}"
                     Click="MoreSettingsButton_OnClick"
@@ -95,8 +77,8 @@
         </widgets:DeviceControlPanel.ConfigurationContent>
 
         <widgets:DeviceControlPanel.ActionsContent>
-          <StackPanel Margin="0,10,0,0">
-            <TextBlock FontSize="{StaticResource FontBody}"
+          <StackPanel Margin="0,16,0,0">
+            <TextBlock FontSize="{StaticResource FontMicro}"
                        Foreground="{StaticResource TextSecondaryBrush}"
                        Text="Actions" />
 
@@ -147,6 +129,10 @@
           </StackPanel>
         </widgets:DeviceControlPanel.ActionsContent>
 
+        <widgets:DeviceControlPanel.LifecycleContent>
+          <widgets:LifecycleActionRow />
+        </widgets:DeviceControlPanel.LifecycleContent>
+
         <widgets:DeviceControlPanel.DiagnosticsContent>
           <Button Style="{StaticResource SoftActionButtonStyle}"
                   Click="DiagnosticsButton_OnClick"
@@ -190,7 +176,7 @@
               </StackPanel>
             </Button>
 
-            <Button Margin="8,0,0,0"
+            <Button Margin="10,0,0,0"
                     Padding="14,0"
                     MinWidth="92"
                     Style="{StaticResource SoftActionButtonStyle}"
