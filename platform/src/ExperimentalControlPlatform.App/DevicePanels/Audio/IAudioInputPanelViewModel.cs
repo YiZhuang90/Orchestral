@@ -1,31 +1,23 @@
 using System.Collections;
 using System.Threading.Tasks;
 using System.Windows.Media;
-using ExperimentalControlPlatform.App.DevicePanels.Contracts;
 using ExperimentalControlPlatform.App.DevicePanels;
+using ExperimentalControlPlatform.App.DevicePanels.Contracts;
 using ExperimentalControlPlatform.App.Widgets;
 using MahApps.Metro.IconPacks;
 
-namespace ExperimentalControlPlatform.App.DevicePanels.Scalar;
+namespace ExperimentalControlPlatform.App.DevicePanels.Audio;
 
-public interface IScalarSensorPanelViewModel : IDeviceTestPanelViewModel, IIntegrationPanelViewModel
+public interface IAudioInputPanelViewModel : IDeviceTestPanelViewModel, IIntegrationPanelViewModel
 {
     IEnumerable DeviceOptions { get; }
     object? SelectedDeviceItem { get; set; }
 
-    IEnumerable ChannelOptions { get; }
-    object? SelectedChannelItem { get; set; }
+    IEnumerable ChannelModeOptions { get; }
+    object? SelectedChannelModeItem { get; set; }
 
-    IEnumerable MeasurementTypeOptions { get; }
-    object? SelectedMeasurementTypeItem { get; set; }
-
-    IEnumerable WireCountOptions { get; }
-    object? SelectedWireCountItem { get; set; }
-
-    IEnumerable MainsFrequencyOptions { get; }
-    object? SelectedMainsFrequencyItem { get; set; }
-
-    bool FilteredRead { get; set; }
+    string TargetUpdateRateInputDraft { get; set; }
+    string WindowMillisecondsInputDraft { get; set; }
 
     string PrimaryValueLabel { get; }
     string CurrentPrimaryValue { get; }
@@ -47,11 +39,9 @@ public interface IScalarSensorPanelViewModel : IDeviceTestPanelViewModel, IInteg
     string XAxisEndLabel { get; }
 
     string FooterConnectionLabel { get; }
-    string FooterChannelLabel { get; }
-    string FooterSensorLabel { get; }
-    string FooterWireLabel { get; }
-    string FooterMainsLabel { get; }
-    string FooterFilterLabel { get; }
+    string FooterDeviceLabel { get; }
+    string FooterFormatLabel { get; }
+    string FooterModeLabel { get; }
     string FooterSystemStateLabel { get; }
 
     bool IsConnected { get; }
@@ -61,6 +51,7 @@ public interface IScalarSensorPanelViewModel : IDeviceTestPanelViewModel, IInteg
     bool CanToggleLive { get; }
     bool CanClearData { get; }
     bool CanExportData { get; }
+    bool CanApplySettings { get; }
     string ConnectionToggleLabel { get; }
     PackIconMaterialKind ConnectionToggleIconKind { get; }
     string LiveToggleLabel { get; }
@@ -70,6 +61,7 @@ public interface IScalarSensorPanelViewModel : IDeviceTestPanelViewModel, IInteg
     string DiagnosticsSubtitle { get; }
     string GetDiagnosticsSummary();
 
+    Task RefreshDevicesAsync();
     Task ConnectAsync();
     Task DisconnectAsync();
     Task ReadOnceAsync();

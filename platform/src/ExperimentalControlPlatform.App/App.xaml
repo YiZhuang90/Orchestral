@@ -1,9 +1,12 @@
 <Application x:Class="ExperimentalControlPlatform.App.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:audio="clr-namespace:ExperimentalControlPlatform.App.DevicePanels.Audio"
              xmlns:camera="clr-namespace:ExperimentalControlPlatform.App.DevicePanels.Camera"
+             xmlns:hypercam="clr-namespace:ExperimentalControlPlatform.App.DevicePanels.HyperCam"
              xmlns:integrated="clr-namespace:ExperimentalControlPlatform.App.DevicePanels.Integrated"
              xmlns:huateng="clr-namespace:ExperimentalControlPlatform.App.DevicePanels.HuaTeng"
+             xmlns:microphone="clr-namespace:ExperimentalControlPlatform.App.DevicePanels.Microphone"
              xmlns:pt104="clr-namespace:ExperimentalControlPlatform.App.DevicePanels.Pt104"
              xmlns:scalar="clr-namespace:ExperimentalControlPlatform.App.DevicePanels.Scalar">
   <Application.Resources>
@@ -25,6 +28,14 @@
 
       <DataTemplate DataType="{x:Type integrated:IntegratedCameraPanelViewModel}">
         <camera:CameraPanelTemplate />
+      </DataTemplate>
+
+      <DataTemplate DataType="{x:Type hypercam:HyperCamPanelViewModel}">
+        <camera:CameraPanelTemplate />
+      </DataTemplate>
+
+      <DataTemplate DataType="{x:Type microphone:IntegratedMicrophonePanelViewModel}">
+        <audio:AudioInputPanelTemplate />
       </DataTemplate>
     </ResourceDictionary>
   </Application.Resources>

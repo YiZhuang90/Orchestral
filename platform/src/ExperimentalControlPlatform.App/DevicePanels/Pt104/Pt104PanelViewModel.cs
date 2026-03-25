@@ -8,7 +8,9 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media;
+using ExperimentalControlPlatform.App.DevicePanels.Contracts;
 using ExperimentalControlPlatform.App.DevicePanels;
 using ExperimentalControlPlatform.App.DevicePanels.Scalar;
 using ExperimentalControlPlatform.App.Widgets;
@@ -22,6 +24,10 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
     private const double PlotCanvasWidth = 504;
     private const double PlotCanvasHeight = 280;
     private const int MaxSamples = 120;
+    private static readonly IReadOnlyList<IntegrationPanelLifecycleAction> ConnectedLifecycleActions =
+    [
+        IntegrationPanelLifecycleAction.Apply
+    ];
 
     private sealed class ChannelState
     {
@@ -40,6 +46,12 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
         public string LastReadLabel { get; set; } = "Last read: waiting for first sample";
 
         public bool IsLiveReading { get; set; }
+
+        public DateTimeOffset? LastSampleTimestamp { get; set; }
+
+        public double? LastSampleValue { get; set; }
+
+        public string? LastSourceMode { get; set; }
     }
 
     public sealed class ChannelTabOption : ObservableObject
@@ -65,6 +77,7 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
     private readonly Pt104Driver _driver;
     private readonly Dictionary<int, ChannelState> _channelStates;
     private readonly IReadOnlyList<ChannelTabOption> _channelOptions;
+    private readonly AsyncRelayCommand _lifecycleActionCommand;
     private List<(DateTime Timestamp, double Value)> _samples;
     private CancellationTokenSource? _liveReadCancellation;
     private Task? _liveReadTask;
@@ -107,16 +120,29 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
     private readonly ValueCardItem _peakLowCard = new("Peak low", "--");
     private readonly ValueCardItem _varianceCard = new("RMS variance", "--");
     private readonly ValueCardItem _sampleCountCard = new("Samples", "0");
+    private IntegrationPanelDataOutput? _dataOutput;
+    private IntegrationPanelAppliedSettingsOutput? _appliedSettingsOutput;
+    private IntegrationPanelStatusOutput? _statusOutput;
+    private IntegrationPanelDiagnosticsOutput? _diagnosticsOutput;
+    private IntegrationPanelSessionEndOutput? _sessionEndOutput;
+    private string? _lastCommand;
+    private string? _lastHardwareResponse;
+    private string? _lastError;
+    private string? _lastStateTransition;
+    private string? _lastValidationResult;
 
     public Pt104PanelViewModel(Pt104Driver driver)
     {
         _driver = driver ?? throw new ArgumentNullException(nameof(driver));
+        _lifecycleActionCommand = new AsyncRelayCommand(ExecuteLifecycleActionAsync, CanExecuteLifecycleAction, HandleLifecycleCommandException);
         _channelOptions = new[] { 1, 2, 3, 4 }.Select(channel => new ChannelTabOption(channel)).ToArray();
         _channelStates = _channelOptions.ToDictionary(channel => channel.ChannelNumber, _ => new ChannelState());
         _samples = _channelStates[_selectedChannel].Samples;
         LoadSelectedChannelState();
         SyncFooterConfig();
         StatisticsCards = new[] { _peakHighCard, _peakLowCard, _varianceCard, _sampleCountCard };
+        RefreshStatusOutput();
+        RefreshDiagnosticsOutput();
     }
 
     public string Title => "PT-104";
@@ -153,6 +179,41 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
     public IReadOnlyList<int> MainsFrequencyOptions { get; } = new[] { 50, 60 };
 
     public IReadOnlyList<ValueCardItem> StatisticsCards { get; }
+
+    public IntegrationPanelDataOutput? DataOutput
+    {
+        get => _dataOutput;
+        private set => SetProperty(ref _dataOutput, value);
+    }
+
+    public IntegrationPanelAppliedSettingsOutput? AppliedSettingsOutput
+    {
+        get => _appliedSettingsOutput;
+        private set => SetProperty(ref _appliedSettingsOutput, value);
+    }
+
+    public IntegrationPanelStatusOutput? StatusOutput
+    {
+        get => _statusOutput;
+        private set => SetProperty(ref _statusOutput, value);
+    }
+
+    public IntegrationPanelDiagnosticsOutput? DiagnosticsOutput
+    {
+        get => _diagnosticsOutput;
+        private set => SetProperty(ref _diagnosticsOutput, value);
+    }
+
+    public IntegrationPanelSessionEndOutput? SessionEndOutput
+    {
+        get => _sessionEndOutput;
+        private set => SetProperty(ref _sessionEndOutput, value);
+    }
+
+    public IReadOnlyList<IntegrationPanelLifecycleAction> SupportedLifecycleActions =>
+        IsConnected && !AnyChannelLiveReading ? ConnectedLifecycleActions : [];
+
+    public ICommand LifecycleActionCommand => _lifecycleActionCommand;
 
     IEnumerable IScalarSensorPanelViewModel.ChannelOptions => ChannelOptions;
 
@@ -235,6 +296,8 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
                 OnPropertyChanged(nameof(CanToggleLive));
                 OnPropertyChanged(nameof(LiveToggleLabel));
                 OnPropertyChanged(nameof(LiveToggleIconKind));
+                OnPropertyChanged(nameof(SupportedLifecycleActions));
+                RefreshStatusOutput();
                 HandleChannelContextSwitch();
             }
         }
@@ -497,6 +560,9 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
                 OnPropertyChanged(nameof(LiveToggleIconKind));
                 OnPropertyChanged(nameof(CanClearData));
                 OnPropertyChanged(nameof(CanExportData));
+                OnPropertyChanged(nameof(SupportedLifecycleActions));
+                RefreshStatusOutput();
+                _lifecycleActionCommand.NotifyCanExecuteChanged();
             }
         }
     }
@@ -519,6 +585,9 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
                 OnPropertyChanged(nameof(LiveToggleIconKind));
                 OnPropertyChanged(nameof(CanClearData));
                 OnPropertyChanged(nameof(CanExportData));
+                OnPropertyChanged(nameof(SupportedLifecycleActions));
+                RefreshStatusOutput();
+                _lifecycleActionCommand.NotifyCanExecuteChanged();
             }
         }
     }
@@ -560,9 +629,11 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
         await RunBusyOperationAsync(async () =>
         {
             var settings = BuildSettings();
+            SetLastCommand($"Connect channel {SelectedChannel}");
             await Task.Run(() => _driver.Connect(settings));
             await VerifyChannelAvailabilityAsync();
-            await Task.Run(() => _driver.ApplySettings(BuildSettings()));
+            settings = BuildSettings();
+            await Task.Run(() => _driver.ApplySettings(settings));
 
             IsConnected = true;
             ConnectedDeviceId = _driver.ConnectedDeviceId ?? "PT-104 connected";
@@ -570,6 +641,11 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
             SystemHealthLabel = "Nominal Operation";
             FooterConnectionLabel = "Hardware: Connected";
             FooterSystemStateLabel = "System Ready";
+            CaptureAppliedSettingsSnapshot(settings, "Applied to connected PT-104 hardware.");
+            SessionEndOutput = null;
+            ClearLastError();
+            SetLastHardwareResponse($"Connected to {ConnectedDeviceId}.");
+            SetLastStateTransition("Disconnected -> Connected");
         });
     }
 
@@ -582,6 +658,8 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
 
         await RunBusyOperationAsync(async () =>
         {
+            var hadLiveReads = AnyChannelLiveReading;
+            SetLastCommand($"Disconnect channel {SelectedChannel}");
             StopAllLiveReads();
             await Task.Run(() => _driver.Disconnect());
             IsConnected = false;
@@ -590,6 +668,19 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
             SystemHealthLabel = "Idle";
             FooterConnectionLabel = "Hardware: Disconnected";
             FooterSystemStateLabel = "Idle";
+            ClearLastError();
+            SetLastHardwareResponse("PT-104 connection closed.");
+            SetLastStateTransition("Connected -> Disconnected");
+            SessionEndOutput = new IntegrationPanelSessionEndOutput
+            {
+                EndedAt = DateTimeOffset.Now,
+                ExitReason = "Disconnected from PT-104 panel.",
+                ConnectionClosed = true,
+                LiveStopped = hadLiveReads,
+                AppliedSettingsSnapshot = AppliedSettingsOutput,
+                FinalStatus = BuildStatusOutput(),
+                OpenIssues = null
+            };
         });
     }
 
@@ -597,11 +688,16 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
     {
         await RunBusyOperationAsync(async () =>
         {
-            await Task.Run(() => _driver.ApplySettings(BuildSettings()));
+            var settings = BuildSettings();
+            SetLastCommand($"Read once on channel {SelectedChannel}");
+            await Task.Run(() => _driver.ApplySettings(settings));
+            CaptureAppliedSettingsSnapshot(settings, "Applied to connected PT-104 hardware before a single read.");
             var reading = await Task.Run(() => _driver.ReadTemperatureC(FilteredRead));
             SetChannelAvailability(CurrentChannelTab, true);
-            ApplyReading(SelectedChannel, reading);
+            ApplyReading(SelectedChannel, reading, "ReadOnce");
             StatusMessage = $"Read channel {SelectedChannel} successfully.";
+            ClearLastError();
+            SetLastHardwareResponse($"Read {reading:F3} C from channel {SelectedChannel}.");
         });
     }
 
@@ -614,6 +710,7 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
 
         try
         {
+            SetLastCommand($"Start live read on channel {SelectedChannel}");
             CurrentChannelState.IsLiveReading = true;
             SetChannelAvailability(CurrentChannelTab, true);
             RaiseLiveStateChanged();
@@ -621,12 +718,15 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
             StatusMessage = $"Live read started on channel {SelectedChannel}.";
             SystemHealthLabel = "Streaming";
             FooterSystemStateLabel = "Streaming";
+            ClearLastError();
+            SetLastStateTransition($"Channel {SelectedChannel} idle -> live");
         }
         catch (Exception ex)
         {
             StatusMessage = ex.Message;
             SystemHealthLabel = "Fault";
             FooterSystemStateLabel = "Fault";
+            SetLastError(ex.Message);
         }
 
         return Task.CompletedTask;
@@ -639,6 +739,7 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
             return;
         }
 
+        SetLastCommand($"Stop live read on channel {SelectedChannel}");
         CurrentChannelState.IsLiveReading = false;
         RaiseLiveStateChanged();
 
@@ -655,10 +756,14 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
             SystemHealthLabel = "Streaming";
             FooterSystemStateLabel = "Streaming";
         }
+
+        SetLastHardwareResponse($"Live acquisition stopped on channel {SelectedChannel}.");
+        SetLastStateTransition($"Channel {SelectedChannel} live -> idle");
     }
 
     public void ClearData()
     {
+        SetLastCommand($"Clear buffered data on channel {SelectedChannel}");
         _samples.Clear();
         LatestTemperature = "No reading";
         LastReadLabel = "Last read: cleared";
@@ -682,6 +787,11 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
         XAxisMidRightLabel = "--";
         XAxisEndLabel = "Now";
         StatusMessage = "Data cleared.";
+        CurrentChannelState.LastSampleTimestamp = null;
+        CurrentChannelState.LastSampleValue = null;
+        CurrentChannelState.LastSourceMode = null;
+        RefreshDataOutput();
+        SetLastHardwareResponse("Buffered PT-104 samples cleared in panel.");
         OnPropertyChanged(nameof(CanClearData));
         OnPropertyChanged(nameof(CanExportData));
     }
@@ -717,6 +827,8 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
 
         File.WriteAllText(saveDialog.FileName, builder.ToString(), Encoding.UTF8);
         StatusMessage = $"Exported {_samples.Count} samples to {Path.GetFileName(saveDialog.FileName)}.";
+        SetLastCommand($"Export CSV for channel {SelectedChannel}");
+        SetLastHardwareResponse($"Exported {_samples.Count} samples from channel {SelectedChannel}.");
     }
 
     public string GetDiagnosticsSummary()
@@ -790,6 +902,7 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
         LastReadLabel = state.LastReadLabel;
         UpdatePlot();
         UpdateStats();
+        RefreshDataOutput();
         OnPropertyChanged(nameof(CanClearData));
         OnPropertyChanged(nameof(CanExportData));
     }
@@ -821,14 +934,20 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
         try
         {
             IsBusy = true;
-            await Task.Run(() => _driver.ApplySettings(BuildSettings()));
+            var settings = BuildSettings();
+            SetLastCommand($"Reconfigure channel {SelectedChannel}");
+            await Task.Run(() => _driver.ApplySettings(settings));
+            CaptureAppliedSettingsSnapshot(settings, "Applied to connected PT-104 hardware.");
             StatusMessage = $"Loaded channel {SelectedChannel}.";
+            ClearLastError();
+            SetLastHardwareResponse($"Applied settings to channel {SelectedChannel}.");
         }
         catch (Exception ex)
         {
             StatusMessage = ex.Message;
             SystemHealthLabel = "Fault";
             FooterSystemStateLabel = "Fault";
+            SetLastError(ex.Message);
         }
         finally
         {
@@ -848,6 +967,7 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
             StatusMessage = ex.Message;
             SystemHealthLabel = "Fault";
             FooterSystemStateLabel = "Fault";
+            SetLastError(ex.Message);
         }
         finally
         {
@@ -887,11 +1007,13 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
                         await Application.Current.Dispatcher.InvokeAsync(() =>
                         {
                             SetChannelAvailability(channel, true);
-                            ApplyReading(channel.ChannelNumber, reading);
+                            ApplyReading(channel.ChannelNumber, reading, "LiveRead");
+                            CaptureAppliedSettingsSnapshot(settings, "Applied during PT-104 live acquisition.");
                             if (channel.ChannelNumber == SelectedChannel)
                             {
                                 StatusMessage = $"Live read updated at {DateTime.Now:HH:mm:ss}.";
                             }
+                            SetLastHardwareResponse($"Live sample {reading:F3} C from channel {channel.ChannelNumber}.");
                         });
                     }
                     catch (OperationCanceledException)
@@ -908,6 +1030,7 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
                             {
                                 StatusMessage = ex.Message;
                             }
+                            SetLastError(ex.Message);
                             RaiseLiveStateChanged();
                         });
                     }
@@ -927,6 +1050,7 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
                 StatusMessage = ex.Message;
                 SystemHealthLabel = "Fault";
                 FooterSystemStateLabel = "Fault";
+                SetLastError(ex.Message);
             });
         }
         finally
@@ -938,6 +1062,7 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
                 StatusMessage = IsConnected ? "Live read stopped." : "Ready to connect";
                 SystemHealthLabel = IsConnected ? "Nominal Operation" : "Idle";
                 FooterSystemStateLabel = IsConnected ? "System Ready" : "Idle";
+                SetLastStateTransition("Live acquisition stopped");
             });
 
             _liveReadCancellation?.Dispose();
@@ -946,7 +1071,7 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
         }
     }
 
-    private void ApplyReading(int channel, double reading)
+    private void ApplyReading(int channel, double reading, string sourceMode)
     {
         var timestamp = DateTime.Now;
         var state = _channelStates[channel];
@@ -960,6 +1085,9 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
 
         state.LatestTemperature = $"{reading:F3}°C";
         state.LastReadLabel = $"Last read: {timestamp:HH:mm:ss}";
+        state.LastSampleTimestamp = new DateTimeOffset(timestamp);
+        state.LastSampleValue = reading;
+        state.LastSourceMode = sourceMode;
 
         if (channel == SelectedChannel)
         {
@@ -967,6 +1095,7 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
             LastReadLabel = state.LastReadLabel;
             UpdatePlot();
             UpdateStats();
+            RefreshDataOutput();
             OnPropertyChanged(nameof(CanClearData));
             OnPropertyChanged(nameof(CanExportData));
         }
@@ -987,6 +1116,7 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
                 }
             }
 
+            SetLastValidationResult($"{_channelOptions.Count(option => option.IsAvailable)} channel(s) available.");
             return;
         }
 
@@ -1016,6 +1146,8 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
                 SelectedChannel = firstAvailable.ChannelNumber;
             }
         }
+
+        SetLastValidationResult($"{_channelOptions.Count(option => option.IsAvailable)} channel(s) available after fallback scan.");
     }
 
     private async Task FastVerifyChannelAvailabilityAsync(IEnumerable<ChannelTabOption> channels)
@@ -1125,6 +1257,9 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
         OnPropertyChanged(nameof(CanDisconnect));
         OnPropertyChanged(nameof(LiveToggleLabel));
         OnPropertyChanged(nameof(LiveToggleIconKind));
+        OnPropertyChanged(nameof(SupportedLifecycleActions));
+        RefreshStatusOutput();
+        _lifecycleActionCommand.NotifyCanExecuteChanged();
     }
 
     private void SetChannelAvailability(ChannelTabOption channel, bool isAvailable)
@@ -1137,6 +1272,8 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
         channel.IsAvailable = isAvailable;
         OnPropertyChanged(nameof(ChannelOptions));
         OnPropertyChanged(nameof(SelectedChannelItem));
+        OnPropertyChanged(nameof(SupportedLifecycleActions));
+        RefreshStatusOutput();
     }
 
     private static string ShortDeviceId(string deviceId)
@@ -1251,6 +1388,187 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
         FooterWireLabel = $"{SelectedWireCount}-Wire";
         FooterMainsLabel = $"{SelectedMainsFrequency} Hz";
         FooterFilterLabel = FilteredRead ? "Filtered" : "Raw";
+    }
+
+    private bool CanExecuteLifecycleAction(object? parameter)
+    {
+        return parameter is IntegrationPanelLifecycleAction.Apply && IsConnected && !IsBusy && !AnyChannelLiveReading;
+    }
+
+    private async Task ExecuteLifecycleActionAsync(object? parameter)
+    {
+        if (parameter is not IntegrationPanelLifecycleAction.Apply)
+        {
+            return;
+        }
+
+        await ApplyCurrentSettingsAsync();
+    }
+
+    private async Task ApplyCurrentSettingsAsync()
+    {
+        if (!IsConnected || AnyChannelLiveReading)
+        {
+            return;
+        }
+
+        await RunBusyOperationAsync(async () =>
+        {
+            var settings = BuildSettings();
+            SetLastCommand($"Apply settings for channel {SelectedChannel}");
+            await Task.Run(() => _driver.ApplySettings(settings));
+            SetLastHardwareResponse($"Applied settings to channel {SelectedChannel}.");
+            StatusMessage = $"Applied settings for channel {SelectedChannel}.";
+            SystemHealthLabel = "Nominal Operation";
+            FooterSystemStateLabel = "System Ready";
+            CaptureAppliedSettingsSnapshot(settings, "Applied to connected PT-104 hardware.");
+
+            SessionEndOutput = null;
+            ClearLastError();
+            SetLastStateTransition($"Applied settings for channel {SelectedChannel}");
+        });
+    }
+
+    private void HandleLifecycleCommandException(Exception exception)
+    {
+        SetLastError(exception.Message);
+        StatusMessage = exception.Message;
+    }
+
+    private void CaptureAppliedSettingsSnapshot(Pt104ConnectionSettings settings, string note)
+    {
+        AppliedSettingsOutput = new IntegrationPanelAppliedSettingsOutput
+        {
+            AppliedAt = DateTimeOffset.Now,
+            DeviceSettings = new Dictionary<string, string?>
+            {
+                ["Device"] = Title,
+                ["Connection"] = IsConnected ? ConnectedDeviceId : "Disconnected"
+            },
+            EndpointSettings = new Dictionary<string, string?>
+            {
+                ["Channel"] = settings.Channel.ToString(CultureInfo.InvariantCulture),
+                ["MeasurementType"] = settings.MeasurementType.ToString(),
+                ["WireCount"] = settings.WireCount.ToString(CultureInfo.InvariantCulture),
+                ["MainsFrequencyHz"] = settings.MainsFrequencyHz.ToString(CultureInfo.InvariantCulture),
+                ["FilteredRead"] = settings.FilteredRead ? "true" : "false"
+            },
+            SessionSettings = new Dictionary<string, string?>
+            {
+                ["SelectedChannel"] = SelectedChannel.ToString(CultureInfo.InvariantCulture),
+                ["AnyChannelLiveReading"] = AnyChannelLiveReading ? "true" : "false",
+                ["AvailableChannelCount"] = _channelOptions.Count(option => option.IsAvailable).ToString(CultureInfo.InvariantCulture)
+            },
+            NormalizationNotes = new[] { note }
+        };
+    }
+
+    private IntegrationPanelStatusOutput BuildStatusOutput()
+    {
+        var backgroundLiveChannels = _channelOptions
+            .Where(channel => channel.ChannelNumber != SelectedChannel && _channelStates[channel.ChannelNumber].IsLiveReading)
+            .Select(channel => $"Channel {channel.ChannelNumber}")
+            .ToArray();
+
+        return new IntegrationPanelStatusOutput
+        {
+            Connected = IsConnected,
+            ReadyState = IsBusy ? "Busy" : IsConnected ? "Ready" : "Disconnected",
+            FaultState = _lastError,
+            LiveState = CurrentChannelState.IsLiveReading
+                ? "Live on selected channel"
+                : AnyChannelLiveReading
+                    ? "Live on other channels"
+                    : "Stopped",
+            SelectedEndpoint = $"Channel {SelectedChannel}",
+            BackgroundActiveEndpoints = backgroundLiveChannels
+        };
+    }
+
+    private void RefreshStatusOutput()
+    {
+        StatusOutput = BuildStatusOutput();
+    }
+
+    private void RefreshDataOutput()
+    {
+        var state = CurrentChannelState;
+        if (state.LastSampleTimestamp is null || state.LastSampleValue is null || _samples.Count == 0)
+        {
+            DataOutput = null;
+            return;
+        }
+
+        var captureRate = _samples.Count > 1
+            ? (_samples.Count - 1) / Math.Max((_samples[^1].Timestamp - _samples[0].Timestamp).TotalSeconds, 1.0)
+            : (double?)null;
+
+        DataOutput = new IntegrationPanelDataOutput
+        {
+            Timestamp = state.LastSampleTimestamp,
+            EndpointId = $"PT-104:Channel-{SelectedChannel}",
+            PayloadType = "TemperatureCelsius",
+            PayloadValue = state.LastSampleValue.Value.ToString("F3", CultureInfo.InvariantCulture),
+            Units = "C",
+            SequenceNumber = _samples.Count,
+            CaptureRate = captureRate,
+            SourceMode = state.LastSourceMode
+        };
+    }
+
+    private void RefreshDiagnosticsOutput()
+    {
+        DiagnosticsOutput = new IntegrationPanelDiagnosticsOutput
+        {
+            LastCommand = _lastCommand,
+            LastHardwareResponse = _lastHardwareResponse,
+            LastError = _lastError,
+            LastStateTransition = _lastStateTransition,
+            LastValidationResult = _lastValidationResult
+        };
+    }
+
+    private void SetLastCommand(string value)
+    {
+        _lastCommand = value;
+        RefreshDiagnosticsOutput();
+    }
+
+    private void SetLastHardwareResponse(string value)
+    {
+        _lastHardwareResponse = value;
+        RefreshDiagnosticsOutput();
+    }
+
+    private void SetLastError(string value)
+    {
+        _lastError = value;
+        RefreshDiagnosticsOutput();
+        RefreshStatusOutput();
+    }
+
+    private void ClearLastError()
+    {
+        if (_lastError is null)
+        {
+            return;
+        }
+
+        _lastError = null;
+        RefreshDiagnosticsOutput();
+        RefreshStatusOutput();
+    }
+
+    private void SetLastStateTransition(string value)
+    {
+        _lastStateTransition = value;
+        RefreshDiagnosticsOutput();
+    }
+
+    private void SetLastValidationResult(string value)
+    {
+        _lastValidationResult = value;
+        RefreshDiagnosticsOutput();
     }
 }
 

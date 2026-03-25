@@ -6,10 +6,12 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using ExperimentalControlPlatform.App.DevicePanels;
 using ExperimentalControlPlatform.App.DevicePanels.Camera;
+using ExperimentalControlPlatform.App.DevicePanels.Contracts;
 using ExperimentalControlPlatform.App.Modals;
 using ExperimentalControlPlatform.Devices.Uvc;
 using MahApps.Metro.IconPacks;
@@ -19,7 +21,12 @@ namespace ExperimentalControlPlatform.App.DevicePanels.Integrated;
 public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPanelViewModel
 {
     private const double MaxDisplayFps = 20.0;
+    private static readonly IReadOnlyList<IntegrationPanelLifecycleAction> ConnectedLifecycleActions =
+    [
+        IntegrationPanelLifecycleAction.Apply
+    ];
     private readonly IntegratedCameraClient _client;
+    private readonly AsyncRelayCommand _lifecycleActionCommand;
     private CancellationTokenSource? _liveCancellation;
     private Task? _liveTask;
     private bool _isBusy;
@@ -47,10 +54,26 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
     private long? _lastFrameTimestamp;
     private long? _lastDisplayTimestamp;
     private double? _smoothedFrameRate;
+    private IntegrationPanelDataOutput? _dataOutput;
+    private IntegrationPanelAppliedSettingsOutput? _appliedSettingsOutput;
+    private IntegrationPanelStatusOutput? _statusOutput;
+    private IntegrationPanelDiagnosticsOutput? _diagnosticsOutput;
+    private IntegrationPanelSessionEndOutput? _sessionEndOutput;
+    private string? _lastCommand;
+    private string? _lastHardwareResponse;
+    private string? _lastError;
+    private string? _lastStateTransition;
+    private string? _lastValidationResult;
+    private DateTimeOffset? _lastFrameCapturedAt;
+    private long _frameSequence;
+    private string? _lastSourceMode;
 
     public IntegratedCameraPanelViewModel(IntegratedCameraClient client)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
+        _lifecycleActionCommand = new AsyncRelayCommand(ExecuteLifecycleActionAsync, CanExecuteLifecycleAction, HandleLifecycleCommandException);
+        RefreshStatusOutput();
+        RefreshDiagnosticsOutput();
     }
 
     public string Title => "Integrated Camera";
@@ -79,6 +102,7 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
                 OnPropertyChanged(nameof(CanSnapFrame));
                 OnPropertyChanged(nameof(CanToggleLive));
                 SyncFooter();
+                RefreshStatusOutput();
             }
         }
     }
@@ -101,6 +125,7 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
             if (SetProperty(ref _draftFrameRateInput, value))
             {
                 OnPropertyChanged(nameof(CanApplySettings));
+                _lifecycleActionCommand.NotifyCanExecuteChanged();
             }
         }
     }
@@ -114,6 +139,7 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
             {
                 OnPropertyChanged(nameof(SelectedColorOptionDraft));
                 OnPropertyChanged(nameof(CanApplySettings));
+                _lifecycleActionCommand.NotifyCanExecuteChanged();
             }
         }
     }
@@ -222,6 +248,40 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
 
     public string DiagnosticsSubtitle => "Windows UVC camera state";
 
+    public IntegrationPanelDataOutput? DataOutput
+    {
+        get => _dataOutput;
+        private set => SetProperty(ref _dataOutput, value);
+    }
+
+    public IntegrationPanelAppliedSettingsOutput? AppliedSettingsOutput
+    {
+        get => _appliedSettingsOutput;
+        private set => SetProperty(ref _appliedSettingsOutput, value);
+    }
+
+    public IntegrationPanelStatusOutput? StatusOutput
+    {
+        get => _statusOutput;
+        private set => SetProperty(ref _statusOutput, value);
+    }
+
+    public IntegrationPanelDiagnosticsOutput? DiagnosticsOutput
+    {
+        get => _diagnosticsOutput;
+        private set => SetProperty(ref _diagnosticsOutput, value);
+    }
+
+    public IntegrationPanelSessionEndOutput? SessionEndOutput
+    {
+        get => _sessionEndOutput;
+        private set => SetProperty(ref _sessionEndOutput, value);
+    }
+
+    public IReadOnlyList<IntegrationPanelLifecycleAction> SupportedLifecycleActions => IsConnected ? ConnectedLifecycleActions : [];
+
+    public ICommand LifecycleActionCommand => _lifecycleActionCommand;
+
     public bool IsConnected
     {
         get => _isConnected;
@@ -234,6 +294,9 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
                 OnPropertyChanged(nameof(CanToggleConnection));
                 OnPropertyChanged(nameof(CanSnapFrame));
                 OnPropertyChanged(nameof(CanToggleLive));
+                OnPropertyChanged(nameof(SupportedLifecycleActions));
+                RefreshStatusOutput();
+                _lifecycleActionCommand.NotifyCanExecuteChanged();
             }
         }
     }
@@ -250,6 +313,8 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
                 OnPropertyChanged(nameof(CanSnapFrame));
                 OnPropertyChanged(nameof(CanToggleLive));
                 OnPropertyChanged(nameof(CanApplySettings));
+                RefreshStatusOutput();
+                _lifecycleActionCommand.NotifyCanExecuteChanged();
             }
         }
     }
@@ -299,11 +364,13 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
         var cameras = _client.ListCameras();
         CameraOptions = cameras;
         SelectedCamera ??= cameras.FirstOrDefault();
+        SetLastCommand("List integrated cameras");
         _latestDiagnostics =
         [
             $"Detected cameras: {cameras.Count}",
             ..cameras.Select(camera => $"{camera.Index}: {camera.DisplayName}")
         ];
+        SetLastHardwareResponse(SelectedCamera is null ? "No integrated camera found." : "Integrated camera ready.");
         _statusMessage = SelectedCamera is null ? "No integrated camera found" : "Integrated camera ready";
         OnPropertyChanged(nameof(CanToggleConnection));
         OnPropertyChanged(nameof(CanSnapFrame));
@@ -317,6 +384,7 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
     {
         if (SelectedCamera is null)
         {
+            SetLastError("No integrated camera selected.");
             _statusMessage = "No integrated camera selected.";
             return;
         }
@@ -325,8 +393,13 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
         OnPropertyChanged(nameof(CanToggleConnection));
         try
         {
-            _ = _client.CaptureSnapshot(SelectedCamera.Index, ParseFrameRate(), _draftColorMode == "Color");
+            SetLastCommand("Connect integrated camera");
+            _ = _client.CaptureSnapshot(SelectedCamera.Index, ParseFrameRate(), _colorMode == "Color");
             IsConnected = true;
+            SessionEndOutput = null;
+            ClearLastError();
+            SetLastHardwareResponse("Integrated camera connection probe succeeded.");
+            SetLastStateTransition($"Connected to {SelectedCamera.DisplayName}");
             _statusMessage = $"Connected to {SelectedCamera.DisplayName}.";
             SyncFooter();
         }
@@ -343,10 +416,21 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
 
     public async Task DisconnectAsync()
     {
+        var liveWasActive = IsLivePreviewing;
         await StopLivePreviewAsync();
         IsConnected = false;
         _statusMessage = "Disconnected.";
         SyncFooter();
+        SetLastStateTransition("Disconnected camera");
+        SessionEndOutput = new IntegrationPanelSessionEndOutput
+        {
+            EndedAt = DateTimeOffset.Now,
+            ExitReason = "Disconnected by operator",
+            ConnectionClosed = true,
+            LiveStopped = liveWasActive,
+            AppliedSettingsSnapshot = AppliedSettingsOutput,
+            FinalStatus = BuildStatusOutput()
+        };
     }
 
     public async Task SnapFrameAsync()
@@ -360,8 +444,13 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
         OnPropertyChanged(nameof(CanSnapFrame));
         try
         {
+            SetLastCommand("Capture snapshot");
+            _lastSourceMode = "snapshot";
             var result = _client.CaptureSnapshot(SelectedCamera.Index, ParseFrameRate(), _colorMode == "Color");
             ApplyFrame(result);
+            ClearLastError();
+            SetLastHardwareResponse("Snapshot captured.");
+            SetLastStateTransition("Captured snapshot");
             _statusMessage = "Snapshot captured.";
         }
         finally
@@ -382,6 +471,8 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
 
         _liveCancellation = new CancellationTokenSource();
         IsLivePreviewing = true;
+        SetLastCommand("Start live preview");
+        SetLastStateTransition("Started live preview");
         SyncFooter();
         _statusMessage = "Live preview started.";
 
@@ -403,6 +494,7 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
         {
             _statusMessage = $"Live preview failed: {ex.Message}";
             _latestDiagnostics.Add($"Live preview failed: {ex}");
+            SetLastError(ex.Message);
         }
         finally
         {
@@ -422,6 +514,7 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
         }
 
         _liveCancellation.Cancel();
+        SetLastStateTransition("Stopped live preview");
         if (_liveTask is not null)
         {
             try
@@ -436,15 +529,57 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
 
     public async Task ApplySettingsAsync()
     {
+        if (!double.TryParse(_draftFrameRateInput, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedFrameRate) || parsedFrameRate <= 0)
+        {
+            SetLastValidationResult("Target frame rate must be a positive number.");
+            _statusMessage = "Target frame rate must be a positive number.";
+            return;
+        }
+
+        SetLastValidationResult("Validated settings.");
+        var previousFrameRateInput = _frameRateInput;
+        var previousColorMode = _colorMode;
         _frameRateInput = _draftFrameRateInput;
         _colorMode = _draftColorMode;
         SyncFooter();
         OnPropertyChanged(nameof(CanApplySettings));
+        _lifecycleActionCommand.NotifyCanExecuteChanged();
 
-        if (IsLivePreviewing)
+        var restartLive = IsLivePreviewing;
+        var appliedToHardware = true;
+        if (restartLive)
         {
             await StopLivePreviewAsync();
             await StartLivePreviewAsync();
+            appliedToHardware = _lastError is null;
+        }
+        else if (IsConnected)
+        {
+            appliedToHardware = TryApplySettingsSnapshot();
+        }
+
+        if (!appliedToHardware)
+        {
+            _frameRateInput = previousFrameRateInput;
+            _colorMode = previousColorMode;
+            SyncFooter();
+            OnPropertyChanged(nameof(CanApplySettings));
+            _lifecycleActionCommand.NotifyCanExecuteChanged();
+            return;
+        }
+
+        _statusMessage = restartLive
+            ? "Camera settings applied. Restarting live preview..."
+            : "Camera settings applied.";
+
+        ClearLastError();
+        SetLastStateTransition(restartLive
+            ? "Applied settings and restarted live preview"
+            : "Applied settings");
+        if (IsConnected)
+        {
+            CaptureAppliedSettingsSnapshot("Applied to connected integrated camera.");
+            SessionEndOutput = null;
         }
     }
 
@@ -492,6 +627,8 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
         await RunOnUiAsync(() =>
         {
             UpdateMeasuredFrameRate(frame.TimestampTicks);
+            _lastSourceMode = "live";
+            SetLastHardwareResponse("Live frame received.");
             ApplyFrame(frame);
         });
     }
@@ -503,6 +640,20 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
         ResolutionText = $"{frame.Width} x {frame.Height}";
         PixelFormatText = frame.IsColor ? "RGB" : "Mono";
         ExposureText = "Auto";
+        _lastFrameCapturedAt = DateTimeOffset.Now;
+        _frameSequence++;
+        DataOutput = new IntegrationPanelDataOutput
+        {
+            Timestamp = _lastFrameCapturedAt,
+            EndpointId = SelectedCamera?.DisplayName,
+            PayloadType = "CameraFrame",
+            PayloadValue = $"{frame.Width}x{frame.Height}; Color={(_colorMode == "Color" ? "true" : "false")}",
+            Units = "pixels",
+            SequenceNumber = _frameSequence,
+            CaptureRate = _smoothedFrameRate,
+            SourceMode = _lastSourceMode
+        };
+        CaptureAppliedSettingsSnapshot($"Verified during {(_lastSourceMode ?? "capture")}.");
         SyncFooter();
     }
 
@@ -547,6 +698,152 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
         FooterFormatLabel = _colorMode;
         FooterTriggerLabel = "UVC";
         FooterSystemStateLabel = IsLivePreviewing ? "Streaming" : "System Ready";
+    }
+
+    private bool CanExecuteLifecycleAction(object? parameter)
+    {
+        return parameter is IntegrationPanelLifecycleAction.Apply && IsConnected && CanApplySettings;
+    }
+
+    private async Task ExecuteLifecycleActionAsync(object? parameter)
+    {
+        if (parameter is not IntegrationPanelLifecycleAction.Apply)
+        {
+            return;
+        }
+
+        SetLastCommand("Apply integrated camera settings");
+        await ApplySettingsAsync().ConfigureAwait(false);
+    }
+
+    private void HandleLifecycleCommandException(Exception exception)
+    {
+        SetLastError(exception.Message);
+        _statusMessage = exception.Message;
+    }
+
+    private void CaptureAppliedSettingsSnapshot(string note)
+    {
+        AppliedSettingsOutput = new IntegrationPanelAppliedSettingsOutput
+        {
+            AppliedAt = DateTimeOffset.Now,
+            DeviceSettings = new Dictionary<string, string?>
+            {
+                ["Device"] = Title,
+                ["Camera"] = SelectedCamera?.DisplayName
+            },
+            EndpointSettings = new Dictionary<string, string?>
+            {
+                ["FrameRateFps"] = _frameRateInput,
+                ["ColorMode"] = _colorMode
+            },
+            SessionSettings = new Dictionary<string, string?>
+            {
+                ["Connected"] = IsConnected ? "true" : "false",
+                ["LivePreviewing"] = IsLivePreviewing ? "true" : "false"
+            },
+            NormalizationNotes = new[] { note }
+        };
+    }
+
+    private bool TryApplySettingsSnapshot()
+    {
+        if (SelectedCamera is null)
+        {
+            SetLastError("No integrated camera selected.");
+            _statusMessage = "No integrated camera selected.";
+            return false;
+        }
+
+        try
+        {
+            _lastSourceMode = "apply";
+            var result = _client.CaptureSnapshot(SelectedCamera.Index, ParseFrameRate(), _colorMode == "Color");
+            ApplyFrame(result);
+            ClearLastError();
+            SetLastHardwareResponse("Applied settings snapshot captured.");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            SetLastError(ex.Message);
+            _statusMessage = $"Applying settings failed: {ex.Message}";
+            return false;
+        }
+    }
+
+    private IntegrationPanelStatusOutput BuildStatusOutput()
+    {
+        return new IntegrationPanelStatusOutput
+        {
+            Connected = IsConnected,
+            ReadyState = _isBusy ? "Busy" : IsConnected ? "Ready" : "Disconnected",
+            FaultState = _lastError,
+            LiveState = IsLivePreviewing ? "Streaming" : "Stopped",
+            SelectedEndpoint = SelectedCamera?.DisplayName,
+            BackgroundActiveEndpoints = []
+        };
+    }
+
+    private void RefreshStatusOutput()
+    {
+        StatusOutput = BuildStatusOutput();
+    }
+
+    private void RefreshDiagnosticsOutput()
+    {
+        DiagnosticsOutput = new IntegrationPanelDiagnosticsOutput
+        {
+            LastCommand = _lastCommand,
+            LastHardwareResponse = _lastHardwareResponse,
+            LastError = _lastError,
+            LastStateTransition = _lastStateTransition,
+            LastValidationResult = _lastValidationResult
+        };
+    }
+
+    private void SetLastCommand(string value)
+    {
+        _lastCommand = value;
+        RefreshDiagnosticsOutput();
+    }
+
+    private void SetLastHardwareResponse(string value)
+    {
+        _lastHardwareResponse = value;
+        RefreshDiagnosticsOutput();
+    }
+
+    private void SetLastError(string value)
+    {
+        _lastError = value;
+        RefreshDiagnosticsOutput();
+        RefreshStatusOutput();
+    }
+
+    private void ClearLastError()
+    {
+        if (_lastError is null)
+        {
+            return;
+        }
+
+        _lastError = null;
+        RefreshDiagnosticsOutput();
+        RefreshStatusOutput();
+    }
+
+    private void SetLastStateTransition(string value)
+    {
+        _lastStateTransition = value;
+        RefreshDiagnosticsOutput();
+        RefreshStatusOutput();
+    }
+
+    private void SetLastValidationResult(string value)
+    {
+        _lastValidationResult = value;
+        RefreshDiagnosticsOutput();
     }
 
     private static Task RunOnUiAsync(Action action)
