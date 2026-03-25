@@ -24,7 +24,7 @@
       <widgets:DeviceControlPanel>
         <widgets:DeviceControlPanel.ConfigurationContent>
           <StackPanel>
-            <TextBlock FontSize="{StaticResource FontBody}"
+            <TextBlock FontSize="{StaticResource FontMicro}"
                        Foreground="{StaticResource TextSecondaryBrush}"
                        Text="Sensor type" />
             <Border Margin="0,6,0,0"
@@ -38,7 +38,7 @@
             </Border>
 
             <TextBlock Margin="0,10,0,0"
-                       FontSize="{StaticResource FontBody}"
+                       FontSize="{StaticResource FontMicro}"
                        Foreground="{StaticResource TextSecondaryBrush}"
                        Text="Wire count" />
             <Border Margin="0,6,0,0"
@@ -52,7 +52,7 @@
             </Border>
 
             <TextBlock Margin="0,10,0,0"
-                       FontSize="{StaticResource FontBody}"
+                       FontSize="{StaticResource FontMicro}"
                        Foreground="{StaticResource TextSecondaryBrush}"
                        Text="Mains filter" />
             <Border Margin="0,6,0,0"
@@ -76,7 +76,7 @@
 
         <widgets:DeviceControlPanel.ActionsContent>
           <StackPanel Margin="0,16,0,0">
-            <TextBlock FontSize="{StaticResource FontBody}"
+            <TextBlock FontSize="{StaticResource FontMicro}"
                        Foreground="{StaticResource TextSecondaryBrush}"
                        Text="Actions" />
 
@@ -127,6 +127,10 @@
           </StackPanel>
         </widgets:DeviceControlPanel.ActionsContent>
 
+        <widgets:DeviceControlPanel.LifecycleContent>
+          <widgets:LifecycleActionRow />
+        </widgets:DeviceControlPanel.LifecycleContent>
+
         <widgets:DeviceControlPanel.DiagnosticsContent>
           <Button Style="{StaticResource SoftActionButtonStyle}"
                   Click="DiagnosticsButton_OnClick"
@@ -156,8 +160,9 @@
             <Button Margin="0,0,8,0"
                     Style="{StaticResource ChartActionButtonStyle}"
                     Padding="9,4"
-                    Background="{StaticResource MutedSurfaceBrush}"
-                    BorderThickness="0"
+                    Background="{StaticResource SurfaceBrush}"
+                    BorderBrush="{StaticResource SoftBorderBrush}"
+                    BorderThickness="1"
                     Click="ClearDataButton_OnClick"
                     IsEnabled="{Binding CanClearData}">
               <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
@@ -171,7 +176,7 @@
             </Button>
             <Button Style="{StaticResource ChartActionButtonStyle}"
                     Padding="9,4"
-                    Background="{StaticResource TextMutedBrush}"
+                    Background="{StaticResource DarkButtonBrush}"
                     BorderThickness="0"
                     Click="ExportDataButton_OnClick"
                     Foreground="#FAF7F6"

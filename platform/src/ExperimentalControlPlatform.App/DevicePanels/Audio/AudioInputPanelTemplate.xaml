@@ -1,15 +1,15 @@
-<UserControl x:Class="ExperimentalControlPlatform.App.DevicePanels.Camera.CameraPanelTemplate"
+<UserControl x:Class="ExperimentalControlPlatform.App.DevicePanels.Audio.AudioInputPanelTemplate"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:shells="clr-namespace:ExperimentalControlPlatform.App.Shell"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:widgets="clr-namespace:ExperimentalControlPlatform.App.Widgets"
-             Loaded="CameraPanelTemplate_OnLoaded">
+             Loaded="AudioInputPanelTemplate_OnLoaded">
   <shells:DevicePanelShell PanelTitle="{Binding Title}"
-                           LeftRailWidth="160">
+                           LeftRailWidth="168">
     <shells:DevicePanelShell.TitleContent>
-      <widgets:HeaderDeviceSelector ItemsSource="{Binding CameraOptions}"
-                                    SelectedItem="{Binding SelectedCameraItem, Mode=TwoWay}"
+      <widgets:HeaderDeviceSelector ItemsSource="{Binding DeviceOptions}"
+                                    SelectedItem="{Binding SelectedDeviceItem, Mode=TwoWay}"
                                     DisplayMemberPath="HeaderDisplayName" />
     </shells:DevicePanelShell.TitleContent>
 
@@ -17,62 +17,44 @@
       <widgets:DeviceControlPanel>
         <widgets:DeviceControlPanel.ConfigurationContent>
           <StackPanel>
-            <StackPanel Margin="0,10,0,0"
-                        Visibility="{Binding ExposureControlVisibility}">
-              <TextBlock FontSize="{StaticResource FontMicro}"
-                         Foreground="{StaticResource TextSecondaryBrush}"
-                         Text="Exposure (us)" />
-              <Border Margin="0,4,0,0"
-                      Background="{StaticResource SurfaceBrush}"
-                      BorderBrush="{StaticResource SoftBorderBrush}"
-                      BorderThickness="1"
-                      CornerRadius="{StaticResource RadiusControl}">
-                <TextBox Style="{StaticResource TextBoxStyle}"
-                         Text="{Binding ExposureInputDraft, UpdateSourceTrigger=PropertyChanged}" />
-              </Border>
-            </StackPanel>
-
-            <TextBlock Margin="0,8,0,0"
-                       FontSize="{StaticResource FontMicro}"
+            <TextBlock FontSize="{StaticResource FontMicro}"
                        Foreground="{StaticResource TextSecondaryBrush}"
-                       Text="Target frame rate (fps)" />
-            <Border Margin="0,4,0,0"
+                       Text="Target update rate (Hz)" />
+            <Border Margin="0,6,0,0"
                     Background="{StaticResource SurfaceBrush}"
                     BorderBrush="{StaticResource SoftBorderBrush}"
                     BorderThickness="1"
                     CornerRadius="{StaticResource RadiusControl}">
               <TextBox Style="{StaticResource TextBoxStyle}"
-                       Text="{Binding FrameRateInputDraft, UpdateSourceTrigger=PropertyChanged}" />
+                       Text="{Binding TargetUpdateRateInputDraft, UpdateSourceTrigger=PropertyChanged}" />
             </Border>
 
-            <TextBlock Margin="0,8,0,0"
+            <TextBlock Margin="0,10,0,0"
                        FontSize="{StaticResource FontMicro}"
                        Foreground="{StaticResource TextSecondaryBrush}"
-                       Text="Color" />
-            <Border Margin="0,4,0,0"
+                       Text="Window (ms)" />
+            <Border Margin="0,6,0,0"
+                    Background="{StaticResource SurfaceBrush}"
+                    BorderBrush="{StaticResource SoftBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource RadiusControl}">
+              <TextBox Style="{StaticResource TextBoxStyle}"
+                       Text="{Binding WindowMillisecondsInputDraft, UpdateSourceTrigger=PropertyChanged}" />
+            </Border>
+
+            <TextBlock Margin="0,10,0,0"
+                       FontSize="{StaticResource FontMicro}"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       Text="Channel mode" />
+            <Border Margin="0,6,0,0"
                     Background="{StaticResource SurfaceBrush}"
                     BorderBrush="{StaticResource SoftBorderBrush}"
                     BorderThickness="1"
                     CornerRadius="{StaticResource RadiusControl}">
               <ComboBox Style="{StaticResource ComboBoxStyle}"
-                        ItemsSource="{Binding ColorOptions}"
-                        SelectedItem="{Binding SelectedColorOptionDraft}" />
+                        ItemsSource="{Binding ChannelModeOptions}"
+                        SelectedItem="{Binding SelectedChannelModeItem}" />
             </Border>
-
-            <Button Margin="0,10,0,0"
-                    HorizontalAlignment="Stretch"
-                    Style="{StaticResource OutlineActionButtonStyle}"
-                    Click="MoreSettingsButton_OnClick"
-                    Visibility="{Binding AdvancedSettingsVisibility}">
-              <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                <iconPacks:PackIconMaterial Margin="0,0,8,0"
-                                            Kind="Tune"
-                                            Width="14"
-                                            Height="14"
-                                            VerticalAlignment="Center" />
-                <TextBlock Text="More settings" />
-              </StackPanel>
-            </Button>
           </StackPanel>
         </widgets:DeviceControlPanel.ConfigurationContent>
 
@@ -82,7 +64,7 @@
                        Foreground="{StaticResource TextSecondaryBrush}"
                        Text="Actions" />
 
-            <StackPanel Margin="0,4,0,0">
+            <StackPanel Margin="0,6,0,0">
               <Button Style="{StaticResource ConnectionToggleButtonStyle}"
                       Tag="{Binding IsConnected}"
                       Click="ToggleConnectionButton_OnClick"
@@ -97,23 +79,23 @@
                 </StackPanel>
               </Button>
 
-              <Button Margin="0,4,0,0"
+              <Button Margin="0,6,0,0"
                       Style="{StaticResource OutlineActionButtonStyle}"
-                      Click="SnapFrameButton_OnClick"
-                      IsEnabled="{Binding CanSnapFrame}">
+                      Click="ReadOnceButton_OnClick"
+                      IsEnabled="{Binding CanReadOnce}">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                   <iconPacks:PackIconMaterial Margin="0,0,8,0"
-                                              Kind="Camera"
+                                              Kind="Refresh"
                                               Width="14"
                                               Height="14"
                                               VerticalAlignment="Center" />
-                  <TextBlock Text="Snap frame" />
+                  <TextBlock Text="Read once" />
                 </StackPanel>
               </Button>
 
-              <Button Margin="0,4,0,0"
+              <Button Margin="0,6,0,0"
                       Style="{StaticResource LiveToggleButtonStyle}"
-                      Tag="{Binding IsLivePreviewing}"
+                      Tag="{Binding IsLiveReading}"
                       Click="ToggleLiveButton_OnClick"
                       IsEnabled="{Binding CanToggleLive}">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
@@ -151,68 +133,71 @@
     </shells:DevicePanelShell.LeftRailContent>
 
     <shells:DevicePanelShell.WorkspaceContent>
-      <widgets:CameraDataPanel>
-        <widgets:CameraDataPanel.HeaderContent>
+      <widgets:SerialDataPanel>
+        <widgets:SerialDataPanel.HeaderContent>
           <widgets:RealTimeValueHeader Label="{Binding PrimaryValueLabel}"
                                        Value="{Binding CurrentPrimaryValue}" />
-        </widgets:CameraDataPanel.HeaderContent>
+        </widgets:SerialDataPanel.HeaderContent>
 
-        <widgets:CameraDataPanel.ToolbarContent>
-          <StackPanel Orientation="Horizontal"
-                      VerticalAlignment="Center"
-                      Visibility="{Binding RoiToolbarVisibility}">
-            <Button Padding="14,0"
-                    MinWidth="92"
-                    Style="{StaticResource OutlineActionButtonStyle}"
-                    Click="SetRoiButton_OnClick"
-                    IsEnabled="{Binding CanSetRoi}">
+        <widgets:SerialDataPanel.ToolbarContent>
+          <StackPanel Orientation="Horizontal">
+            <Button Margin="0,0,8,0"
+                    Style="{StaticResource ChartActionButtonStyle}"
+                    Padding="9,4"
+                    Background="{StaticResource SurfaceBrush}"
+                    BorderBrush="{StaticResource SoftBorderBrush}"
+                    BorderThickness="1"
+                    Click="ClearDataButton_OnClick"
+                    IsEnabled="{Binding CanClearData}">
               <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                 <iconPacks:PackIconMaterial Margin="0,0,8,0"
-                                            Kind="Selection"
+                                            Kind="TrashCanOutline"
                                             Width="14"
                                             Height="14"
                                             VerticalAlignment="Center" />
-                <TextBlock Text="Set ROI" />
+                <TextBlock Text="Clear data" />
               </StackPanel>
             </Button>
-
-            <Button Margin="10,0,0,0"
-                    Padding="14,0"
-                    MinWidth="92"
-                    Style="{StaticResource SoftActionButtonStyle}"
-                    Click="ClearRoiButton_OnClick"
-                    IsEnabled="{Binding CanClearRoi}">
+            <Button Style="{StaticResource ChartActionButtonStyle}"
+                    Padding="9,4"
+                    Background="{StaticResource DarkButtonBrush}"
+                    BorderThickness="0"
+                    Click="ExportDataButton_OnClick"
+                    Foreground="#FAF7F6"
+                    IsEnabled="{Binding CanExportData}">
               <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                 <iconPacks:PackIconMaterial Margin="0,0,8,0"
-                                            Kind="BackspaceOutline"
+                                            Kind="FileExportOutline"
                                             Width="14"
                                             Height="14"
                                             VerticalAlignment="Center" />
-                <TextBlock Text="Clear ROI" />
+                <TextBlock Text="Export CSV" />
               </StackPanel>
             </Button>
           </StackPanel>
-        </widgets:CameraDataPanel.ToolbarContent>
+        </widgets:SerialDataPanel.ToolbarContent>
 
-        <widgets:CameraDataPanel.ImageContent>
-          <widgets:CameraImageWindow BackgroundImage="{Binding BackgroundFrameImage}"
-                                     PreviewImage="{Binding PreviewImage}"
-                                     EmptyStateText="{Binding EmptyStateText}"
-                                     RoiPlaceholderVisible="{Binding RoiOverlayVisibility}"
-                                     RoiHandleVisibility="{Binding RoiHandleVisibility}"
-                                     RoiLiveVisibility="{Binding RoiLiveVisibility}"
-                                     RoiRectNormalized="{Binding RoiRectNormalized}"
-                                     RoiEditStarted="CameraImageWindow_OnRoiEditStarted"
-                                     RoiEditCompleted="CameraImageWindow_OnRoiEditCompleted" />
-        </widgets:CameraDataPanel.ImageContent>
+        <widgets:SerialDataPanel.PlotContent>
+          <widgets:PlottingWindow PlotWidth="{Binding PlotWidth}"
+                                  PlotHeight="{Binding PlotHeight}"
+                                  PlotMinLabel="{Binding PlotMinLabel}"
+                                  PlotLowerMidLabel="{Binding PlotLowerMidLabel}"
+                                  PlotMidLabel="{Binding PlotMidLabel}"
+                                  PlotUpperMidLabel="{Binding PlotUpperMidLabel}"
+                                  PlotMaxLabel="{Binding PlotMaxLabel}"
+                                  XAxisStartLabel="{Binding XAxisStartLabel}"
+                                  XAxisMidLeftLabel="{Binding XAxisMidLeftLabel}"
+                                  XAxisMidRightLabel="{Binding XAxisMidRightLabel}"
+                                  XAxisEndLabel="{Binding XAxisEndLabel}"
+                                  PlotPoints="{Binding PlotPoints}"
+                                  PlotFillPoints="{Binding PlotFillPoints}" />
+        </widgets:SerialDataPanel.PlotContent>
 
-        <widgets:CameraDataPanel.MetadataContent>
-          <widgets:FrameMetadataStrip ResolutionText="{Binding ResolutionText}"
-                                      PixelFormatText="{Binding PixelFormatText}"
-                                      ExposureText="{Binding ExposureText}"
-                                      FrameRateText="{Binding FrameRateText}" />
-        </widgets:CameraDataPanel.MetadataContent>
-      </widgets:CameraDataPanel>
+        <widgets:SerialDataPanel.StatsContent>
+          <widgets:StatisticsPanel ItemsSource="{Binding StatisticsCards}"
+                                   Columns="4" />
+        </widgets:SerialDataPanel.StatsContent>
+      </widgets:SerialDataPanel>
     </shells:DevicePanelShell.WorkspaceContent>
 
     <shells:DevicePanelShell.FooterContent>
@@ -232,7 +217,7 @@
                        FontFamily="{StaticResource BodyFontFamily}"
                        FontSize="{StaticResource FontBody}"
                        Foreground="{StaticResource TextSecondaryBrush}"
-                       Text="{Binding FooterCameraLabel}" />
+                       Text="{Binding FooterDeviceLabel}" />
             <TextBlock Margin="24,0,0,0"
                        FontFamily="{StaticResource BodyFontFamily}"
                        FontSize="{StaticResource FontBody}"
@@ -242,7 +227,7 @@
                        FontFamily="{StaticResource BodyFontFamily}"
                        FontSize="{StaticResource FontBody}"
                        Foreground="{StaticResource TextSecondaryBrush}"
-                       Text="{Binding FooterTriggerLabel}" />
+                       Text="{Binding FooterModeLabel}" />
           </StackPanel>
         </widgets:FooterStatusBar.LeftContent>
 
