@@ -13,6 +13,10 @@ The goal is to make every integration panel usable not only as a UI surface, but
 - recording,
 - and future orchestration.
 
+The runtime architecture that should carry those inputs and outputs at system level is defined in:
+
+- [DEVICE_RUNTIME_IO_ARCHITECTURE.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/DEVICE_RUNTIME_IO_ARCHITECTURE.md)
+
 ## Core Principle
 
 An integration panel is not only a renderer.
@@ -25,6 +29,17 @@ It is a bounded operational node with:
 - and termination behavior.
 
 ## 1. Input Contract
+
+**Status**: architecture intent, not yet implemented as a general system contract.
+
+The input contract depends on:
+
+- a device identity registry,
+- a capability-model layer,
+- and a settings persistence layer.
+
+Those are out of scope for the first runtime IO implementation pass.
+Current panels still rely heavily on hardcoded defaults and local initialization paths.
 
 Every integration panel should consume:
 
@@ -85,6 +100,7 @@ Examples:
 Suggested fields:
 
 - `Timestamp`
+- `DeviceId`
 - `EndpointId`
 - `PayloadType`
 - `PayloadValue`
