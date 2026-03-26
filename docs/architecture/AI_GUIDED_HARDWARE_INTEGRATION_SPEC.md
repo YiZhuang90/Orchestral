@@ -225,6 +225,8 @@ The decision should be based on:
 The detailed archetype and widget mapping rules are defined in:
 
 - [DEVICE_ARCHETYPE_MAPPING.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/DEVICE_ARCHETYPE_MAPPING.md)
+- [DEVICE_RUNTIME_IO_ARCHITECTURE.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/DEVICE_RUNTIME_IO_ARCHITECTURE.md)
+- [TIMING_AND_SYNCHRONIZATION_STRATEGY.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/TIMING_AND_SYNCHRONIZATION_STRATEGY.md)
 
 This stage should not create a one-off UI by default. It should first try to map the device onto the existing widget system and window archetypes, then infer the default parameter surface for the chosen archetype.
 
@@ -240,6 +242,10 @@ The default order should be:
 2. high-level general device template and shell,
 3. new class template,
 4. one-off panel only as a last resort.
+
+For each integrated device, this workflow should also produce a concrete archetype record using:
+
+- [DEVICE_ARCHETYPE_RECORD_TEMPLATE.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/DEVICE_ARCHETYPE_RECORD_TEMPLATE.md)
 
 ## 7.4 Stage D: generated integration attempt
 

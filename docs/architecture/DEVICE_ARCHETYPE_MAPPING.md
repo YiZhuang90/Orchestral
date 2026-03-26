@@ -4,6 +4,10 @@
 
 This document defines how Orchestral should map a newly integrated device onto an implementation-window archetype and widget stack.
 
+The corresponding runtime IO model for those archetypes is defined in:
+
+- [DEVICE_RUNTIME_IO_ARCHITECTURE.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/DEVICE_RUNTIME_IO_ARCHITECTURE.md)
+
 The default rule is:
 
 - reuse an existing shell and widget family whenever possible
@@ -235,6 +239,11 @@ Ownership rule:
 - keep the dominant archetype's ownership model
 - add only one extra endpoint or session layer when the secondary role truly requires it
 
+Hybrid versus two-session decision rule:
+
+- use one hybrid session when command acceptance and data output share the same connection lifecycle and protocol boundary
+- use two sessions only when the acquisition path and the command path use physically different communication channels or genuinely independent connection state
+
 Examples:
 
 - camera with deep hardware-control workflow
@@ -299,6 +308,14 @@ For each integrated device, Orchestral should record:
 - panel output model
 - optional widget families left for later
 - and why this mapping was selected
+
+Use:
+
+- [DEVICE_ARCHETYPE_RECORD_TEMPLATE.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/DEVICE_ARCHETYPE_RECORD_TEMPLATE.md)
+
+Suggested location:
+
+- `docs/devices/<device-name>/device-archetype-record.md`
 
 Common future widget candidates across archetypes include:
 
