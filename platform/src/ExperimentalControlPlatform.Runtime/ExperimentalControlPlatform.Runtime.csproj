@@ -7,5 +7,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ExperimentalControlPlatform.Core\ExperimentalControlPlatform.Core.csproj" />
+    <ProjectReference Include="..\ExperimentalControlPlatform.Devices\ExperimentalControlPlatform.Devices.csproj" />
   </ItemGroup>
 </Project>

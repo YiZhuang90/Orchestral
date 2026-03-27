@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -15,6 +16,7 @@ using ExperimentalControlPlatform.App.DevicePanels.Audio;
 using ExperimentalControlPlatform.App.DevicePanels.Contracts;
 using ExperimentalControlPlatform.App.Widgets;
 using ExperimentalControlPlatform.Devices.Audio;
+using ExperimentalControlPlatform.Runtime;
 using MahApps.Metro.IconPacks;
 using Microsoft.Win32;
 
@@ -30,14 +32,15 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
         IntegrationPanelLifecycleAction.Apply
     ];
 
-    private readonly IntegratedMicrophoneClient _client;
+    private readonly IMicrophoneService _microphoneService;
+    private readonly IDeviceSessionRegistry _sessionRegistry;
     private readonly AsyncRelayCommand _lifecycleActionCommand;
     private readonly ValueCardItem _peakCard = new("Peak", "--");
     private readonly ValueCardItem _sampleRateCard = new("Sample rate", "--");
     private readonly ValueCardItem _windowCard = new("Window", "--");
     private readonly ValueCardItem _clippingCard = new("Clipping", "No");
-    private CancellationTokenSource? _liveReadCancellation;
-    private Task? _liveReadTask;
+    private IntegratedMicrophoneSession? _session;
+    private MicrophoneFrameJournal? _frameJournal;
     private bool _isBusy;
     private bool _isConnected;
     private bool _isLiveReading;
@@ -77,9 +80,10 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
     private long _frameSequence;
     private string? _lastSourceMode;
 
-    public IntegratedMicrophonePanelViewModel(IntegratedMicrophoneClient client)
+    public IntegratedMicrophonePanelViewModel(IMicrophoneService microphoneService, IDeviceSessionRegistry sessionRegistry)
     {
-        _client = client ?? throw new ArgumentNullException(nameof(client));
+        _microphoneService = microphoneService ?? throw new ArgumentNullException(nameof(microphoneService));
+        _sessionRegistry = sessionRegistry ?? throw new ArgumentNullException(nameof(sessionRegistry));
         _lifecycleActionCommand = new AsyncRelayCommand(ExecuteLifecycleActionAsync, CanExecuteLifecycleAction, HandleLifecycleCommandException);
         StatisticsCards = new[] { _peakCard, _sampleRateCard, _windowCard, _clippingCard };
         SyncXAxisLabels(ParseWindowMilliseconds(_windowMillisecondsInput));
@@ -371,7 +375,7 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
 
     public async Task RefreshDevicesAsync()
     {
-        var devices = await Task.Run(() => _client.ListDevices()).ConfigureAwait(true);
+        var devices = await Task.Run(() => _microphoneService.ListCaptureDevices()).ConfigureAwait(true);
         DeviceOptions = devices;
         SelectedDevice ??= DeviceOptions.FirstOrDefault();
         SetLastCommand("List microphones");
@@ -391,143 +395,81 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
             return;
         }
 
-        _isBusy = true;
-        RaiseCommandState();
+        var session = GetOrCreateSession();
+        BindSession(session);
+
         try
         {
-            SetLastCommand("Connect integrated microphone");
-            var deviceId = SelectedDevice.DeviceId;
-            var targetUpdateRate = ParseTargetUpdateRate();
-            var windowMilliseconds = ParseWindowMilliseconds(_windowMillisecondsInput);
-            var channelMode = ParseChannelMode(_selectedChannelModeLabel);
-            var frame = await Task.Run(
-                () => _client.CaptureSnapshot(deviceId, targetUpdateRate, windowMilliseconds, channelMode))
-                .ConfigureAwait(true);
-            IsConnected = true;
-            SessionEndOutput = null;
-            ClearLastError();
-            SetLastHardwareResponse("Integrated microphone connection probe succeeded.");
-            SetLastStateTransition($"Connected to {SelectedDevice.DisplayName}");
-            ApplyFrame(frame, "connect");
-            _statusMessage = $"Connected to {SelectedDevice.DisplayName}.";
-            SyncFooter();
+            await session.ConnectAsync(BuildCaptureSettings()).ConfigureAwait(true);
         }
         catch (Exception ex)
         {
-            SetLastError(ex.Message);
-            _statusMessage = $"Unable to connect microphone: {ex.Message}";
+            Debug.WriteLine($"[IntegratedMicrophonePanelViewModel] Connect failed: {ex}");
         }
-        finally
-        {
-            _isBusy = false;
-            RaiseCommandState();
-        }
-
-        await Task.CompletedTask;
     }
 
     public async Task DisconnectAsync()
     {
-        var liveWasActive = IsLiveReading;
-        StopLiveRead();
-        if (_liveReadTask is not null)
+        if (_session is null)
         {
-            try
-            {
-                await _liveReadTask.ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-            }
+            return;
         }
 
-        IsConnected = false;
-        _statusMessage = "Disconnected.";
-        SyncFooter();
-        SetLastStateTransition("Disconnected microphone");
-        SessionEndOutput = new IntegrationPanelSessionEndOutput
+        var session = _session;
+        try
         {
-            EndedAt = DateTimeOffset.Now,
-            ExitReason = "Disconnected by operator",
-            ConnectionClosed = true,
-            LiveStopped = liveWasActive,
-            AppliedSettingsSnapshot = AppliedSettingsOutput,
-            FinalStatus = BuildStatusOutput()
-        };
+            await session.DisconnectAsync(StopReason.UserRequested("Disconnected by operator")).ConfigureAwait(true);
+        }
+        finally
+        {
+            _sessionRegistry.Remove(session.SessionId);
+            UnbindSession();
+            await session.DisposeAsync().ConfigureAwait(true);
+        }
     }
 
     public async Task ReadOnceAsync()
     {
-        if (SelectedDevice is null)
+        if (_session is null)
         {
             return;
         }
 
-        _isBusy = true;
-        RaiseCommandState();
         try
         {
-            SetLastCommand("Capture microphone snapshot");
-            var deviceId = SelectedDevice.DeviceId;
-            var targetUpdateRate = ParseTargetUpdateRate();
-            var windowMilliseconds = ParseWindowMilliseconds(_windowMillisecondsInput);
-            var channelMode = ParseChannelMode(_selectedChannelModeLabel);
-            var frame = await Task.Run(
-                () => _client.CaptureSnapshot(deviceId, targetUpdateRate, windowMilliseconds, channelMode))
-                .ConfigureAwait(true);
-            ClearLastError();
-            SetLastHardwareResponse("Microphone snapshot captured.");
-            SetLastStateTransition("Captured microphone snapshot");
-            ApplyFrame(frame, "snapshot");
-            _statusMessage = "Microphone snapshot captured.";
+            await _session.ReadOnceAsync().ConfigureAwait(true);
         }
         catch (Exception ex)
         {
-            SetLastError(ex.Message);
-            _statusMessage = $"Snapshot failed: {ex.Message}";
+            Debug.WriteLine($"[IntegratedMicrophonePanelViewModel] Read once failed: {ex}");
         }
-        finally
-        {
-            _isBusy = false;
-            RaiseCommandState();
-        }
-
-        await Task.CompletedTask;
     }
 
     public async Task StartLiveReadAsync()
     {
-        if (SelectedDevice is null || IsLiveReading)
+        if (_session is null || IsLiveReading)
         {
             return;
         }
 
-        _liveReadCancellation = new CancellationTokenSource();
-        IsLiveReading = true;
-        SetLastCommand("Start live microphone read");
-        SetLastStateTransition("Started live microphone read");
-        SyncFooter();
-        _statusMessage = "Live microphone read started.";
-
-        var deviceId = SelectedDevice.DeviceId;
-        var targetUpdateRate = ParseTargetUpdateRate();
-        var windowMilliseconds = ParseWindowMilliseconds(_windowMillisecondsInput);
-        var channelMode = ParseChannelMode(_selectedChannelModeLabel);
-        var cancellationToken = _liveReadCancellation.Token;
-
-        _liveReadTask = RunLiveReadLoopAsync(deviceId, targetUpdateRate, windowMilliseconds, channelMode, cancellationToken);
-        await Task.CompletedTask;
+        try
+        {
+            await _session.StartLiveAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[IntegratedMicrophonePanelViewModel] Start live failed: {ex}");
+        }
     }
 
     public void StopLiveRead()
     {
-        if (_liveReadCancellation is null)
+        if (_session is null)
         {
             return;
         }
 
-        _liveReadCancellation.Cancel();
-        SetLastStateTransition("Stopped live microphone read");
+        _ = StopLiveReadCoreAsync();
     }
 
     public void ClearData()
@@ -592,65 +534,23 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
             $"Target update rate: {_targetUpdateRateInput} Hz",
             $"Window: {_windowMillisecondsInput} ms",
             $"Channel mode: {_selectedChannelModeLabel}",
-            $"Status: {_statusMessage}"
+            $"Status: {_statusMessage}",
+            $"Runtime journal frames: {_frameJournal?.FrameCount ?? 0}"
         });
     }
 
     public void Dispose()
     {
-        _liveReadCancellation?.Cancel();
-        _liveReadCancellation?.Dispose();
-    }
+        if (_session is null)
+        {
+            UnbindSession();
+            return;
+        }
 
-    private async Task ApplyLiveFrameAsync(MicrophoneFrame frame)
-    {
-        await RunOnUiAsync(() =>
-        {
-            _lastSourceMode = "live";
-            SetLastHardwareResponse("Live microphone frame received.");
-            ApplyFrame(frame, "live");
-        }).ConfigureAwait(false);
-    }
-
-    private async Task RunLiveReadLoopAsync(
-        string deviceId,
-        double targetUpdateRate,
-        int windowMilliseconds,
-        MicrophoneChannelMode channelMode,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            await _client.StreamFramesAsync(
-                deviceId,
-                targetUpdateRate,
-                windowMilliseconds,
-                channelMode,
-                ApplyLiveFrameAsync,
-                cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception ex)
-        {
-            await RunOnUiAsync(() =>
-            {
-                SetLastError(ex.Message);
-                _statusMessage = $"Live microphone read failed: {ex.Message}";
-            }).ConfigureAwait(false);
-        }
-        finally
-        {
-            await RunOnUiAsync(() =>
-            {
-                IsLiveReading = false;
-                _liveReadCancellation?.Dispose();
-                _liveReadCancellation = null;
-                _liveReadTask = null;
-                SyncFooter();
-            }).ConfigureAwait(false);
-        }
+        var session = _session;
+        _sessionRegistry.Remove(session.SessionId);
+        UnbindSession();
+        _ = RunSessionDisposeAsync(session, "Panel disposed.");
     }
 
     public async Task ApplySettingsAsync()
@@ -670,70 +570,28 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
         }
 
         SetLastValidationResult("Validated microphone settings.");
-        var previousUpdateRate = _targetUpdateRateInput;
-        var previousWindow = _windowMillisecondsInput;
-        var previousMode = _selectedChannelModeLabel;
-
-        _targetUpdateRateInput = _draftTargetUpdateRateInput;
-        _windowMillisecondsInput = _draftWindowMillisecondsInput;
-        _selectedChannelModeLabel = _draftSelectedChannelModeLabel;
-        SyncXAxisLabels(ParseWindowMilliseconds(_windowMillisecondsInput));
-        SyncFooter();
-        OnPropertyChanged(nameof(CanApplySettings));
-        _lifecycleActionCommand.NotifyCanExecuteChanged();
-
-        var restartLive = IsLiveReading;
-        var appliedToHardware = true;
-        if (restartLive)
+        if (_session is null)
         {
-            StopLiveRead();
-            if (_liveReadTask is not null)
-            {
-                try
-                {
-                    await _liveReadTask.ConfigureAwait(false);
-                }
-                catch (OperationCanceledException)
-                {
-                }
-            }
-
-            await StartLiveReadAsync().ConfigureAwait(false);
-            appliedToHardware = _lastError is null;
-        }
-        else if (IsConnected)
-        {
-            appliedToHardware = await TryApplySettingsSnapshotAsync().ConfigureAwait(true);
-        }
-
-        if (!appliedToHardware)
-        {
-            _targetUpdateRateInput = previousUpdateRate;
-            _windowMillisecondsInput = previousWindow;
-            _selectedChannelModeLabel = previousMode;
+            _targetUpdateRateInput = _draftTargetUpdateRateInput;
+            _windowMillisecondsInput = _draftWindowMillisecondsInput;
+            _selectedChannelModeLabel = _draftSelectedChannelModeLabel;
             SyncXAxisLabels(ParseWindowMilliseconds(_windowMillisecondsInput));
             SyncFooter();
+            SetLastStateTransition("Staged settings for the next capture");
+            _statusMessage = "Microphone settings staged for the next capture.";
             OnPropertyChanged(nameof(CanApplySettings));
             _lifecycleActionCommand.NotifyCanExecuteChanged();
+            await Task.CompletedTask;
             return;
         }
 
-        _statusMessage = restartLive
-            ? "Microphone settings applied. Restarting live read..."
-            : IsConnected
-                ? "Microphone settings applied."
-                : "Microphone settings staged for the next capture.";
-
-        ClearLastError();
-        SetLastStateTransition(restartLive
-            ? "Applied settings and restarted live microphone read"
-            : IsConnected
-                ? "Applied settings"
-                : "Staged settings for the next capture");
-        if (IsConnected)
+        try
         {
-            CaptureAppliedSettingsSnapshot("Applied to connected integrated microphone.");
-            SessionEndOutput = null;
+            await _session.ApplySettingsAsync(BuildCaptureSettings()).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[IntegratedMicrophonePanelViewModel] Apply settings failed: {ex}");
         }
     }
 
@@ -891,38 +749,6 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
         _statusMessage = exception.Message;
     }
 
-    private async Task<bool> TryApplySettingsSnapshotAsync()
-    {
-        if (SelectedDevice is null)
-        {
-            SetLastError("No microphone selected.");
-            _statusMessage = "No microphone selected.";
-            return false;
-        }
-
-        try
-        {
-            _lastSourceMode = "apply";
-            var deviceId = SelectedDevice.DeviceId;
-            var targetUpdateRate = ParseTargetUpdateRate();
-            var windowMilliseconds = ParseWindowMilliseconds(_windowMillisecondsInput);
-            var channelMode = ParseChannelMode(_selectedChannelModeLabel);
-            var frame = await Task.Run(
-                () => _client.CaptureSnapshot(deviceId, targetUpdateRate, windowMilliseconds, channelMode))
-                .ConfigureAwait(true);
-            ApplyFrame(frame, "apply");
-            ClearLastError();
-            SetLastHardwareResponse("Applied microphone settings snapshot captured.");
-            return true;
-        }
-        catch (Exception ex)
-        {
-            SetLastError(ex.Message);
-            _statusMessage = $"Applying microphone settings failed: {ex.Message}";
-            return false;
-        }
-    }
-
     private void CaptureAppliedSettingsSnapshot(string note)
     {
         AppliedSettingsOutput = new IntegrationPanelAppliedSettingsOutput
@@ -1069,5 +895,244 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
         }
 
         return dispatcher.InvokeAsync(action).Task;
+    }
+
+    private async Task StopLiveReadCoreAsync()
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _session.StopLiveAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[IntegratedMicrophonePanelViewModel] Stop live failed: {ex}");
+        }
+    }
+
+    private IntegratedMicrophoneSession GetOrCreateSession()
+    {
+        if (SelectedDevice is null)
+        {
+            throw new InvalidOperationException("No microphone selected.");
+        }
+
+        var sessionId = new DeviceSessionId("Microphone", SelectedDevice.DeviceId);
+        return _sessionRegistry.GetOrAdd(sessionId, () => new IntegratedMicrophoneSession(_microphoneService, SelectedDevice));
+    }
+
+    private void BindSession(IntegratedMicrophoneSession session)
+    {
+        if (ReferenceEquals(_session, session))
+        {
+            return;
+        }
+
+        UnbindSession();
+        _session = session;
+        _session.State.Changed += OnSessionStateChanged;
+        _session.Diagnostics.Changed += OnSessionDiagnosticsChanged;
+        _session.AppliedSettings.Changed += OnSessionAppliedSettingsChanged;
+        _session.SessionEnd.Changed += OnSessionEndChanged;
+        _session.LatestFrame.Changed += OnSessionFrameChanged;
+        _frameJournal = new MicrophoneFrameJournal(_session.Frames);
+
+        ApplySessionState(_session.State.Current!);
+        ApplySessionDiagnostics(_session.Diagnostics.Current!);
+        ApplySessionAppliedSettings(_session.AppliedSettings.Current);
+        ApplySessionEnd(_session.SessionEnd.Current);
+        if (_session.LatestFrame.Current is not null)
+        {
+            ApplySessionFrame(_session.LatestFrame.Current);
+        }
+    }
+
+    private void UnbindSession()
+    {
+        if (_session is not null)
+        {
+            _session.State.Changed -= OnSessionStateChanged;
+            _session.Diagnostics.Changed -= OnSessionDiagnosticsChanged;
+            _session.AppliedSettings.Changed -= OnSessionAppliedSettingsChanged;
+            _session.SessionEnd.Changed -= OnSessionEndChanged;
+            _session.LatestFrame.Changed -= OnSessionFrameChanged;
+            _session = null;
+        }
+
+        _frameJournal?.Dispose();
+        _frameJournal = null;
+    }
+
+    private void OnSessionStateChanged(IntegratedMicrophoneSessionState state)
+    {
+        _ = RunOnUiAsync(() => ApplySessionState(state));
+    }
+
+    private void OnSessionDiagnosticsChanged(DeviceDiagnosticsSnapshot snapshot)
+    {
+        _ = RunOnUiAsync(() => ApplySessionDiagnostics(snapshot));
+    }
+
+    private void OnSessionAppliedSettingsChanged(MicrophoneCaptureSettings? settings)
+    {
+        _ = RunOnUiAsync(() => ApplySessionAppliedSettings(settings));
+    }
+
+    private void OnSessionEndChanged(DeviceSessionEndSnapshot? snapshot)
+    {
+        _ = RunOnUiAsync(() => ApplySessionEnd(snapshot));
+    }
+
+    private void OnSessionFrameChanged(MicrophoneFrame? frame)
+    {
+        if (frame is null)
+        {
+            return;
+        }
+
+        _ = RunOnUiAsync(() => ApplySessionFrame(frame));
+    }
+
+    private void ApplySessionState(IntegratedMicrophoneSessionState state)
+    {
+        _isBusy = state.Busy;
+        _statusMessage = state.StatusMessage;
+        _lastFrameCapturedAt = state.LastFrameCapturedAt;
+        _frameSequence = state.FrameSequence;
+        _lastSourceMode = state.LastSourceMode;
+        IsConnected = state.Connected;
+        IsLiveReading = state.LiveReading;
+        if (!IsLiveReading)
+        {
+            FooterSystemStateLabel = _latestWaveformSamples.Length > 0 && IsConnected
+                ? "Frame ready"
+                : "System Ready";
+        }
+
+        SyncFooter();
+        RaiseCommandState();
+        RefreshAppliedSettingsOutput();
+    }
+
+    private void ApplySessionDiagnostics(DeviceDiagnosticsSnapshot snapshot)
+    {
+        _lastCommand = snapshot.LastCommand;
+        _lastHardwareResponse = snapshot.LastHardwareResponse;
+        _lastError = snapshot.LastError;
+        _lastStateTransition = snapshot.LastStateTransition;
+        _lastValidationResult = snapshot.LastValidationResult;
+        RefreshDiagnosticsOutput();
+        RefreshStatusOutput();
+    }
+
+    private void ApplySessionAppliedSettings(MicrophoneCaptureSettings? settings)
+    {
+        if (settings is null)
+        {
+            return;
+        }
+
+        _targetUpdateRateInput = settings.TargetUpdateRateHz.ToString("0.###", CultureInfo.InvariantCulture);
+        _draftTargetUpdateRateInput = _targetUpdateRateInput;
+        _windowMillisecondsInput = settings.WindowMilliseconds.ToString(CultureInfo.InvariantCulture);
+        _draftWindowMillisecondsInput = _windowMillisecondsInput;
+        _selectedChannelModeLabel = FormatChannelMode(settings.ChannelMode);
+        _draftSelectedChannelModeLabel = _selectedChannelModeLabel;
+        SyncXAxisLabels(settings.WindowMilliseconds);
+        SyncFooter();
+        OnPropertyChanged(nameof(TargetUpdateRateInputDraft));
+        OnPropertyChanged(nameof(WindowMillisecondsInputDraft));
+        OnPropertyChanged(nameof(SelectedChannelModeItem));
+        OnPropertyChanged(nameof(CanApplySettings));
+        _lifecycleActionCommand.NotifyCanExecuteChanged();
+        RefreshAppliedSettingsOutput();
+    }
+
+    private void ApplySessionEnd(DeviceSessionEndSnapshot? snapshot)
+    {
+        if (snapshot is null)
+        {
+            SessionEndOutput = null;
+            return;
+        }
+
+        SessionEndOutput = new IntegrationPanelSessionEndOutput
+        {
+            EndedAt = snapshot.EndedAt,
+            ExitReason = $"{snapshot.ReasonCode}: {snapshot.ReasonMessage}",
+            ConnectionClosed = snapshot.ConnectionClosed,
+            LiveStopped = snapshot.LiveStopped,
+            AppliedSettingsSnapshot = AppliedSettingsOutput,
+            FinalStatus = BuildStatusOutput()
+        };
+    }
+
+    private void ApplySessionFrame(MicrophoneFrame frame)
+    {
+        ApplyFrame(frame, _session?.State.Current?.LastSourceMode ?? _lastSourceMode ?? "session");
+    }
+
+    private void RefreshAppliedSettingsOutput()
+    {
+        var settings = _session?.AppliedSettings.Current;
+        if (settings is null)
+        {
+            return;
+        }
+
+        AppliedSettingsOutput = new IntegrationPanelAppliedSettingsOutput
+        {
+            AppliedAt = DateTimeOffset.Now,
+            DeviceSettings = new Dictionary<string, string?>
+            {
+                ["Device"] = Title,
+                ["Microphone"] = SelectedDevice?.DisplayName
+            },
+            EndpointSettings = new Dictionary<string, string?>
+            {
+                ["TargetUpdateRateHz"] = settings.TargetUpdateRateHz.ToString("0.###", CultureInfo.InvariantCulture),
+                ["WindowMilliseconds"] = settings.WindowMilliseconds.ToString(CultureInfo.InvariantCulture),
+                ["ChannelMode"] = FormatChannelMode(settings.ChannelMode)
+            },
+            SessionSettings = new Dictionary<string, string?>
+            {
+                ["Connected"] = IsConnected ? "true" : "false",
+                ["LiveReading"] = IsLiveReading ? "true" : "false"
+            },
+            NormalizationNotes = ["Mapped from runtime session settings."]
+        };
+    }
+
+    private MicrophoneCaptureSettings BuildCaptureSettings()
+    {
+        var device = SelectedDevice ?? throw new InvalidOperationException("No microphone selected.");
+        var targetUpdateRate = TryParsePositiveDouble(_draftTargetUpdateRateInput, out var parsedTargetUpdateRate)
+            ? parsedTargetUpdateRate
+            : ParseTargetUpdateRate();
+        var windowMilliseconds = TryParsePositiveInt(_draftWindowMillisecondsInput, out var parsedWindowMilliseconds)
+            ? parsedWindowMilliseconds
+            : ParseWindowMilliseconds(_windowMillisecondsInput);
+        return new MicrophoneCaptureSettings(
+            device.DeviceId,
+            targetUpdateRate,
+            windowMilliseconds,
+            ParseChannelMode(_draftSelectedChannelModeLabel));
+    }
+
+    private static async Task RunSessionDisposeAsync(IntegratedMicrophoneSession session, string reason)
+    {
+        try
+        {
+            await session.DisconnectAsync(StopReason.UserRequested(reason)).ConfigureAwait(false);
+            await session.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[IntegratedMicrophonePanelViewModel] Session dispose failed: {ex}");
+        }
     }
 }
