@@ -4,10 +4,11 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
+using ExperimentalControlPlatform.Runtime;
 
 namespace ExperimentalControlPlatform.App.DevicePanels.Pt104;
 
-public sealed class Pt104Driver : IDisposable
+public sealed class Pt104Driver : IPt104RuntimeDriver
 {
     private const uint PicoOk = 0x00000000;
     private const uint PicoNoSamplesAvailable = 0x00000025;
@@ -94,6 +95,11 @@ public sealed class Pt104Driver : IDisposable
         }
     }
 
+    public void Connect(Pt104ChannelConfiguration configuration)
+    {
+        Connect(ToPanelSettings(configuration));
+    }
+
     public double ReadTemperatureC(bool filtered, int attempts = 10, int delayMilliseconds = 800, bool allowRepeatValue = true)
     {
         if (!IsConnected)
@@ -138,6 +144,11 @@ public sealed class Pt104Driver : IDisposable
         _configuredChannel = settings.Channel;
     }
 
+    public void ApplySettings(Pt104ChannelConfiguration configuration)
+    {
+        ApplySettings(ToPanelSettings(configuration));
+    }
+
     public void ConfigureChannel(Pt104ConnectionSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -148,6 +159,11 @@ public sealed class Pt104Driver : IDisposable
         }
 
         ConfigureChannel(_handle, settings);
+    }
+
+    public void ConfigureChannel(Pt104ChannelConfiguration configuration)
+    {
+        ConfigureChannel(ToPanelSettings(configuration));
     }
 
     public double ReadTemperatureC(int channel, bool filtered, int attempts = 10, int delayMilliseconds = 800, bool allowRepeatValue = true)
@@ -208,6 +224,20 @@ public sealed class Pt104Driver : IDisposable
                 // Best effort on dispose for the first device panel slice.
             }
         }
+    }
+
+    private static Pt104ConnectionSettings ToPanelSettings(Pt104ChannelConfiguration configuration)
+    {
+        return new Pt104ConnectionSettings(
+            configuration.Channel,
+            configuration.MeasurementMode switch
+            {
+                Pt104MeasurementMode.Pt1000 => Pt104MeasurementType.Pt1000,
+                _ => Pt104MeasurementType.Pt100
+            },
+            configuration.WireCount,
+            configuration.MainsFrequencyHz,
+            configuration.FilteredRead);
     }
 
     private static void EnsureLibraryLoaded()

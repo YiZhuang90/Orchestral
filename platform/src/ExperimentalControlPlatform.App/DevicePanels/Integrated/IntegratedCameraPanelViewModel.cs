@@ -14,6 +14,7 @@ using ExperimentalControlPlatform.App.DevicePanels.Camera;
 using ExperimentalControlPlatform.App.DevicePanels.Contracts;
 using ExperimentalControlPlatform.App.Modals;
 using ExperimentalControlPlatform.Devices.Uvc;
+using ExperimentalControlPlatform.Runtime;
 using MahApps.Metro.IconPacks;
 
 namespace ExperimentalControlPlatform.App.DevicePanels.Integrated;
@@ -26,9 +27,9 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
         IntegrationPanelLifecycleAction.Apply
     ];
     private readonly IntegratedCameraClient _client;
+    private readonly IDeviceSessionRegistry _sessionRegistry;
     private readonly AsyncRelayCommand _lifecycleActionCommand;
-    private CancellationTokenSource? _liveCancellation;
-    private Task? _liveTask;
+    private IntegratedCameraSession? _session;
     private bool _isBusy;
     private bool _isConnected;
     private bool _isLivePreviewing;
@@ -68,9 +69,10 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
     private long _frameSequence;
     private string? _lastSourceMode;
 
-    public IntegratedCameraPanelViewModel(IntegratedCameraClient client)
+    public IntegratedCameraPanelViewModel(IntegratedCameraClient client, IDeviceSessionRegistry sessionRegistry)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
+        _sessionRegistry = sessionRegistry ?? throw new ArgumentNullException(nameof(sessionRegistry));
         _lifecycleActionCommand = new AsyncRelayCommand(ExecuteLifecycleActionAsync, CanExecuteLifecycleAction, HandleLifecycleCommandException);
         RefreshStatusOutput();
         RefreshDiagnosticsOutput();
@@ -389,141 +391,86 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
             return;
         }
 
-        _isBusy = true;
-        OnPropertyChanged(nameof(CanToggleConnection));
+        var session = GetOrCreateSession();
+        BindSession(session);
         try
         {
-            SetLastCommand("Connect integrated camera");
-            _ = _client.CaptureSnapshot(SelectedCamera.Index, ParseFrameRate(), _colorMode == "Color");
-            IsConnected = true;
-            SessionEndOutput = null;
-            ClearLastError();
-            SetLastHardwareResponse("Integrated camera connection probe succeeded.");
-            SetLastStateTransition($"Connected to {SelectedCamera.DisplayName}");
-            _statusMessage = $"Connected to {SelectedCamera.DisplayName}.";
-            SyncFooter();
+            await session.ConnectAsync(BuildCaptureSettings()).ConfigureAwait(true);
         }
-        finally
+        catch (Exception ex)
         {
-            _isBusy = false;
-            OnPropertyChanged(nameof(CanToggleConnection));
-            OnPropertyChanged(nameof(CanSnapFrame));
-            OnPropertyChanged(nameof(CanToggleLive));
+            Debug.WriteLine($"[IntegratedCameraPanelViewModel] Connect failed: {ex}");
         }
-
-        await Task.CompletedTask;
     }
 
     public async Task DisconnectAsync()
     {
-        var liveWasActive = IsLivePreviewing;
-        await StopLivePreviewAsync();
-        IsConnected = false;
-        _statusMessage = "Disconnected.";
-        SyncFooter();
-        SetLastStateTransition("Disconnected camera");
-        SessionEndOutput = new IntegrationPanelSessionEndOutput
+        if (_session is null)
         {
-            EndedAt = DateTimeOffset.Now,
-            ExitReason = "Disconnected by operator",
-            ConnectionClosed = true,
-            LiveStopped = liveWasActive,
-            AppliedSettingsSnapshot = AppliedSettingsOutput,
-            FinalStatus = BuildStatusOutput()
-        };
+            return;
+        }
+
+        var session = _session;
+        try
+        {
+            await session.DisconnectAsync(StopReason.UserRequested("Disconnected integrated camera panel.")).ConfigureAwait(true);
+        }
+        finally
+        {
+            _sessionRegistry.Remove(session.SessionId);
+            UnbindSession();
+            await session.DisposeAsync().ConfigureAwait(true);
+        }
     }
 
     public async Task SnapFrameAsync()
     {
-        if (SelectedCamera is null)
+        if (_session is null)
         {
             return;
         }
 
-        _isBusy = true;
-        OnPropertyChanged(nameof(CanSnapFrame));
         try
         {
-            SetLastCommand("Capture snapshot");
-            _lastSourceMode = "snapshot";
-            var result = _client.CaptureSnapshot(SelectedCamera.Index, ParseFrameRate(), _colorMode == "Color");
-            ApplyFrame(result);
-            ClearLastError();
-            SetLastHardwareResponse("Snapshot captured.");
-            SetLastStateTransition("Captured snapshot");
-            _statusMessage = "Snapshot captured.";
+            await _session.SnapFrameAsync().ConfigureAwait(true);
         }
-        finally
+        catch (Exception ex)
         {
-            _isBusy = false;
-            OnPropertyChanged(nameof(CanSnapFrame));
+            Debug.WriteLine($"[IntegratedCameraPanelViewModel] Snap failed: {ex}");
         }
-
-        await Task.CompletedTask;
     }
 
     public async Task StartLivePreviewAsync()
     {
-        if (SelectedCamera is null || IsLivePreviewing)
+        if (_session is null || IsLivePreviewing)
         {
             return;
         }
 
-        _liveCancellation = new CancellationTokenSource();
-        IsLivePreviewing = true;
-        SetLastCommand("Start live preview");
-        SetLastStateTransition("Started live preview");
-        SyncFooter();
-        _statusMessage = "Live preview started.";
-
         try
         {
-            _liveTask = _client.StreamFramesAsync(
-                SelectedCamera.Index,
-                ParseFrameRate(),
-                _colorMode == "Color",
-                ApplyLiveFrameAsync,
-                _liveCancellation.Token);
-
-            await _liveTask.ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
+            await _session.StartLiveAsync().ConfigureAwait(true);
         }
         catch (Exception ex)
         {
-            _statusMessage = $"Live preview failed: {ex.Message}";
-            _latestDiagnostics.Add($"Live preview failed: {ex}");
-            SetLastError(ex.Message);
-        }
-        finally
-        {
-            IsLivePreviewing = false;
-            _liveCancellation?.Dispose();
-            _liveCancellation = null;
-            _liveTask = null;
-            SyncFooter();
+            Debug.WriteLine($"[IntegratedCameraPanelViewModel] Start live failed: {ex}");
         }
     }
 
     public async Task StopLivePreviewAsync()
     {
-        if (_liveCancellation is null)
+        if (_session is null)
         {
             return;
         }
 
-        _liveCancellation.Cancel();
-        SetLastStateTransition("Stopped live preview");
-        if (_liveTask is not null)
+        try
         {
-            try
-            {
-                await _liveTask.ConfigureAwait(false);
-            }
-            catch
-            {
-            }
+            await _session.StopLiveAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[IntegratedCameraPanelViewModel] Stop live failed: {ex}");
         }
     }
 
@@ -537,49 +484,25 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
         }
 
         SetLastValidationResult("Validated settings.");
-        var previousFrameRateInput = _frameRateInput;
-        var previousColorMode = _colorMode;
         _frameRateInput = _draftFrameRateInput;
         _colorMode = _draftColorMode;
         SyncFooter();
         OnPropertyChanged(nameof(CanApplySettings));
         _lifecycleActionCommand.NotifyCanExecuteChanged();
 
-        var restartLive = IsLivePreviewing;
-        var appliedToHardware = true;
-        if (restartLive)
+        if (_session is null)
         {
-            await StopLivePreviewAsync();
-            await StartLivePreviewAsync();
-            appliedToHardware = _lastError is null;
-        }
-        else if (IsConnected)
-        {
-            appliedToHardware = TryApplySettingsSnapshot();
-        }
-
-        if (!appliedToHardware)
-        {
-            _frameRateInput = previousFrameRateInput;
-            _colorMode = previousColorMode;
-            SyncFooter();
-            OnPropertyChanged(nameof(CanApplySettings));
-            _lifecycleActionCommand.NotifyCanExecuteChanged();
+            _statusMessage = "Integrated camera settings staged for the next capture.";
             return;
         }
 
-        _statusMessage = restartLive
-            ? "Camera settings applied. Restarting live preview..."
-            : "Camera settings applied.";
-
-        ClearLastError();
-        SetLastStateTransition(restartLive
-            ? "Applied settings and restarted live preview"
-            : "Applied settings");
-        if (IsConnected)
+        try
         {
-            CaptureAppliedSettingsSnapshot("Applied to connected integrated camera.");
-            SessionEndOutput = null;
+            await _session.ApplySettingsAsync(BuildCaptureSettings()).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[IntegratedCameraPanelViewModel] Apply settings failed: {ex}");
         }
     }
 
@@ -610,30 +533,7 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
 
     public Task ApplyRoiAsync() => Task.CompletedTask;
 
-    private async Task ApplyLiveFrameAsync(IntegratedFrameResult frame)
-    {
-        var nowTicks = Stopwatch.GetTimestamp();
-        if (_lastDisplayTimestamp.HasValue)
-        {
-            var minTicks = Stopwatch.Frequency / MaxDisplayFps;
-            if (nowTicks - _lastDisplayTimestamp.Value < minTicks)
-            {
-                await RunOnUiAsync(() => UpdateMeasuredFrameRate(frame.TimestampTicks));
-                return;
-            }
-        }
-
-        _lastDisplayTimestamp = nowTicks;
-        await RunOnUiAsync(() =>
-        {
-            UpdateMeasuredFrameRate(frame.TimestampTicks);
-            _lastSourceMode = "live";
-            SetLastHardwareResponse("Live frame received.");
-            ApplyFrame(frame);
-        });
-    }
-
-    private void ApplyFrame(IntegratedFrameResult frame)
+    private void ApplyFrame(IntegratedCameraFrame frame)
     {
         PreviewImage = LoadImage(frame);
         CurrentFrameValue = $"{frame.Width} x {frame.Height}";
@@ -675,7 +575,7 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
         _lastFrameTimestamp = timestampTicks;
     }
 
-    private ImageSource LoadImage(IntegratedFrameResult frame)
+    private ImageSource LoadImage(IntegratedCameraFrame frame)
     {
         var pixelFormat = frame.IsColor ? PixelFormats.Rgb24 : PixelFormats.Gray8;
         var stride = frame.IsColor ? frame.Width * 3 : frame.Width;
@@ -744,32 +644,6 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
             },
             NormalizationNotes = new[] { note }
         };
-    }
-
-    private bool TryApplySettingsSnapshot()
-    {
-        if (SelectedCamera is null)
-        {
-            SetLastError("No integrated camera selected.");
-            _statusMessage = "No integrated camera selected.";
-            return false;
-        }
-
-        try
-        {
-            _lastSourceMode = "apply";
-            var result = _client.CaptureSnapshot(SelectedCamera.Index, ParseFrameRate(), _colorMode == "Color");
-            ApplyFrame(result);
-            ClearLastError();
-            SetLastHardwareResponse("Applied settings snapshot captured.");
-            return true;
-        }
-        catch (Exception ex)
-        {
-            SetLastError(ex.Message);
-            _statusMessage = $"Applying settings failed: {ex.Message}";
-            return false;
-        }
     }
 
     private IntegrationPanelStatusOutput BuildStatusOutput()
@@ -860,17 +734,220 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
 
     public void Dispose()
     {
+        if (_session is null)
+        {
+            UnbindSession();
+            return;
+        }
+
+        var session = _session;
+        _sessionRegistry.Remove(session.SessionId);
+        UnbindSession();
+        _ = RunSessionDisposeAsync(session, "Disposed integrated camera panel.");
+    }
+
+    private IntegratedCameraCaptureSettings BuildCaptureSettings()
+    {
+        var camera = SelectedCamera ?? throw new InvalidOperationException("No integrated camera selected.");
+        var deviceId = camera.InstanceId ?? $"{camera.Index}:{camera.DisplayName}";
+        return new IntegratedCameraCaptureSettings(
+            deviceId,
+            camera.Index,
+            camera.DisplayName,
+            ParseFrameRate(),
+            _colorMode == "Color");
+    }
+
+    private IntegratedCameraSession GetOrCreateSession()
+    {
+        var camera = SelectedCamera ?? throw new InvalidOperationException("No integrated camera selected.");
+        var deviceId = camera.InstanceId ?? $"{camera.Index}:{camera.DisplayName}";
+        var sessionId = new DeviceSessionId("IntegratedCamera", deviceId);
+        return _sessionRegistry.GetOrAdd(
+            sessionId,
+            () => new IntegratedCameraSession(_client, deviceId, camera.Index, camera.DisplayName));
+    }
+
+    private void BindSession(IntegratedCameraSession session)
+    {
+        if (ReferenceEquals(_session, session))
+        {
+            return;
+        }
+
+        UnbindSession();
+        _session = session;
+        session.State.Changed += OnSessionStateChanged;
+        session.Diagnostics.Changed += OnSessionDiagnosticsChanged;
+        session.AppliedSettings.Changed += OnSessionAppliedSettingsChanged;
+        session.SessionEnd.Changed += OnSessionEndChanged;
+        session.LatestFrame.Changed += OnSessionFrameChanged;
+
+        ApplySessionState(session.State.Current!);
+        ApplySessionDiagnostics(session.Diagnostics.Current!);
+        ApplySessionAppliedSettings(session.AppliedSettings.Current);
+        ApplySessionEnd(session.SessionEnd.Current);
+        if (session.LatestFrame.Current is not null)
+        {
+            ApplySessionFrame(session.LatestFrame.Current);
+        }
+    }
+
+    private void UnbindSession()
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        _session.State.Changed -= OnSessionStateChanged;
+        _session.Diagnostics.Changed -= OnSessionDiagnosticsChanged;
+        _session.AppliedSettings.Changed -= OnSessionAppliedSettingsChanged;
+        _session.SessionEnd.Changed -= OnSessionEndChanged;
+        _session.LatestFrame.Changed -= OnSessionFrameChanged;
+        _session = null;
+    }
+
+    private void OnSessionStateChanged(IntegratedCameraSessionState state) => _ = RunOnUiAsync(() => ApplySessionState(state));
+    private void OnSessionDiagnosticsChanged(DeviceDiagnosticsSnapshot snapshot) => _ = RunOnUiAsync(() => ApplySessionDiagnostics(snapshot));
+    private void OnSessionAppliedSettingsChanged(IntegratedCameraCaptureSettings? settings) => _ = RunOnUiAsync(() => ApplySessionAppliedSettings(settings));
+    private void OnSessionEndChanged(DeviceSessionEndSnapshot? snapshot) => _ = RunOnUiAsync(() => ApplySessionEnd(snapshot));
+    private void OnSessionFrameChanged(IntegratedCameraFrame? frame)
+    {
+        if (frame is not null)
+        {
+            _ = RunOnUiAsync(() => ApplySessionFrame(frame));
+        }
+    }
+
+    private void ApplySessionState(IntegratedCameraSessionState state)
+    {
+        _isBusy = state.Busy;
+        _statusMessage = state.StatusMessage;
+        _lastFrameCapturedAt = state.LastFrameCapturedAt;
+        _frameSequence = state.FrameSequence;
+        _lastSourceMode = state.LastSourceMode;
+        IsConnected = state.Connected;
+        IsLivePreviewing = state.LivePreviewing;
+        _frameRateInput = state.TargetFrameRate.ToString("0.###", CultureInfo.InvariantCulture);
+        _draftFrameRateInput = _frameRateInput;
+        _colorMode = state.ColorEnabled ? "Color" : "Mono";
+        _draftColorMode = _colorMode;
+        SyncFooter();
+        OnPropertyChanged(nameof(FrameRateInputDraft));
+        OnPropertyChanged(nameof(SelectedColorOptionDraft));
+        OnPropertyChanged(nameof(CanApplySettings));
+        _lifecycleActionCommand.NotifyCanExecuteChanged();
+    }
+
+    private void ApplySessionDiagnostics(DeviceDiagnosticsSnapshot snapshot)
+    {
+        _lastCommand = snapshot.LastCommand;
+        _lastHardwareResponse = snapshot.LastHardwareResponse;
+        _lastError = snapshot.LastError;
+        _lastStateTransition = snapshot.LastStateTransition;
+        _lastValidationResult = snapshot.LastValidationResult;
+        RefreshDiagnosticsOutput();
+        RefreshStatusOutput();
+    }
+
+    private void ApplySessionAppliedSettings(IntegratedCameraCaptureSettings? settings)
+    {
+        if (settings is null)
+        {
+            return;
+        }
+
+        _frameRateInput = settings.TargetFrameRate.ToString("0.###", CultureInfo.InvariantCulture);
+        _draftFrameRateInput = _frameRateInput;
+        _colorMode = settings.ColorEnabled ? "Color" : "Mono";
+        _draftColorMode = _colorMode;
+        RefreshAppliedSettingsOutput();
+        SyncFooter();
+        OnPropertyChanged(nameof(FrameRateInputDraft));
+        OnPropertyChanged(nameof(SelectedColorOptionDraft));
+        OnPropertyChanged(nameof(CanApplySettings));
+        _lifecycleActionCommand.NotifyCanExecuteChanged();
+    }
+
+    private void ApplySessionEnd(DeviceSessionEndSnapshot? snapshot)
+    {
+        if (snapshot is null)
+        {
+            SessionEndOutput = null;
+            return;
+        }
+
+        SessionEndOutput = new IntegrationPanelSessionEndOutput
+        {
+            EndedAt = snapshot.EndedAt,
+            ExitReason = $"{snapshot.ReasonCode}: {snapshot.ReasonMessage}",
+            ConnectionClosed = snapshot.ConnectionClosed,
+            LiveStopped = snapshot.LiveStopped,
+            AppliedSettingsSnapshot = AppliedSettingsOutput,
+            FinalStatus = BuildStatusOutput()
+        };
+    }
+
+    private void ApplySessionFrame(IntegratedCameraFrame frame)
+    {
+        var nowTicks = Stopwatch.GetTimestamp();
+        if ((_lastSourceMode ?? "session") == "live" && _lastDisplayTimestamp.HasValue)
+        {
+            var minTicks = Stopwatch.Frequency / MaxDisplayFps;
+            if (nowTicks - _lastDisplayTimestamp.Value < minTicks)
+            {
+                UpdateMeasuredFrameRate(frame.TimestampTicks);
+                return;
+            }
+        }
+
+        _lastDisplayTimestamp = nowTicks;
+        UpdateMeasuredFrameRate(frame.TimestampTicks);
+        ApplyFrame(frame);
+        RefreshAppliedSettingsOutput();
+    }
+
+    private void RefreshAppliedSettingsOutput()
+    {
+        var settings = _session?.AppliedSettings.Current;
+        if (settings is null)
+        {
+            return;
+        }
+
+        AppliedSettingsOutput = new IntegrationPanelAppliedSettingsOutput
+        {
+            AppliedAt = DateTimeOffset.Now,
+            DeviceSettings = new Dictionary<string, string?>
+            {
+                ["Device"] = Title,
+                ["Camera"] = settings.DisplayName
+            },
+            EndpointSettings = new Dictionary<string, string?>
+            {
+                ["FrameRateFps"] = settings.TargetFrameRate.ToString("0.###", CultureInfo.InvariantCulture),
+                ["ColorMode"] = settings.ColorEnabled ? "Color" : "Mono"
+            },
+            SessionSettings = new Dictionary<string, string?>
+            {
+                ["Connected"] = IsConnected ? "true" : "false",
+                ["LivePreviewing"] = IsLivePreviewing ? "true" : "false"
+            },
+            NormalizationNotes = ["Mapped from runtime session settings."]
+        };
+    }
+
+    private static async Task RunSessionDisposeAsync(IntegratedCameraSession session, string reason)
+    {
         try
         {
-            _liveCancellation?.Cancel();
-            _liveTask?.GetAwaiter().GetResult();
+            await session.DisconnectAsync(StopReason.UserRequested(reason)).ConfigureAwait(false);
+            await session.DisposeAsync().ConfigureAwait(false);
         }
-        catch
+        catch (Exception ex)
         {
-        }
-        finally
-        {
-            _liveCancellation?.Dispose();
+            Debug.WriteLine($"[IntegratedCameraPanelViewModel] Session dispose failed: {ex}");
         }
     }
 }

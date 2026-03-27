@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using ExperimentalControlPlatform.Runtime;
 using ExperimentalControlPlatform.Devices.HuaTeng;
 
 namespace ExperimentalControlPlatform.App.DevicePanels.HuaTeng;
@@ -10,7 +11,7 @@ namespace ExperimentalControlPlatform.App.DevicePanels.HuaTeng;
 using DeviceCameraInfo = ExperimentalControlPlatform.Devices.HuaTeng.HuaTengCameraInfo;
 using AppCameraInfo = ExperimentalControlPlatform.App.DevicePanels.HuaTeng.HuaTengCameraInfo;
 
-public sealed class HuaTengCameraProbeClient
+public sealed class HuaTengCameraProbeClient : IHuaTengCameraRuntimeService
 {
     private readonly HuaTengNativeCameraService _service;
 
@@ -98,6 +99,34 @@ public sealed class HuaTengCameraProbeClient
         return _service.StreamFramesAsync(
             settings,
             frame => onFrame(MapFrame("Streaming.", frame)),
+            cancellationToken);
+    }
+
+    async Task<HuaTengFrame> IHuaTengCameraRuntimeService.CaptureSnapshotAsync(HuaTengCaptureSettings settings, CancellationToken cancellationToken)
+    {
+        var result = await CaptureSnapshotAsync(
+            settings.CameraIndex,
+            settings.PixelFormat,
+            settings.TriggerMode,
+            settings.ExposureUs,
+            ToRect(settings.Roi),
+            cancellationToken).ConfigureAwait(false);
+        return ToRuntimeFrame(settings, result);
+    }
+
+    Task IHuaTengCameraRuntimeService.StreamFramesAsync(
+        HuaTengCaptureSettings settings,
+        Func<HuaTengFrame, Task> onFrame,
+        CancellationToken cancellationToken)
+    {
+        return StreamFramesAsync(
+            settings.CameraIndex,
+            settings.PixelFormat,
+            settings.TriggerMode,
+            settings.ExposureUs,
+            settings.TargetFrameRate,
+            ToRect(settings.Roi),
+            frame => onFrame(ToRuntimeFrame(settings, frame)),
             cancellationToken);
     }
 
@@ -196,5 +225,35 @@ public sealed class HuaTengCameraProbeClient
             HuaTengTriggerMode.Triggered => "Triggered",
             _ => "Continuous"
         };
+    }
+
+    private static Rect? ToRect(CaptureRegion? region)
+    {
+        return region is null ? null : new Rect(region.X, region.Y, region.Width, region.Height);
+    }
+
+    private static CaptureRegion? ToRegion(Rect? rect)
+    {
+        return rect is null ? null : new CaptureRegion(rect.Value.X, rect.Value.Y, rect.Value.Width, rect.Value.Height);
+    }
+
+    private static HuaTengFrame ToRuntimeFrame(HuaTengCaptureSettings settings, HuaTengFrameResult result)
+    {
+        return new HuaTengFrame(
+            settings.DeviceId,
+            settings.DisplayName,
+            result.Ok,
+            result.Summary,
+            result.Width,
+            result.Height,
+            result.PixelData,
+            result.PixelFormat,
+            result.TriggerMode,
+            settings.ColorTone,
+            result.ExposureUs,
+            result.IsMono,
+            result.TimestampTenthsOfMilliseconds,
+            ToRegion(result.Roi),
+            result.Diagnostics);
     }
 }
