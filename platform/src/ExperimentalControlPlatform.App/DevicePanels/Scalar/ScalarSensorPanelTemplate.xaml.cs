@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using ExperimentalControlPlatform.App.DevicePanels.Contracts;
 using ExperimentalControlPlatform.App.Modals;
 
 namespace ExperimentalControlPlatform.App.DevicePanels.Scalar;
@@ -55,5 +56,29 @@ public partial class ScalarSensorPanelTemplate : UserControl
     private void ExportDataButton_OnClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is IScalarSensorPanelViewModel panel) panel.ExportCsv();
+    }
+
+    private async void OutputSettingsButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not IOutputSettingsPanelViewModel panel)
+        {
+            return;
+        }
+
+        var dialog = new OrchestralModalWindow(
+            "Output settings",
+            new OutputSettingsDialogViewModel(panel.SupportedOutputPayloadTypes, panel.CurrentOutputSettings),
+            "Apply")
+        {
+            Owner = Window.GetWindow(this)
+        };
+
+        dialog.ShowDialog();
+        if (!dialog.PrimaryActionInvoked || dialog.ModalContent is not OutputSettingsDialogViewModel content)
+        {
+            return;
+        }
+
+        await panel.ApplyOutputSettingsAsync(content.BuildSettings());
     }
 }

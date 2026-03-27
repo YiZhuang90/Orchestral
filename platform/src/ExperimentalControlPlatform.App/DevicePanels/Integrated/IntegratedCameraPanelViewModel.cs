@@ -19,7 +19,7 @@ using MahApps.Metro.IconPacks;
 
 namespace ExperimentalControlPlatform.App.DevicePanels.Integrated;
 
-public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPanelViewModel
+public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPanelViewModel, IOutputSettingsPanelViewModel
 {
     private const double MaxDisplayFps = 20.0;
     private static readonly IReadOnlyList<IntegrationPanelLifecycleAction> ConnectedLifecycleActions =
@@ -29,6 +29,7 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
     private readonly IntegratedCameraClient _client;
     private readonly IDeviceSessionRegistry _sessionRegistry;
     private readonly AsyncRelayCommand _lifecycleActionCommand;
+    private readonly IntegrationPanelOutputPublisher _outputPublisher = new();
     private IntegratedCameraSession? _session;
     private bool _isBusy;
     private bool _isConnected;
@@ -68,6 +69,11 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
     private DateTimeOffset? _lastFrameCapturedAt;
     private long _frameSequence;
     private string? _lastSourceMode;
+    private IntegrationPanelOutputSettings _outputSettings = new(
+        IntegrationPanelOutputPayloadType.Image,
+        IntegrationPanelOutputEmissionMode.LatestOnly,
+        5.0,
+        true);
 
     public IntegratedCameraPanelViewModel(IntegratedCameraClient client, IDeviceSessionRegistry sessionRegistry)
     {
@@ -249,6 +255,15 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
     public string DiagnosticsTitle => "Integrated camera diagnostics";
 
     public string DiagnosticsSubtitle => "Windows UVC camera state";
+
+    public IReadOnlyList<IntegrationPanelOutputPayloadType> SupportedOutputPayloadTypes { get; } =
+    [
+        IntegrationPanelOutputPayloadType.Image
+    ];
+
+    public IntegrationPanelOutputSettings CurrentOutputSettings => _outputSettings;
+
+    public string OutputSettingsSubtitle => "Shape the integrated-camera frame output before it reaches the runtime bus.";
 
     public IntegrationPanelDataOutput? DataOutput
     {
@@ -506,6 +521,26 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
         }
     }
 
+    public Task ApplyOutputSettingsAsync(IntegrationPanelOutputSettings settings)
+    {
+        _outputSettings = settings;
+        _outputPublisher.Reset();
+        SetLastCommand("Apply integrated camera output settings");
+        SetLastValidationResult("Validated integrated camera output settings.");
+        SetLastStateTransition("Applied integrated camera output settings");
+        _statusMessage = "Integrated camera output settings updated.";
+        if (_session?.LatestFrame.Current is not null)
+        {
+            ApplySessionFrame(_session.LatestFrame.Current);
+        }
+        else
+        {
+            RefreshAppliedSettingsOutput();
+        }
+
+        return Task.CompletedTask;
+    }
+
     public string GetDiagnosticsSummary()
     {
         return string.Join(Environment.NewLine, new[]
@@ -542,17 +577,26 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
         ExposureText = "Auto";
         _lastFrameCapturedAt = DateTimeOffset.Now;
         _frameSequence++;
-        DataOutput = new IntegrationPanelDataOutput
+        var timestamp = _lastFrameCapturedAt ?? DateTimeOffset.Now;
+        var payloadValue = $"{frame.Width}x{frame.Height}; Color={(_colorMode == "Color" ? "true" : "false")}";
+        if (_outputPublisher.ShouldPublish(_outputSettings, timestamp, payloadValue))
         {
-            Timestamp = _lastFrameCapturedAt,
-            EndpointId = SelectedCamera?.DisplayName,
-            PayloadType = "CameraFrame",
-            PayloadValue = $"{frame.Width}x{frame.Height}; Color={(_colorMode == "Color" ? "true" : "false")}",
-            Units = "pixels",
-            SequenceNumber = _frameSequence,
-            CaptureRate = _smoothedFrameRate,
-            SourceMode = _lastSourceMode
-        };
+            DataOutput = new IntegrationPanelDataOutput
+            {
+                Timestamp = _outputSettings.IncludeMetadata ? timestamp : null,
+                DeviceId = _outputSettings.IncludeMetadata ? SelectedCamera?.InstanceId : null,
+                EndpointId = _outputSettings.IncludeMetadata ? SelectedCamera?.DisplayName : null,
+                PayloadType = _outputSettings.PayloadType.ToString(),
+                PayloadValue = payloadValue,
+                Units = "pixels",
+                SequenceNumber = _frameSequence,
+                CaptureRate = _smoothedFrameRate,
+                SourceMode = _lastSourceMode,
+                OutputEmissionMode = _outputSettings.EmissionMode.ToString(),
+                OutputFrequencyHz = _outputSettings.OutputFrequencyHz,
+                MetadataIncluded = _outputSettings.IncludeMetadata
+            };
+        }
         CaptureAppliedSettingsSnapshot($"Verified during {(_lastSourceMode ?? "capture")}.");
         SyncFooter();
     }
@@ -643,6 +687,10 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
                 ["LivePreviewing"] = IsLivePreviewing ? "true" : "false"
             },
             NormalizationNotes = new[] { note }
+        };
+        AppliedSettingsOutput = AppliedSettingsOutput with
+        {
+            SessionSettings = AppliedSettingsOutput.SessionSettings.WithOutputSettings(_outputSettings)
         };
     }
 
@@ -935,6 +983,10 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
                 ["LivePreviewing"] = IsLivePreviewing ? "true" : "false"
             },
             NormalizationNotes = ["Mapped from runtime session settings."]
+        };
+        AppliedSettingsOutput = AppliedSettingsOutput with
+        {
+            SessionSettings = AppliedSettingsOutput.SessionSettings.WithOutputSettings(_outputSettings)
         };
     }
 

@@ -21,4 +21,10 @@ public sealed record IntegrationPanelDataOutput
     public double? CaptureRate { get; init; }
 
     public string? SourceMode { get; init; }
+
+    public string? OutputEmissionMode { get; init; }
+
+    public double? OutputFrequencyHz { get; init; }
+
+    public bool MetadataIncluded { get; init; }
 }

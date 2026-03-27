@@ -34,6 +34,14 @@ public partial class ControlCenterPanelTemplate : UserControl
         }
     }
 
+    private async void EmergencyStopButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is IControlCenterPanelViewModel panel)
+        {
+            await panel.EmergencyStopAsync();
+        }
+    }
+
     private void ClearLogButton_OnClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is IControlCenterPanelViewModel panel)

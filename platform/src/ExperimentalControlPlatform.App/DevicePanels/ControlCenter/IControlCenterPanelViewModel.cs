@@ -32,6 +32,7 @@ public interface IControlCenterPanelViewModel : IDeviceTestPanelViewModel, IInte
     bool CanToggleConnection { get; }
     bool CanReadPulseCount { get; }
     bool CanApplyCommand { get; }
+    bool CanEmergencyStop { get; }
     bool CanClearLog { get; }
     string ConnectionToggleLabel { get; }
     PackIconMaterialKind ConnectionToggleIconKind { get; }
@@ -45,5 +46,7 @@ public interface IControlCenterPanelViewModel : IDeviceTestPanelViewModel, IInte
     Task DisconnectAsync();
     Task ReadPulseCountAsync();
     Task ApplyCommandAsync();
+    Task EmergencyStopAsync();
+    Task ApplyAndExitAsync();
     void ClearLog();
 }

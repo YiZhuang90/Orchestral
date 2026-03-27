@@ -19,7 +19,8 @@ public sealed class ControlCenterPanelViewModel : ObservableObject, IControlCent
 {
     private static readonly IReadOnlyList<IntegrationPanelLifecycleAction> ConnectedLifecycleActions =
     [
-        IntegrationPanelLifecycleAction.Apply
+        IntegrationPanelLifecycleAction.Apply,
+        IntegrationPanelLifecycleAction.ApplyAndExit
     ];
 
     private readonly IControlCenterService _service;
@@ -196,6 +197,7 @@ public sealed class ControlCenterPanelViewModel : ObservableObject, IControlCent
                 OnPropertyChanged(nameof(CanToggleConnection));
                 OnPropertyChanged(nameof(CanReadPulseCount));
                 OnPropertyChanged(nameof(CanApplyCommand));
+                OnPropertyChanged(nameof(CanEmergencyStop));
                 OnPropertyChanged(nameof(SupportedLifecycleActions));
                 _lifecycleActionCommand.NotifyCanExecuteChanged();
                 SyncFooter();
@@ -209,6 +211,8 @@ public sealed class ControlCenterPanelViewModel : ObservableObject, IControlCent
     public bool CanReadPulseCount => IsConnected;
 
     public bool CanApplyCommand => IsConnected && TryBuildCommand(out _);
+
+    public bool CanEmergencyStop => IsConnected;
 
     public bool CanClearLog => !string.IsNullOrWhiteSpace(CommandHistory);
 
@@ -286,27 +290,7 @@ public sealed class ControlCenterPanelViewModel : ObservableObject, IControlCent
 
     public async Task DisconnectAsync()
     {
-        if (_session is null)
-        {
-            return;
-        }
-
-        var session = _session;
-        try
-        {
-            await session.DisposeAsync().ConfigureAwait(false);
-        }
-        finally
-        {
-            if (_sessionRegistry.Remove(session.SessionId))
-            {
-                UnbindSession();
-            }
-            else
-            {
-                RunOnUi(UnbindSession);
-            }
-        }
+        await DisconnectWithReasonAsync(StopReason.UserRequested("Disconnected control center session.")).ConfigureAwait(false);
     }
 
     public async Task ReadPulseCountAsync()
@@ -327,6 +311,48 @@ public sealed class ControlCenterPanelViewModel : ObservableObject, IControlCent
         }
 
         await _session.ApplyCommandAsync(command).ConfigureAwait(false);
+    }
+
+    public async Task EmergencyStopAsync()
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        await _session.EmergencyStopAsync().ConfigureAwait(false);
+    }
+
+    public async Task ApplyAndExitAsync()
+    {
+        if (_session is null || !TryBuildCommand(out var command))
+        {
+            return;
+        }
+
+        var stagedCommandNote = BuildStagedCommandNote(command);
+
+        await _session.EmergencyStopAsync().ConfigureAwait(false);
+        await DisconnectWithReasonAsync(new StopReason("ApplyAndExit", "Applied settings were staged and the control center returned to idle wait state.")).ConfigureAwait(false);
+        RunOnUi(() =>
+        {
+            if (AppliedSettingsOutput is not null)
+            {
+                var updatedAppliedSettings = AppliedSettingsOutput with
+                {
+                    NormalizationNotes = AppendNote(AppliedSettingsOutput.NormalizationNotes, stagedCommandNote)
+                };
+                AppliedSettingsOutput = updatedAppliedSettings;
+
+                if (SessionEndOutput is not null)
+                {
+                    SessionEndOutput = SessionEndOutput with
+                    {
+                        AppliedSettingsSnapshot = updatedAppliedSettings
+                    };
+                }
+            }
+        });
     }
 
     public void ClearLog()
@@ -364,22 +390,58 @@ public sealed class ControlCenterPanelViewModel : ObservableObject, IControlCent
 
     private bool CanExecuteLifecycleAction(object? parameter)
     {
-        return parameter is IntegrationPanelLifecycleAction.Apply && CanApplyCommand;
+        return parameter switch
+        {
+            IntegrationPanelLifecycleAction.Apply => CanApplyCommand,
+            IntegrationPanelLifecycleAction.ApplyAndExit => CanApplyCommand,
+            _ => false
+        };
     }
 
     private async Task ExecuteLifecycleActionAsync(object? parameter)
     {
-        if (parameter is not IntegrationPanelLifecycleAction.Apply)
+        switch (parameter)
         {
-            return;
+            case IntegrationPanelLifecycleAction.Apply:
+                await ApplyCommandAsync().ConfigureAwait(false);
+                return;
+            case IntegrationPanelLifecycleAction.ApplyAndExit:
+                await ApplyAndExitAsync().ConfigureAwait(false);
+                return;
+            default:
+                return;
         }
-
-        await ApplyCommandAsync().ConfigureAwait(false);
     }
 
     private void HandleLifecycleException(Exception exception)
     {
         AppendHistory($"[{DateTimeOffset.Now:HH:mm:ss}] Apply failed: {exception.Message}");
+    }
+
+    private async Task DisconnectWithReasonAsync(StopReason reason)
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        var session = _session;
+        try
+        {
+            await session.DisconnectAsync(reason).ConfigureAwait(false);
+            await session.DisposeAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            if (_sessionRegistry.Remove(session.SessionId))
+            {
+                UnbindSession();
+            }
+            else
+            {
+                RunOnUi(UnbindSession);
+            }
+        }
     }
 
     private void BindSession(ControlCenterSession session)
@@ -473,26 +535,10 @@ public sealed class ControlCenterPanelViewModel : ObservableObject, IControlCent
 
         RunOnUi(() =>
         {
-            AppliedSettingsOutput = new IntegrationPanelAppliedSettingsOutput
-            {
-                AppliedAt = applied.AppliedAt,
-                DeviceSettings = new Dictionary<string, string?>
-                {
-                    ["Device"] = Title,
-                    ["Port"] = _selectedDevice?.PortName
-                },
-                EndpointSettings = new Dictionary<string, string?>
-                {
-                    ["LaserEnabled"] = applied.LaserEnabled ? "true" : "false",
-                    ["PuffEnabled"] = applied.PuffEnabled ? "true" : "false",
-                    ["StepCount"] = applied.StepCount.ToString(CultureInfo.InvariantCulture)
-                },
-                SessionSettings = new Dictionary<string, string?>
-                {
-                    ["Connected"] = IsConnected ? "true" : "false"
-                },
-                NormalizationNotes = [applied.TransportNote]
-            };
+            AppliedSettingsOutput = BuildAppliedSettingsSnapshot(
+                new ControlCenterCommand(applied.PuffEnabled, applied.LaserEnabled, applied.StepCount),
+                applied.TransportNote,
+                applied.AppliedAt);
         });
     }
 
@@ -616,6 +662,55 @@ public sealed class ControlCenterPanelViewModel : ObservableObject, IControlCent
             true => "On",
             false => "Off",
             null => "Unknown"
+        };
+    }
+
+    private static string BuildStagedCommandNote(ControlCenterCommand command)
+    {
+        return $"Operator staged next system-level command before exit: Laser={(command.LaserEnabled ? "On" : "Off")}, Puff={(command.PuffEnabled ? "On" : "Off")}, StepCount={command.StepCount}.";
+    }
+
+    private static string[] AppendNote(IReadOnlyList<string>? notes, string note)
+    {
+        if (notes is null || notes.Count == 0)
+        {
+            return [note];
+        }
+
+        var result = new string[notes.Count + 1];
+        for (var index = 0; index < notes.Count; index++)
+        {
+            result[index] = notes[index];
+        }
+
+        result[^1] = note;
+        return result;
+    }
+
+    private IntegrationPanelAppliedSettingsOutput BuildAppliedSettingsSnapshot(
+        ControlCenterCommand command,
+        string note,
+        DateTimeOffset? appliedAt = null)
+    {
+        return new IntegrationPanelAppliedSettingsOutput
+        {
+            AppliedAt = appliedAt ?? DateTimeOffset.UtcNow,
+            DeviceSettings = new Dictionary<string, string?>
+            {
+                ["Device"] = Title,
+                ["Port"] = _selectedDevice?.PortName
+            },
+            EndpointSettings = new Dictionary<string, string?>
+            {
+                ["LaserEnabled"] = command.LaserEnabled ? "true" : "false",
+                ["PuffEnabled"] = command.PuffEnabled ? "true" : "false",
+                ["StepCount"] = command.StepCount.ToString(CultureInfo.InvariantCulture)
+            },
+            SessionSettings = new Dictionary<string, string?>
+            {
+                ["Connected"] = IsConnected ? "true" : "false"
+            },
+            NormalizationNotes = [note]
         };
     }
 

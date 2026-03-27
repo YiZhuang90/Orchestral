@@ -18,7 +18,7 @@ using MahApps.Metro.IconPacks;
 
 namespace ExperimentalControlPlatform.App.DevicePanels.HuaTeng;
 
-public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewModel
+public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewModel, IOutputSettingsPanelViewModel
 {
     private const double MaxDisplayFps = 20.0;
     private static readonly IReadOnlyList<IntegrationPanelLifecycleAction> ConnectedLifecycleActions =
@@ -28,6 +28,7 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
     private readonly HuaTengCameraProbeClient _probeClient;
     private readonly IDeviceSessionRegistry _sessionRegistry;
     private readonly AsyncRelayCommand _lifecycleActionCommand;
+    private readonly IntegrationPanelOutputPublisher _outputPublisher = new();
     private HuaTengCameraSession? _session;
     private bool _isBusy;
     private bool _isConnecting;
@@ -85,6 +86,11 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
     private DateTimeOffset? _lastFrameCapturedAt;
     private long _frameSequence;
     private string? _lastSourceMode;
+    private IntegrationPanelOutputSettings _outputSettings = new(
+        IntegrationPanelOutputPayloadType.Image,
+        IntegrationPanelOutputEmissionMode.LatestOnly,
+        3.0,
+        true);
 
     public HuaTengPanelViewModel(HuaTengCameraProbeClient probeClient, IDeviceSessionRegistry sessionRegistry)
     {
@@ -328,6 +334,15 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
     public string DiagnosticsTitle => "HuaTeng camera diagnostics";
 
     public string DiagnosticsSubtitle => "USB camera state and frame pipeline";
+
+    public IReadOnlyList<IntegrationPanelOutputPayloadType> SupportedOutputPayloadTypes { get; } =
+    [
+        IntegrationPanelOutputPayloadType.Image
+    ];
+
+    public IntegrationPanelOutputSettings CurrentOutputSettings => _outputSettings;
+
+    public string OutputSettingsSubtitle => "Shape the HuaTeng frame output before it reaches the runtime bus.";
 
     public IntegrationPanelDataOutput? DataOutput
     {
@@ -583,6 +598,26 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
         {
             Debug.WriteLine($"[HuaTengPanelViewModel] Apply detailed settings failed: {ex}");
         }
+    }
+
+    public Task ApplyOutputSettingsAsync(IntegrationPanelOutputSettings settings)
+    {
+        _outputSettings = settings;
+        _outputPublisher.Reset();
+        SetLastCommand("Apply HuaTeng output settings");
+        SetLastValidationResult("Validated HuaTeng output settings.");
+        SetLastStateTransition("Applied HuaTeng output settings");
+        StatusMessage = "HuaTeng output settings updated.";
+        if (_session?.LatestFrame.Current is not null)
+        {
+            ApplySessionFrame(_session.LatestFrame.Current);
+        }
+        else
+        {
+            RefreshAppliedSettingsOutput();
+        }
+
+        return Task.CompletedTask;
     }
 
     public async Task RefreshCamerasAsync()
@@ -1151,6 +1186,10 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
             },
             NormalizationNotes = ["Mapped from runtime session settings."]
         };
+        AppliedSettingsOutput = AppliedSettingsOutput with
+        {
+            SessionSettings = AppliedSettingsOutput.SessionSettings.WithOutputSettings(_outputSettings)
+        };
     }
 
     private static CaptureRegion? ToCaptureRegion(Rect? rect)
@@ -1430,17 +1469,7 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
         _lastFrameCapturedAt = DateTimeOffset.Now;
         _frameSequence++;
         _lastSourceMode = sourceMode;
-        DataOutput = new IntegrationPanelDataOutput
-        {
-            Timestamp = _lastFrameCapturedAt,
-            EndpointId = SelectedCamera?.SerialNumber ?? SelectedCamera?.DisplayName,
-            PayloadType = "CameraFrame",
-            PayloadValue = $"{result.Width}x{result.Height}; ROI={CurrentRoiValue}",
-            Units = "pixels",
-            SequenceNumber = _frameSequence,
-            CaptureRate = _smoothedFrameRate,
-            SourceMode = _lastSourceMode
-        };
+        PublishFrameOutput(SelectedCamera?.SerialNumber, SelectedCamera?.SerialNumber ?? SelectedCamera?.DisplayName, $"{result.Width}x{result.Height}; ROI={CurrentRoiValue}");
         CaptureAppliedSettingsSnapshot($"Verified during {sourceMode}.");
     }
 
@@ -1449,18 +1478,7 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
         _lastFrameCapturedAt = DateTimeOffset.Now;
         _frameSequence++;
         _lastSourceMode = sourceMode;
-        DataOutput = new IntegrationPanelDataOutput
-        {
-            Timestamp = _lastFrameCapturedAt,
-            DeviceId = frame.DeviceId,
-            EndpointId = SelectedCamera?.SerialNumber ?? SelectedCamera?.DisplayName,
-            PayloadType = "CameraFrame",
-            PayloadValue = $"{frame.Width}x{frame.Height}; ROI={CurrentRoiValue}",
-            Units = "pixels",
-            SequenceNumber = _frameSequence,
-            CaptureRate = _smoothedFrameRate,
-            SourceMode = _lastSourceMode
-        };
+        PublishFrameOutput(frame.DeviceId, SelectedCamera?.SerialNumber ?? SelectedCamera?.DisplayName, $"{frame.Width}x{frame.Height}; ROI={CurrentRoiValue}");
         RefreshAppliedSettingsOutput();
     }
 
@@ -1489,6 +1507,10 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
                 ["AppliedRoi"] = _appliedRoiPixels.HasValue ? CurrentRoiValue : "Full frame"
             },
             NormalizationNotes = new[] { note }
+        };
+        AppliedSettingsOutput = AppliedSettingsOutput with
+        {
+            SessionSettings = AppliedSettingsOutput.SessionSettings.WithOutputSettings(_outputSettings)
         };
     }
 
@@ -1554,6 +1576,31 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
         }).ConfigureAwait(false);
 
         return success;
+    }
+
+    private void PublishFrameOutput(string? deviceId, string? endpointId, string payloadValue)
+    {
+        var timestamp = _lastFrameCapturedAt ?? DateTimeOffset.Now;
+        if (!_outputPublisher.ShouldPublish(_outputSettings, timestamp, payloadValue))
+        {
+            return;
+        }
+
+        DataOutput = new IntegrationPanelDataOutput
+        {
+            Timestamp = _outputSettings.IncludeMetadata ? timestamp : null,
+            DeviceId = _outputSettings.IncludeMetadata ? deviceId : null,
+            EndpointId = _outputSettings.IncludeMetadata ? endpointId : null,
+            PayloadType = _outputSettings.PayloadType.ToString(),
+            PayloadValue = payloadValue,
+            Units = "pixels",
+            SequenceNumber = _frameSequence,
+            CaptureRate = _smoothedFrameRate,
+            SourceMode = _lastSourceMode,
+            OutputEmissionMode = _outputSettings.EmissionMode.ToString(),
+            OutputFrequencyHz = _outputSettings.OutputFrequencyHz,
+            MetadataIncluded = _outputSettings.IncludeMetadata
+        };
     }
 
     private IntegrationPanelStatusOutput BuildStatusOutput()

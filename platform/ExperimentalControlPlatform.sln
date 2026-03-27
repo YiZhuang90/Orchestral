@@ -1,4 +1,4 @@
-
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -20,6 +20,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExperimentalControlPlatform.Runtime.Tests", "tests\ExperimentalControlPlatform.Runtime.Tests\ExperimentalControlPlatform.Runtime.Tests.csproj", "{4D1E57B4-BDAB-452C-A87E-0D33C258882A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExperimentalControlPlatform.Devices.Tests", "tests\ExperimentalControlPlatform.Devices.Tests\ExperimentalControlPlatform.Devices.Tests.csproj", "{ED7906F9-20AA-4F86-8557-BB449EA90FBB}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{FA4C08A3-3E4B-4D50-81F9-C1BDAD5A2D34}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExperimentalControlPlatform.App.Tests", "tests\ExperimentalControlPlatform.App.Tests\ExperimentalControlPlatform.App.Tests.csproj", "{56E9E205-A471-4DF1-AFFC-713094C1A431}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -63,8 +67,15 @@ Global
 		{ED7906F9-20AA-4F86-8557-BB449EA90FBB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{ED7906F9-20AA-4F86-8557-BB449EA90FBB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{ED7906F9-20AA-4F86-8557-BB449EA90FBB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{56E9E205-A471-4DF1-AFFC-713094C1A431}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{56E9E205-A471-4DF1-AFFC-713094C1A431}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{56E9E205-A471-4DF1-AFFC-713094C1A431}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{56E9E205-A471-4DF1-AFFC-713094C1A431}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{56E9E205-A471-4DF1-AFFC-713094C1A431} = {FA4C08A3-3E4B-4D50-81F9-C1BDAD5A2D34}
 	EndGlobalSection
 EndGlobal

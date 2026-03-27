@@ -191,6 +191,7 @@ High-value parameters belong here.
 Advanced, unstable, or rarely changed settings should move into:
 
 - `More settings`
+- `Output settings`
 - diagnostics
 - secondary dialogs
 
@@ -273,6 +274,7 @@ Every panel should define the behavior of:
 - `Apply and exit`
 - `Close without apply`
 - `Disconnect and close` when relevant
+- `Emergency stop` when the device class can create unsafe real-world state
 
 ### Apply
 
@@ -290,9 +292,12 @@ Every panel should define the behavior of:
 - validate settings,
 - apply them to the correct scope,
 - persist or log the final applied configuration,
+- return the device to a known idle or waiting-for-call state,
 - terminate the live session or connection cleanly,
 - emit a session-end record,
 - and close the panel.
+
+Acquisition-only panels that do not stage meaningful command state may omit `Apply and exit` in the first generation, but that omission should be an explicit device-policy choice.
 
 ### Close without apply
 
@@ -310,6 +315,17 @@ If present, `Disconnect and close` should:
 - terminate the device connection,
 - emit final status and diagnostics records,
 - and close the panel.
+
+### Emergency stop
+
+When a device class can cause real-world damage or unsafe state, the panel should expose a device-level `Emergency stop`.
+
+This should:
+
+- call the device session's safe-stop path,
+- push the device toward its safest supported local state,
+- preserve auditable diagnostics,
+- and avoid pretending that acquisition-only devices need the same stop semantics as pumps, valves, stages, or controllers.
 
 ## Data Contract
 
@@ -345,6 +361,7 @@ Each device panel should provide a view-model that can answer:
 - what the subcontext selector should show
 - what the panel outputs are
 - what the apply and exit lifecycle should emit
+- whether a device-level emergency stop exists and when it is enabled
 
 The shell should not need PT-104-specific knowledge to render these basics.
 

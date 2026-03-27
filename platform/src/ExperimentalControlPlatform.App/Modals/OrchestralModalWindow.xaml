@@ -194,6 +194,88 @@
         </Border>
       </StackPanel>
     </DataTemplate>
+
+    <DataTemplate DataType="{x:Type modals:OutputSettingsDialogViewModel}">
+      <StackPanel>
+        <TextBlock FontFamily="Manrope, Segoe UI"
+                   FontSize="16"
+                   Foreground="#2E3430"
+                   Text="Runtime output settings" />
+        <TextBlock Margin="0,4,0,0"
+                   FontSize="12"
+                   Foreground="#5A615C"
+                   Text="{Binding Subtitle}" />
+
+        <TextBlock Margin="0,18,0,0"
+                   FontSize="12"
+                   Foreground="#5A615C"
+                   Text="Payload type" />
+        <Border Margin="0,6,0,0"
+                Background="#FFFFFF"
+                BorderBrush="#D8DDD7"
+                BorderThickness="1"
+                CornerRadius="8">
+          <ComboBox ItemsSource="{Binding PayloadTypeOptions}"
+                    SelectedItem="{Binding SelectedPayloadType, Mode=TwoWay}"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Padding="12,0"
+                    Height="34"
+                    FontSize="12"
+                    FontFamily="Inter, Segoe UI"
+                    Foreground="#2E3430"
+                    VerticalContentAlignment="Center" />
+        </Border>
+
+        <TextBlock Margin="0,14,0,0"
+                   FontSize="12"
+                   Foreground="#5A615C"
+                   Text="Emission mode" />
+        <Border Margin="0,6,0,0"
+                Background="#FFFFFF"
+                BorderBrush="#D8DDD7"
+                BorderThickness="1"
+                CornerRadius="8">
+          <ComboBox ItemsSource="{Binding EmissionModeOptions}"
+                    SelectedItem="{Binding SelectedEmissionMode, Mode=TwoWay}"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Padding="12,0"
+                    Height="34"
+                    FontSize="12"
+                    FontFamily="Inter, Segoe UI"
+                    Foreground="#2E3430"
+                    VerticalContentAlignment="Center" />
+        </Border>
+
+        <TextBlock Margin="0,14,0,0"
+                   FontSize="12"
+                   Foreground="#5A615C"
+                   Text="Output frequency (Hz)" />
+        <Border Margin="0,6,0,0"
+                Background="#FFFFFF"
+                BorderBrush="#D8DDD7"
+                BorderThickness="1"
+                CornerRadius="8">
+          <TextBox Background="Transparent"
+                   BorderThickness="0"
+                   Padding="12,0"
+                   Height="34"
+                   FontSize="12"
+                   FontFamily="Inter, Segoe UI"
+                   Foreground="#2E3430"
+                   Text="{Binding OutputFrequencyHzInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                   VerticalContentAlignment="Center" />
+        </Border>
+
+        <CheckBox Margin="0,16,0,0"
+                  IsChecked="{Binding IncludeMetadata, Mode=TwoWay}">
+          <TextBlock FontSize="12"
+                     Foreground="#2E3430"
+                     Text="Include metadata" />
+        </CheckBox>
+      </StackPanel>
+    </DataTemplate>
   </Window.Resources>
 
   <Border Margin="1"
