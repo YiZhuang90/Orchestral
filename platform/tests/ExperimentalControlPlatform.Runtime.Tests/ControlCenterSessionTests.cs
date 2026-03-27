@@ -110,6 +110,40 @@ public sealed class ControlCenterSessionTests
     }
 
     [Fact]
+    public async Task EmergencyStopAsync_SendsSafeCommand_AndLeavesSessionConnected()
+    {
+        var service = new FakeControlCenterService();
+        var session = new ControlCenterSession(service, TestDevice);
+
+        await session.ConnectAsync();
+        await session.EmergencyStopAsync();
+
+        Assert.Equal(new ControlCenterCommand(false, false, 0), Assert.Single(service.SentCommands));
+        var currentState = Assert.IsType<ControlCenterSessionState>(session.State.Current);
+        Assert.True(currentState.Connected);
+        Assert.False(currentState.LastCommandedLaserEnabled);
+        Assert.False(currentState.LastCommandedPuffEnabled);
+        Assert.Equal(0, currentState.LastStepCount);
+    }
+
+    [Fact]
+    public async Task EmergencyStopAsync_WhenDisconnected_DoesNotThrow_AndPublishesDiagnosticNote()
+    {
+        var service = new FakeControlCenterService();
+        var session = new ControlCenterSession(service, TestDevice);
+
+        await session.EmergencyStopAsync();
+
+        Assert.Empty(service.SentCommands);
+        Assert.Equal(
+            "Skipped emergency stop because the session is already disconnected.",
+            session.Diagnostics.Current!.LastValidationResult);
+        Assert.Equal(
+            "Emergency stop ignored because the control center is disconnected.",
+            session.State.Current!.StatusMessage);
+    }
+
+    [Fact]
     public async Task ApplyCommandAsync_WhenTransportFails_PublishesFailureStatus()
     {
         var service = new FakeControlCenterService

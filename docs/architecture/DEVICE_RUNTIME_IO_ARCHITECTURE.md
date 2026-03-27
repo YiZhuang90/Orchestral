@@ -96,6 +96,26 @@ The implementation may internally use:
 The session object is the architectural concept.
 The threading model is an implementation detail.
 
+## Current implementation status
+
+The first runtime-IO implementation pass is now present in code, not only in architecture.
+
+Implemented runtime sessions currently include:
+
+- `IntegratedMicrophoneSession`
+- `ControlCenterSession`
+- `Pt104Session`
+- `IntegratedCameraSession`
+- `HuaTengCameraSession`
+
+The current branch also already reflects these architectural consequences:
+
+- panels for those devices are moving to session-client behavior instead of owning hardware loops directly,
+- the application host owns session-registry behavior,
+- controlled-device sessions can define device-level `EmergencyStop`,
+- acquisition-style panels can expose a small operator-facing output-settings surface,
+- and `ApplyAndExit` is treated as a session-lifecycle action rather than only a UI close action.
+
 ## How
 
 ### How the system should be layered
@@ -208,6 +228,7 @@ Default first-generation rules:
 - no duplicate simultaneous sessions for the same physical device unless that device explicitly supports independent multi-session access
 - connect and disconnect within one panel lifetime normally reuse the same session object
 - a new session is created only when the host intentionally starts a new device-session lifetime
+- controlled-device sessions should define an explicit device-level safe-stop path when the hardware can cause unsafe real-world state
 
 ## What
 
@@ -291,6 +312,18 @@ Suggested fields:
 - `SequenceNumber`
 - `CaptureRate`
 - `SourceMode`
+
+The first-generation operator-facing output-settings surface should stay minimal.
+
+Recommended operator-controlled fields:
+
+- `PayloadType`
+- `EmissionMode`
+- `OutputFrequency`
+- `MetadataIncluded`
+
+Output routing should not be a first-generation panel choice.
+The runtime bus should be the default path, with recorder or downstream wiring composed later by coordinator or agent-driven logic.
 
 #### Status output
 
@@ -487,40 +520,39 @@ One microphone device session owns:
   - stop live
   - apply settings
 
-### 6. Example B: Arduino Uno R4 WiFi with LED matrix
+### 6. Example B: control-center / flow-rate controller
 
-Use this as an illustrative controlled-device example.
+Use this as the first real controlled-device runtime pilot.
 
 #### Why
 
-It is inexpensive, deterministic, and a good way to prove command-plane design.
+It already exists in the current trusted hardware inventory and proves real command-plane behavior.
 
 #### How
 
-One Arduino device session owns:
+One control-center device session owns:
 
-- board identity and serial transport,
-- current command protocol version,
+- device identity and serial transport,
 - connection lifecycle,
-- LED-matrix endpoint state,
+- current applied command state,
 - command acknowledgements,
-- fault and reconnect behavior.
+- fault, safe-stop, and reconnect behavior.
 
 #### What it exposes
 
 - command plane:
   - connect
   - disconnect
-  - send text
-  - send pattern
-  - clear display
+  - apply command
+  - emergency stop
 - data/status plane:
 - command result
-- applied display state
-- board health
+- applied controller state
+- controller health
 - transport diagnostics
 
-For the first real controlled-device pilot in the current hardware inventory, prefer the turbulence control-center serial device or flow-rate controller path because it already exists in the trusted hardware set and carries real command and feedback behavior.
+Device-level `EmergencyStop` should be treated as the base controlled-device safety primitive.
+A future system-level `StopAll` should orchestrate over those device-level guarantees rather than replacing them.
 
 ### 7. How to treat Arduino with attached sensors or actuators
 

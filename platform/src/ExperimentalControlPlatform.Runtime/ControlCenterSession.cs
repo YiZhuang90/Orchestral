@@ -207,6 +207,87 @@ public sealed class ControlCenterSession : IDeviceSession
         }
     }
 
+    public async Task EmergencyStopAsync(CancellationToken cancellationToken = default)
+    {
+        IControlCenterConnection? connection;
+        lock (_syncRoot)
+        {
+            connection = _connection;
+        }
+
+        if (connection is null)
+        {
+            PublishDiagnostics(Diagnostics.Current! with
+            {
+                LastCommand = "Emergency stop control center",
+                LastValidationResult = "Skipped emergency stop because the session is already disconnected.",
+                LastError = null
+            });
+            PublishState(State.Current! with
+            {
+                Busy = false,
+                StatusMessage = "Emergency stop ignored because the control center is disconnected."
+            });
+            return;
+        }
+
+        var safeCommand = new ControlCenterCommand(PuffEnabled: false, LaserEnabled: false, StepCount: 0);
+
+        PublishDiagnostics(Diagnostics.Current! with
+        {
+            LastCommand = "Emergency stop control center",
+            LastValidationResult = "Validated emergency-stop safe command.",
+            LastError = null
+        });
+        PublishState(State.Current! with
+        {
+            Busy = true,
+            StatusMessage = "Applying emergency-stop safe command..."
+        });
+
+        try
+        {
+            await Task.Run(() => _service.SendCommand(connection, safeCommand), cancellationToken).ConfigureAwait(false);
+            var appliedAt = DateTimeOffset.UtcNow;
+            AppliedStatePort.Publish(new ControlCenterAppliedState(
+                safeCommand.PuffEnabled,
+                safeCommand.LaserEnabled,
+                safeCommand.StepCount,
+                appliedAt,
+                "Emergency-stop safe command written to serial transport."));
+            PublishDiagnostics(Diagnostics.Current! with
+            {
+                LastHardwareResponse = "Emergency-stop safe command written to serial transport.",
+                LastStateTransition = "Applied emergency-stop safe command",
+                LastError = null
+            });
+
+            var currentState = State.Current!;
+            PublishState(currentState with
+            {
+                Busy = false,
+                LastCommandedPuffEnabled = false,
+                LastCommandedLaserEnabled = false,
+                LastStepCount = 0,
+                CommandSequence = currentState.CommandSequence + 1,
+                StatusMessage = "Emergency stop applied; control center is idle."
+            });
+        }
+        catch (Exception ex)
+        {
+            PublishDiagnostics(Diagnostics.Current! with
+            {
+                LastError = ex.Message
+            });
+            PublishState(State.Current! with
+            {
+                Busy = false,
+                StatusMessage = $"Emergency stop failed: {ex.Message}"
+            });
+            throw;
+        }
+    }
+
     public async Task DisconnectAsync(StopReason? reason = null, CancellationToken cancellationToken = default)
     {
         var stopReason = reason ?? StopReason.UserRequested("Disconnected control center session.");
@@ -250,6 +331,14 @@ public sealed class ControlCenterSession : IDeviceSession
 
     public async ValueTask DisposeAsync()
     {
+        lock (_syncRoot)
+        {
+            if (_connection is null)
+            {
+                return;
+            }
+        }
+
         await DisconnectAsync(StopReason.UserRequested("Disposed control center session.")).ConfigureAwait(false);
     }
 

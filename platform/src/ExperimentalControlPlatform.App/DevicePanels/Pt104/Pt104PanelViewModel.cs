@@ -21,7 +21,7 @@ using Microsoft.Win32;
 
 namespace ExperimentalControlPlatform.App.DevicePanels.Pt104;
 
-public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelViewModel
+public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelViewModel, IOutputSettingsPanelViewModel
 {
     private const double PlotCanvasWidth = 504;
     private const double PlotCanvasHeight = 280;
@@ -81,6 +81,7 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
     private readonly Dictionary<int, ChannelState> _channelStates;
     private readonly IReadOnlyList<ChannelTabOption> _channelOptions;
     private readonly AsyncRelayCommand _lifecycleActionCommand;
+    private readonly IntegrationPanelOutputPublisher _outputPublisher = new();
     private Pt104Session? _session;
     private List<(DateTime Timestamp, double Value)> _samples;
     private CancellationTokenSource? _liveReadCancellation;
@@ -134,6 +135,11 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
     private string? _lastError;
     private string? _lastStateTransition;
     private string? _lastValidationResult;
+    private IntegrationPanelOutputSettings _outputSettings = new(
+        IntegrationPanelOutputPayloadType.Scalar,
+        IntegrationPanelOutputEmissionMode.LatestOnly,
+        1.0,
+        true);
 
     public Pt104PanelViewModel(Pt104Driver driver, IDeviceSessionRegistry sessionRegistry)
     {
@@ -283,6 +289,15 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
     public string DiagnosticsTitle => "PT-104 diagnostics";
 
     public string DiagnosticsSubtitle => "Hardware state and channel configuration";
+
+    public IReadOnlyList<IntegrationPanelOutputPayloadType> SupportedOutputPayloadTypes { get; } =
+    [
+        IntegrationPanelOutputPayloadType.Scalar
+    ];
+
+    public IntegrationPanelOutputSettings CurrentOutputSettings => _outputSettings;
+
+    public string OutputSettingsSubtitle => "Shape PT-104 channel output before it reaches the runtime bus.";
 
     public int SelectedChannel
     {
@@ -811,6 +826,19 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
         _sessionRegistry.Remove(session.SessionId);
         UnbindSession();
         _ = RunSessionDisposeAsync(session, "Disposed PT-104 panel.");
+    }
+
+    public Task ApplyOutputSettingsAsync(IntegrationPanelOutputSettings settings)
+    {
+        _outputSettings = settings;
+        _outputPublisher.Reset();
+        SetLastCommand($"Apply output settings for channel {SelectedChannel}");
+        SetLastValidationResult("Validated PT-104 output settings.");
+        SetLastStateTransition($"Applied output settings for channel {SelectedChannel}");
+        StatusMessage = "PT-104 output settings updated.";
+        RefreshDataOutput();
+        CaptureAppliedSettingsSnapshot(BuildSettings(SelectedChannel), "Updated PT-104 output settings.");
+        return Task.CompletedTask;
     }
 
     private Pt104ConnectionSettings BuildSettings()
@@ -1420,6 +1448,10 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
             },
             NormalizationNotes = new[] { note }
         };
+        AppliedSettingsOutput = AppliedSettingsOutput with
+        {
+            SessionSettings = AppliedSettingsOutput.SessionSettings.WithOutputSettings(_outputSettings)
+        };
     }
 
     private IntegrationPanelStatusOutput BuildStatusOutput()
@@ -1462,16 +1494,27 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
             ? (_samples.Count - 1) / Math.Max((_samples[^1].Timestamp - _samples[0].Timestamp).TotalSeconds, 1.0)
             : (double?)null;
 
+        var timestamp = state.LastSampleTimestamp.Value;
+        var payloadValue = state.LastSampleValue.Value.ToString("F3", CultureInfo.InvariantCulture);
+        if (!_outputPublisher.ShouldPublish(_outputSettings, timestamp, payloadValue))
+        {
+            return;
+        }
+
         DataOutput = new IntegrationPanelDataOutput
         {
-            Timestamp = state.LastSampleTimestamp,
-            EndpointId = $"PT-104:Channel-{SelectedChannel}",
-            PayloadType = "TemperatureCelsius",
-            PayloadValue = state.LastSampleValue.Value.ToString("F3", CultureInfo.InvariantCulture),
+            Timestamp = _outputSettings.IncludeMetadata ? timestamp : null,
+            DeviceId = _outputSettings.IncludeMetadata ? ConnectedDeviceId : null,
+            EndpointId = _outputSettings.IncludeMetadata ? $"PT-104:Channel-{SelectedChannel}" : null,
+            PayloadType = _outputSettings.PayloadType.ToString(),
+            PayloadValue = payloadValue,
             Units = "C",
             SequenceNumber = _samples.Count,
             CaptureRate = captureRate,
-            SourceMode = state.LastSourceMode
+            SourceMode = state.LastSourceMode,
+            OutputEmissionMode = _outputSettings.EmissionMode.ToString(),
+            OutputFrequencyHz = _outputSettings.OutputFrequencyHz,
+            MetadataIncluded = _outputSettings.IncludeMetadata
         };
     }
 

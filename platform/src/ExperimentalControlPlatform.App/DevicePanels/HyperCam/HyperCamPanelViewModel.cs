@@ -15,7 +15,7 @@ using MahApps.Metro.IconPacks;
 
 namespace ExperimentalControlPlatform.App.DevicePanels.HyperCam;
 
-public sealed class HyperCamPanelViewModel : ObservableObject, ICameraPanelViewModel
+public sealed class HyperCamPanelViewModel : ObservableObject, ICameraPanelViewModel, IOutputSettingsPanelViewModel
 {
     private static readonly IReadOnlyList<IntegrationPanelLifecycleAction> ConnectedLifecycleActions =
     [
@@ -23,6 +23,7 @@ public sealed class HyperCamPanelViewModel : ObservableObject, ICameraPanelViewM
     ];
 
     private readonly AsyncRelayCommand _lifecycleActionCommand;
+    private readonly IntegrationPanelOutputPublisher _outputPublisher = new();
     private readonly IReadOnlyList<HyperCamOption> _cameraOptions =
     [
         new("HyperCam")
@@ -54,6 +55,11 @@ public sealed class HyperCamPanelViewModel : ObservableObject, ICameraPanelViewM
     private string? _lastError;
     private string? _lastStateTransition;
     private string? _lastValidationResult;
+    private IntegrationPanelOutputSettings _outputSettings = new(
+        IntegrationPanelOutputPayloadType.Image,
+        IntegrationPanelOutputEmissionMode.LatestOnly,
+        5.0,
+        true);
     private IntegrationPanelDataOutput? _dataOutput;
     private IntegrationPanelAppliedSettingsOutput? _appliedSettingsOutput;
     private IntegrationPanelStatusOutput? _statusOutput;
@@ -281,6 +287,15 @@ public sealed class HyperCamPanelViewModel : ObservableObject, ICameraPanelViewM
 
     public string DiagnosticsSubtitle => "Mock camera panel for design review";
 
+    public IReadOnlyList<IntegrationPanelOutputPayloadType> SupportedOutputPayloadTypes { get; } =
+    [
+        IntegrationPanelOutputPayloadType.Image
+    ];
+
+    public IntegrationPanelOutputSettings CurrentOutputSettings => _outputSettings;
+
+    public string OutputSettingsSubtitle => "Shape the HyperCam mock output before it reaches the runtime bus.";
+
     public bool CanSetRoi => false;
 
     public bool CanClearRoi => false;
@@ -422,6 +437,18 @@ public sealed class HyperCamPanelViewModel : ObservableObject, ICameraPanelViewM
         return Task.CompletedTask;
     }
 
+    public Task ApplyOutputSettingsAsync(IntegrationPanelOutputSettings settings)
+    {
+        _outputSettings = settings;
+        _outputPublisher.Reset();
+        SetLastCommand("Apply HyperCam output settings");
+        SetLastStateTransition("Applied HyperCam output settings");
+        _statusMessage = "HyperCam output settings updated.";
+        UpdateFrameCards();
+        CaptureAppliedSettingsSnapshot("Applied HyperCam output settings.");
+        return Task.CompletedTask;
+    }
+
     public CameraSettingsDialogViewModel? CreateDetailedSettingsDialog()
     {
         return new CameraSettingsDialogViewModel(
@@ -493,17 +520,26 @@ public sealed class HyperCamPanelViewModel : ObservableObject, ICameraPanelViewM
     {
         CurrentPrimaryValue = "1280 x 720";
         ResolutionText = "1280 x 720";
-        DataOutput = new IntegrationPanelDataOutput
+        var timestamp = DateTimeOffset.Now;
+        var payloadValue = $"{ResolutionText}; {PixelFormatText}";
+        if (_outputPublisher.ShouldPublish(_outputSettings, timestamp, payloadValue))
         {
-            Timestamp = DateTimeOffset.Now,
-            EndpointId = _selectedCamera?.DisplayName ?? "HyperCam",
-            PayloadType = "MockCameraFrame",
-            PayloadValue = $"{ResolutionText}; {PixelFormatText}",
-            Units = "pixels",
-            SequenceNumber = 1,
-            CaptureRate = ParsePositiveDouble(_frameRateInput, 120),
-            SourceMode = IsLivePreviewing ? "live" : "snapshot"
-        };
+            DataOutput = new IntegrationPanelDataOutput
+            {
+                Timestamp = _outputSettings.IncludeMetadata ? timestamp : null,
+                DeviceId = _outputSettings.IncludeMetadata ? "HyperCam" : null,
+                EndpointId = _outputSettings.IncludeMetadata ? _selectedCamera?.DisplayName ?? "HyperCam" : null,
+                PayloadType = _outputSettings.PayloadType.ToString(),
+                PayloadValue = payloadValue,
+                Units = "pixels",
+                SequenceNumber = 1,
+                CaptureRate = ParsePositiveDouble(_frameRateInput, 120),
+                SourceMode = IsLivePreviewing ? "live" : "snapshot",
+                OutputEmissionMode = _outputSettings.EmissionMode.ToString(),
+                OutputFrequencyHz = _outputSettings.OutputFrequencyHz,
+                MetadataIncluded = _outputSettings.IncludeMetadata
+            };
+        }
     }
 
     private void SyncFooter()
@@ -537,6 +573,10 @@ public sealed class HyperCamPanelViewModel : ObservableObject, ICameraPanelViewM
                 ["LivePreviewing"] = IsLivePreviewing ? "true" : "false"
             },
             NormalizationNotes = [note]
+        };
+        AppliedSettingsOutput = AppliedSettingsOutput with
+        {
+            SessionSettings = AppliedSettingsOutput.SessionSettings.WithOutputSettings(_outputSettings)
         };
     }
 

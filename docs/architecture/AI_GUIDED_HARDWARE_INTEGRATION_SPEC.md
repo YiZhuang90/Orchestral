@@ -58,6 +58,7 @@ If successful, the workflow should produce:
 - a device definition draft,
 - a protocol definition draft,
 - a suitable implementation-window mapping,
+- a runtime-session mapping,
 - a verification plan,
 - a handover verification record,
 - and device integration documentation.
@@ -478,6 +479,14 @@ The implementation-window mapping should explicitly record:
 - what parts were reused unchanged,
 - and what new reusable modules, if any, had to be introduced.
 
+The integration artifacts should also explicitly record:
+
+- which runtime session owns the live device behavior,
+- whether the panel is acting as a session client,
+- what output-settings surface exists, if any,
+- whether the device requires a device-level emergency stop path,
+- and what `Apply and exit` means for that device's idle or waiting-for-call state.
+
 These artifacts should become part of project memory.
 
 The handover verification report should capture:
@@ -487,6 +496,13 @@ The handover verification report should capture:
 - hardware responses,
 - truthfulness checks for displayed values,
 - and any known gaps that still require manual confirmation.
+
+For runtime-backed devices, the handover record should also capture:
+
+- whether the panel is subscribing to structured session outputs instead of owning hardware loops directly,
+- whether output settings publish truthful structured fields,
+- whether device-level emergency stop behavior was verified when relevant,
+- and whether `Apply and exit` leaves the device in the expected idle or waiting-for-call state.
 
 For devices with hardware constraints, the artifacts should also record:
 

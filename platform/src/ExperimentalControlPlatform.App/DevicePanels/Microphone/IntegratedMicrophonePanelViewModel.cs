@@ -22,7 +22,7 @@ using Microsoft.Win32;
 
 namespace ExperimentalControlPlatform.App.DevicePanels.Microphone;
 
-public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudioInputPanelViewModel
+public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudioInputPanelViewModel, IOutputSettingsPanelViewModel
 {
     private const double PlotCanvasWidth = 504;
     private const double PlotCanvasHeight = 280;
@@ -35,6 +35,7 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
     private readonly IMicrophoneService _microphoneService;
     private readonly IDeviceSessionRegistry _sessionRegistry;
     private readonly AsyncRelayCommand _lifecycleActionCommand;
+    private readonly IntegrationPanelOutputPublisher _outputPublisher = new();
     private readonly ValueCardItem _peakCard = new("Peak", "--");
     private readonly ValueCardItem _sampleRateCard = new("Sample rate", "--");
     private readonly ValueCardItem _windowCard = new("Window", "--");
@@ -79,6 +80,11 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
     private DateTimeOffset? _lastFrameCapturedAt;
     private long _frameSequence;
     private string? _lastSourceMode;
+    private IntegrationPanelOutputSettings _outputSettings = new(
+        IntegrationPanelOutputPayloadType.Waveform,
+        IntegrationPanelOutputEmissionMode.LatestOnly,
+        20.0,
+        true);
 
     public IntegratedMicrophonePanelViewModel(IMicrophoneService microphoneService, IDeviceSessionRegistry sessionRegistry)
     {
@@ -339,6 +345,16 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
 
     public string DiagnosticsSubtitle => "Windows audio-input capture state";
 
+    public IReadOnlyList<IntegrationPanelOutputPayloadType> SupportedOutputPayloadTypes { get; } =
+    [
+        IntegrationPanelOutputPayloadType.Waveform,
+        IntegrationPanelOutputPayloadType.Scalar
+    ];
+
+    public IntegrationPanelOutputSettings CurrentOutputSettings => _outputSettings;
+
+    public string OutputSettingsSubtitle => "Shape the microphone output before it reaches the runtime bus.";
+
     public IntegrationPanelDataOutput? DataOutput
     {
         get => _dataOutput;
@@ -595,6 +611,26 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
         }
     }
 
+    public Task ApplyOutputSettingsAsync(IntegrationPanelOutputSettings settings)
+    {
+        _outputSettings = settings;
+        _outputPublisher.Reset();
+        SetLastCommand("Apply microphone output settings");
+        SetLastValidationResult("Validated microphone output settings.");
+        SetLastStateTransition("Applied microphone output settings");
+        _statusMessage = "Microphone output settings updated.";
+        if (_session?.LatestFrame.Current is not null)
+        {
+            ApplySessionFrame(_session.LatestFrame.Current);
+        }
+        else
+        {
+            RefreshAppliedSettingsOutput();
+        }
+
+        return Task.CompletedTask;
+    }
+
     private void ApplyFrame(MicrophoneFrame frame, string sourceMode)
     {
         _latestWaveformSamples = frame.Samples.ToArray();
@@ -614,17 +650,7 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
 
         BuildPlot(frame.Samples, frame.WindowDuration);
 
-        DataOutput = new IntegrationPanelDataOutput
-        {
-            Timestamp = _lastFrameCapturedAt,
-            EndpointId = frame.DeviceId,
-            PayloadType = "AudioWindow",
-            PayloadValue = $"RMS={FormatDbfs(frame.RmsDbfs)}; Peak={FormatDbfs(frame.PeakDbfs)}; Samples={frame.Samples.Length}",
-            Units = "dBFS",
-            SequenceNumber = _frameSequence,
-            CaptureRate = ParseTargetUpdateRate(),
-            SourceMode = _lastSourceMode
-        };
+        PublishFrameOutput(frame);
 
         CaptureAppliedSettingsSnapshot($"Verified during {sourceMode}.");
         OnPropertyChanged(nameof(CanClearData));
@@ -771,6 +797,10 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
                 ["LiveReading"] = IsLiveReading ? "true" : "false"
             },
             NormalizationNotes = new[] { note }
+        };
+        AppliedSettingsOutput = AppliedSettingsOutput with
+        {
+            SessionSettings = AppliedSettingsOutput.SessionSettings.WithOutputSettings(_outputSettings)
         };
     }
 
@@ -1105,6 +1135,10 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
             },
             NormalizationNotes = ["Mapped from runtime session settings."]
         };
+        AppliedSettingsOutput = AppliedSettingsOutput with
+        {
+            SessionSettings = AppliedSettingsOutput.SessionSettings.WithOutputSettings(_outputSettings)
+        };
     }
 
     private MicrophoneCaptureSettings BuildCaptureSettings()
@@ -1134,5 +1168,36 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
         {
             Debug.WriteLine($"[IntegratedMicrophonePanelViewModel] Session dispose failed: {ex}");
         }
+    }
+
+    private void PublishFrameOutput(MicrophoneFrame frame)
+    {
+        var timestamp = _lastFrameCapturedAt ?? DateTimeOffset.Now;
+        var payloadValue = _outputSettings.PayloadType switch
+        {
+            IntegrationPanelOutputPayloadType.Scalar => FormatDbfs(frame.RmsDbfs),
+            _ => $"RMS={FormatDbfs(frame.RmsDbfs)}; Peak={FormatDbfs(frame.PeakDbfs)}; Samples={frame.Samples.Length}"
+        };
+        var signature = $"{_outputSettings.PayloadType}:{payloadValue}";
+        if (!_outputPublisher.ShouldPublish(_outputSettings, timestamp, signature))
+        {
+            return;
+        }
+
+        DataOutput = new IntegrationPanelDataOutput
+        {
+            Timestamp = _outputSettings.IncludeMetadata ? timestamp : null,
+            DeviceId = _outputSettings.IncludeMetadata ? frame.DeviceId : null,
+            EndpointId = _outputSettings.IncludeMetadata ? frame.DeviceId : null,
+            PayloadType = _outputSettings.PayloadType.ToString(),
+            PayloadValue = payloadValue,
+            Units = "dBFS",
+            SequenceNumber = _frameSequence,
+            CaptureRate = ParseTargetUpdateRate(),
+            SourceMode = _lastSourceMode,
+            OutputEmissionMode = _outputSettings.EmissionMode.ToString(),
+            OutputFrequencyHz = _outputSettings.OutputFrequencyHz,
+            MetadataIncluded = _outputSettings.IncludeMetadata
+        };
     }
 }

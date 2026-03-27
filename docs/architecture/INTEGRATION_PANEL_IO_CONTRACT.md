@@ -89,6 +89,18 @@ Every integration panel should emit structured outputs.
 
 The panel should expose the current device payload in a structured form.
 
+When the panel supports output settings, the first-generation operator-facing surface should stay minimal.
+
+Recommended first-generation fields:
+
+- `Payload type`
+- `Emission mode`
+- `Output frequency`
+- `Include metadata`
+
+The output destination should not be a first-generation panel concern.
+Panels should publish to the runtime bus by default and let recorder, coordinator, or agent-driven orchestration decide downstream wiring later.
+
 Examples:
 
 - scalar sample stream
@@ -108,6 +120,9 @@ Suggested fields:
 - `SequenceNumber`
 - `CaptureRate`
 - `SourceMode`
+- `OutputEmissionMode`
+- `OutputFrequencyHz`
+- `MetadataIncluded`
 
 ### 3.2 Applied-settings output
 
@@ -174,6 +189,7 @@ Every panel should define the operational meaning of:
 - `Apply and exit`
 - `Close without apply`
 - `Disconnect and close` when relevant
+- `Emergency stop` when the device class can create unsafe real-world state
 
 ## 4.1 Apply
 
@@ -190,11 +206,14 @@ Every panel should define the operational meaning of:
 
 - perform the same validation and apply step,
 - log the final applied settings,
+- leave the device in a known idle or waiting-for-call state,
 - terminate the live session and hardware connection cleanly,
 - emit the session-end output,
 - close the panel.
 
 This should be the default safe termination path for integration work.
+
+Acquisition-only panels that do not stage meaningful command state may omit `Apply and exit` in the first generation, but that exception should be explicit rather than accidental.
 
 ## 4.3 Close without apply
 
@@ -212,6 +231,17 @@ If a panel exposes `Disconnect and close`, it should:
 - disconnect the hardware,
 - emit final status and diagnostics outputs,
 - then close the panel.
+
+## 4.5 Emergency stop
+
+When a device can create unsafe real-world state, the panel should expose `Emergency stop` as a device-level runtime action.
+
+`Emergency stop` should:
+
+- command the device session into its safest supported local state,
+- preserve a truthful applied-state or status snapshot,
+- keep the semantics device-specific rather than pretending every device stops the same way,
+- and produce diagnostics that make the stop action auditable later.
 
 ## 5. Truthfulness Rules
 

@@ -81,6 +81,19 @@
                        Text="Actions" />
 
             <StackPanel Margin="0,6,0,0">
+              <Button Margin="0,0,0,6"
+                      Style="{StaticResource OutlineActionButtonStyle}"
+                      Click="OutputSettingsButton_OnClick">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                  <iconPacks:PackIconMaterial Margin="0,0,8,0"
+                                              Kind="Tune"
+                                              Width="14"
+                                              Height="14"
+                                              VerticalAlignment="Center" />
+                  <TextBlock Text="Output settings" />
+                </StackPanel>
+              </Button>
+
               <Button Style="{StaticResource ConnectionToggleButtonStyle}"
                       Tag="{Binding IsConnected}"
                       Click="ToggleConnectionButton_OnClick"
