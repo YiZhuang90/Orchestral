@@ -69,9 +69,19 @@ public sealed class DeviceSessionRegistry : IDeviceSessionRegistry
             sessions = _sessions.Values.ToArray();
         }
 
-        foreach (var session in sessions)
+        try
         {
-            await session.StopAsync(reason, cancellationToken).ConfigureAwait(false);
+            foreach (var session in sessions)
+            {
+                await session.StopAsync(reason, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            lock (_syncRoot)
+            {
+                _sessions.Clear();
+            }
         }
     }
 }

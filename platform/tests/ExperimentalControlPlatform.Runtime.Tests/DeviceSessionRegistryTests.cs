@@ -30,6 +30,7 @@ public sealed class DeviceSessionRegistryTests
 
         Assert.Equal(1, first.StopCallCount);
         Assert.Equal(1, second.StopCallCount);
+        Assert.Empty(registry.Sessions);
     }
 
     private sealed class FakeSession : IDeviceSession

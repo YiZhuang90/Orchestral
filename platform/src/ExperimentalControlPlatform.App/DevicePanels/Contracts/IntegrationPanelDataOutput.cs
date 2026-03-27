@@ -6,6 +6,8 @@ public sealed record IntegrationPanelDataOutput
 {
     public DateTimeOffset? Timestamp { get; init; }
 
+    public string? DeviceId { get; init; }
+
     public string? EndpointId { get; init; }
 
     public string? PayloadType { get; init; }
