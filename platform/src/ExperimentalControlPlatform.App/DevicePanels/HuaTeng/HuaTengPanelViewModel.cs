@@ -13,6 +13,7 @@ using ExperimentalControlPlatform.App.DevicePanels;
 using ExperimentalControlPlatform.App.DevicePanels.Camera;
 using ExperimentalControlPlatform.App.DevicePanels.Contracts;
 using ExperimentalControlPlatform.App.Modals;
+using ExperimentalControlPlatform.Runtime;
 using MahApps.Metro.IconPacks;
 
 namespace ExperimentalControlPlatform.App.DevicePanels.HuaTeng;
@@ -25,9 +26,9 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
         IntegrationPanelLifecycleAction.Apply
     ];
     private readonly HuaTengCameraProbeClient _probeClient;
+    private readonly IDeviceSessionRegistry _sessionRegistry;
     private readonly AsyncRelayCommand _lifecycleActionCommand;
-    private CancellationTokenSource? _liveCancellation;
-    private Task? _liveTask;
+    private HuaTengCameraSession? _session;
     private bool _isBusy;
     private bool _isConnecting;
     private bool _isConnected;
@@ -85,9 +86,10 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
     private long _frameSequence;
     private string? _lastSourceMode;
 
-    public HuaTengPanelViewModel(HuaTengCameraProbeClient probeClient)
+    public HuaTengPanelViewModel(HuaTengCameraProbeClient probeClient, IDeviceSessionRegistry sessionRegistry)
     {
         _probeClient = probeClient ?? throw new ArgumentNullException(nameof(probeClient));
+        _sessionRegistry = sessionRegistry ?? throw new ArgumentNullException(nameof(sessionRegistry));
         _lifecycleActionCommand = new AsyncRelayCommand(ExecuteLifecycleActionAsync, CanExecuteLifecycleAction, HandleLifecycleCommandException);
         RefreshStatusOutput();
         RefreshDiagnosticsOutput();
@@ -472,7 +474,7 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
 
     public async Task ApplyRoiAsync()
     {
-        if (!_hasRoiSelection || SelectedCamera is null)
+        if (_session is null || !_hasRoiSelection || SelectedCamera is null)
         {
             return;
         }
@@ -485,50 +487,14 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
 
         try
         {
-            SetLastCommand("Capture ROI snapshot");
-            var result = await _probeClient.CaptureSnapshotAsync(
-                SelectedCamera.Index,
-                _selectedPixelFormat,
-                _selectedTriggerMode,
-                ParseExposure(_exposureInput),
-                roiPixels.Value).ConfigureAwait(false);
-
-            _latestDiagnostics = result.Diagnostics.ToList();
-            if (!result.Ok)
-            {
-                SetLastHardwareResponse(result.Summary);
-                SetLastError(result.Summary);
-                StatusMessage = result.Summary;
-                FooterSystemStateLabel = "Fault";
-                return;
-            }
-
-            ClearLastError();
-            SetLastHardwareResponse(result.Summary);
-            SetLastStateTransition("Applied ROI snapshot");
-            _appliedRoiPixels = result.Roi ?? roiPixels;
-            _currentFrameWidth = result.Width;
-            _currentFrameHeight = result.Height;
-            UpdateNormalizedRoiFromAppliedPixels();
-            ResolutionText = $"{result.Width} x {result.Height}";
-            PixelFormatText = result.PixelFormat;
-            ExposureText = $"{result.ExposureUs:0} us";
-            FrameRateText = "--";
-            StatusMessage = "ROI applied.";
-            FooterSystemStateLabel = "ROI ready";
-            FooterFormatLabel = result.PixelFormat;
-            FooterTriggerLabel = result.TriggerMode;
+            await _session.ApplyRoiAsync(ToCaptureRegion(roiPixels.Value)).ConfigureAwait(true);
             _isRoiEditMode = true;
             OnPropertyChanged(nameof(RoiHandleVisibility));
             OnPropertyChanged(nameof(RoiLiveVisibility));
-            UpdateRoiSummary();
-            CaptureFrameOutput(result, "roi");
         }
         catch (Exception ex)
         {
-            SetLastError(ex.Message);
-            StatusMessage = $"ROI apply failed: {ex.Message}";
-            FooterSystemStateLabel = "Fault";
+            Debug.WriteLine($"[HuaTengPanelViewModel] Apply ROI failed: {ex}");
         }
     }
 
@@ -561,11 +527,6 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
         }
 
         SetLastValidationResult("Validated settings.");
-        var restartLive = IsLivePreviewing;
-        var previousPixelFormat = _selectedPixelFormat;
-        var previousTriggerMode = _selectedTriggerMode;
-        var previousExposureInput = _exposureInput;
-        var previousFrameRateInput = _frameRateInput;
         _selectedPixelFormat = _draftSelectedPixelFormat;
         _selectedTriggerMode = _draftSelectedTriggerMode;
         _exposureInput = _draftExposureInput;
@@ -575,49 +536,20 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
         OnPropertyChanged(nameof(CanApplySettings));
         _lifecycleActionCommand.NotifyCanExecuteChanged();
 
-        var appliedToHardware = true;
-        if (restartLive)
+        if (_session is null)
         {
-            await RestartLivePreviewAsync();
-            appliedToHardware = _lastError is null;
-        }
-        else if (IsConnected)
-        {
-            appliedToHardware = await TryApplySettingsSnapshotAsync("Settings applied.").ConfigureAwait(false);
-        }
-
-        if (!appliedToHardware)
-        {
-            _selectedPixelFormat = previousPixelFormat;
-            _selectedTriggerMode = previousTriggerMode;
-            _exposureInput = previousExposureInput;
-            _frameRateInput = previousFrameRateInput;
-            SyncFooter();
-            OnPropertyChanged(nameof(CanApplySettings));
-            _lifecycleActionCommand.NotifyCanExecuteChanged();
+            StatusMessage = "Camera settings staged for the next capture.";
+            FooterSystemStateLabel = "System Ready";
             return;
         }
 
-        StatusMessage = restartLive
-            ? "Camera settings applied. Restarting live preview..."
-            : IsConnected
-                ? "Camera settings applied."
-                : "Camera settings staged for the next capture.";
-        if (!restartLive)
+        try
         {
-            FooterSystemStateLabel = IsConnected ? "Ready" : "System Ready";
+            await _session.ApplySettingsAsync(BuildCaptureSettings()).ConfigureAwait(true);
         }
-
-        ClearLastError();
-        SetLastStateTransition(restartLive
-            ? "Applied settings and restarted live preview"
-            : IsConnected
-                ? "Applied settings"
-                : "Staged settings for the next capture");
-        if (IsConnected)
+        catch (Exception ex)
         {
-            CaptureAppliedSettingsSnapshot("Applied to connected HuaTeng camera.");
-            SessionEndOutput = null;
+            Debug.WriteLine($"[HuaTengPanelViewModel] Apply settings failed: {ex}");
         }
     }
 
@@ -626,9 +558,6 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
         ArgumentNullException.ThrowIfNull(dialog);
 
         SetLastCommand("Apply detailed camera settings");
-        var restartLive = IsLivePreviewing;
-        var previousTriggerMode = _selectedTriggerMode;
-        var previousColorTone = _selectedColorTone;
         _draftSelectedTriggerMode = dialog.SelectedTriggerMode;
         _selectedTriggerMode = dialog.SelectedTriggerMode;
         _draftSelectedColorTone = dialog.SelectedColorTone;
@@ -640,50 +569,19 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
         OnPropertyChanged(nameof(CanApplySettings));
         _lifecycleActionCommand.NotifyCanExecuteChanged();
 
-        var appliedToHardware = true;
-        if (restartLive)
+        if (_session is null)
         {
-            await RestartLivePreviewAsync();
-            appliedToHardware = _lastError is null;
-        }
-        else if (IsConnected)
-        {
-            appliedToHardware = await TryApplySettingsSnapshotAsync("Detailed settings applied.").ConfigureAwait(false);
-        }
-
-        if (!appliedToHardware)
-        {
-            _draftSelectedTriggerMode = previousTriggerMode;
-            _selectedTriggerMode = previousTriggerMode;
-            _draftSelectedColorTone = previousColorTone;
-            _selectedColorTone = previousColorTone;
-            SyncFooter();
-            OnPropertyChanged(nameof(SelectedTriggerModeDraft));
-            OnPropertyChanged(nameof(CanApplySettings));
-            _lifecycleActionCommand.NotifyCanExecuteChanged();
+            StatusMessage = "Detailed settings staged for the next capture.";
             return;
         }
 
-        StatusMessage = restartLive
-            ? "Detailed settings applied. Restarting live preview..."
-            : IsConnected
-                ? "Detailed settings applied."
-                : "Detailed settings staged for the next capture.";
-        if (!restartLive)
+        try
         {
-            FooterSystemStateLabel = IsConnected ? "Ready" : "System Ready";
+            await _session.ApplySettingsAsync(BuildCaptureSettings()).ConfigureAwait(true);
         }
-
-        ClearLastError();
-        SetLastStateTransition(restartLive
-            ? "Applied detailed settings and restarted live preview"
-            : IsConnected
-                ? "Applied detailed settings"
-                : "Staged detailed settings for the next capture");
-        if (IsConnected)
+        catch (Exception ex)
         {
-            CaptureAppliedSettingsSnapshot("Applied detailed settings to connected HuaTeng camera.");
-            SessionEndOutput = null;
+            Debug.WriteLine($"[HuaTengPanelViewModel] Apply detailed settings failed: {ex}");
         }
     }
 
@@ -739,13 +637,12 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
                 return;
             }
 
-            IsConnected = true;
-            SessionEndOutput = null;
-            ClearLastError();
-            SetLastStateTransition($"Connected to {SelectedCamera.DisplayName}");
-            StatusMessage = $"Connected to {SelectedCamera.DisplayName}.";
-            FooterSystemStateLabel = "Ready";
-            SyncFooter();
+            var session = GetOrCreateSession();
+            BindSession(session);
+            await session.ConnectAsync(BuildCaptureSettings()).ConfigureAwait(true);
+            _isRoiEditMode = false;
+            OnPropertyChanged(nameof(RoiHandleVisibility));
+            OnPropertyChanged(nameof(RoiLiveVisibility));
         }
         finally
         {
@@ -756,83 +653,39 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
 
     public async Task DisconnectAsync()
     {
-        var liveWasActive = IsLivePreviewing;
-        await StopLivePreviewAsync().ConfigureAwait(false);
-        IsConnected = false;
-        StatusMessage = "Camera disconnected.";
-        FooterSystemStateLabel = "System Ready";
-        SetLastStateTransition("Disconnected camera");
-        SessionEndOutput = new IntegrationPanelSessionEndOutput
+        if (_session is null)
         {
-            EndedAt = DateTimeOffset.Now,
-            ExitReason = "Disconnected by operator",
-            ConnectionClosed = true,
-            LiveStopped = liveWasActive,
-            AppliedSettingsSnapshot = AppliedSettingsOutput,
-            FinalStatus = BuildStatusOutput()
-        };
+            return;
+        }
+
+        var session = _session;
+        try
+        {
+            await session.DisconnectAsync(StopReason.UserRequested("Disconnected HuaTeng panel.")).ConfigureAwait(true);
+        }
+        finally
+        {
+            _sessionRegistry.Remove(session.SessionId);
+            UnbindSession();
+            await session.DisposeAsync().ConfigureAwait(true);
+        }
     }
 
     public async Task SnapFrameAsync()
     {
-        if (SelectedCamera is null)
+        if (_session is null)
         {
-            await RefreshCamerasAsync().ConfigureAwait(false);
-            if (SelectedCamera is null)
-            {
-                StatusMessage = "No HuaTeng camera is available over USB.";
-                return;
-            }
+            return;
         }
 
-        await RunBusyAsync(async () =>
+        try
         {
-            SetLastCommand("Capture snapshot");
-            var result = await _probeClient.CaptureSnapshotAsync(
-                SelectedCamera!.Index,
-                _selectedPixelFormat,
-                _selectedTriggerMode,
-                ParseExposure(_exposureInput)).ConfigureAwait(false);
-
-            _latestDiagnostics = result.Diagnostics.ToList();
-            if (!result.Ok)
-            {
-                SetLastHardwareResponse(result.Summary);
-                SetLastError(result.Summary);
-                StatusMessage = result.Summary;
-                FooterSystemStateLabel = "Fault";
-                return;
-            }
-
-            ClearLastError();
-            SetLastHardwareResponse(result.Summary);
-            SetLastStateTransition("Captured snapshot");
-            PreviewImage = LoadImage(result);
-            _currentFrameWidth = result.Width;
-            _currentFrameHeight = result.Height;
-            if (!_hasRoiSelection)
-            {
-                _fullFrameWidth = result.Width;
-                _fullFrameHeight = result.Height;
-            }
-            CurrentFrameValue = $"{result.Width} x {result.Height}";
-            ResolutionText = $"{result.Width} x {result.Height}";
-            PixelFormatText = result.PixelFormat;
-            ExposureText = $"{result.ExposureUs:0} us";
-            FrameRateText = "--";
-            StatusMessage = result.Summary;
-            FooterSystemStateLabel = IsLivePreviewing ? "Streaming" : "Frame ready";
-            FooterFormatLabel = result.PixelFormat;
-            FooterTriggerLabel = result.TriggerMode;
-            if (result.Camera is not null)
-            {
-                SelectedCamera = result.Camera;
-            }
-
-            OnPropertyChanged(nameof(CanSetRoi));
-            UpdateRoiSummary();
-            CaptureFrameOutput(result, "snapshot");
-        }).ConfigureAwait(false);
+            await _session.SnapFrameAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[HuaTengPanelViewModel] Snap failed: {ex}");
+        }
     }
 
     public async Task StartLivePreviewAsync()
@@ -871,12 +724,7 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
             SelectedCamera = camera;
         }
 
-        _liveCancellation = new CancellationTokenSource();
         _isRoiEditMode = false;
-        IsLivePreviewing = true;
-        SetLastCommand("Start live preview");
-        SetLastStateTransition("Started live preview");
-        FooterSystemStateLabel = "Streaming";
         _lastFrameTimestamp = null;
         _lastCaptureTimestampTenths = null;
         _lastDisplayTimestamp = null;
@@ -885,65 +733,30 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
         OnPropertyChanged(nameof(RoiHandleVisibility));
         OnPropertyChanged(nameof(RoiLiveVisibility));
 
-        var liveFailed = false;
-
         try
         {
-            _liveTask = _probeClient.StreamFramesAsync(
-                camera.Index,
-                _selectedPixelFormat,
-                _selectedTriggerMode,
-                ParseExposure(_exposureInput),
-                ParseFrameRate(),
-                _appliedRoiPixels ?? GetAppliedRoiPixels(),
-                ApplyLiveFrameAsync,
-                _liveCancellation.Token);
-
-            await _liveTask.ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
+            await _session!.StartLiveAsync().ConfigureAwait(true);
         }
         catch (Exception ex)
         {
-            liveFailed = true;
-            SetLastError(ex.Message);
-            StatusMessage = $"Live preview failed: {ex.Message}";
-            FooterSystemStateLabel = "Fault";
-        }
-        finally
-        {
-            IsLivePreviewing = false;
-            _liveCancellation?.Dispose();
-            _liveCancellation = null;
-            _liveTask = null;
-            if (!liveFailed)
-            {
-                FooterSystemStateLabel = IsConnected ? "Ready" : "System Ready";
-            }
-            OnPropertyChanged(nameof(RoiHandleVisibility));
-            OnPropertyChanged(nameof(RoiLiveVisibility));
+            Debug.WriteLine($"[HuaTengPanelViewModel] Start live failed: {ex}");
         }
     }
 
     public async Task StopLivePreviewAsync()
     {
-        if (_liveCancellation is null)
+        if (_session is null)
         {
             return;
         }
 
-        _liveCancellation.Cancel();
-        SetLastStateTransition("Stopped live preview");
-        if (_liveTask is not null)
+        try
         {
-            try
-            {
-                await _liveTask.ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-            }
+            await _session.StopLiveAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[HuaTengPanelViewModel] Stop live failed: {ex}");
         }
 
         OnPropertyChanged(nameof(RoiLiveVisibility));
@@ -969,8 +782,16 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
 
     public void Dispose()
     {
-        _liveCancellation?.Cancel();
-        _liveCancellation?.Dispose();
+        if (_session is null)
+        {
+            UnbindSession();
+            return;
+        }
+
+        var session = _session;
+        _sessionRegistry.Remove(session.SessionId);
+        UnbindSession();
+        _ = RunSessionDisposeAsync(session, "Disposed HuaTeng panel.");
     }
 
     private async Task RunBusyAsync(Func<Task> operation)
@@ -1023,6 +844,88 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
         FooterTriggerLabel = _selectedTriggerMode;
     }
 
+    private HuaTengCaptureSettings BuildCaptureSettings()
+    {
+        var camera = SelectedCamera ?? throw new InvalidOperationException("No HuaTeng camera selected.");
+        var deviceId = string.IsNullOrWhiteSpace(camera.SerialNumber)
+            ? $"{camera.Index}:{camera.DisplayName}"
+            : camera.SerialNumber;
+        return new HuaTengCaptureSettings(
+            deviceId,
+            camera.Index,
+            camera.DisplayName,
+            _selectedPixelFormat,
+            _selectedTriggerMode,
+            _selectedColorTone,
+            ParseExposure(_exposureInput),
+            ParseFrameRate(),
+            ToCaptureRegion(_appliedRoiPixels ?? GetAppliedRoiPixels()));
+    }
+
+    private HuaTengCameraSession GetOrCreateSession()
+    {
+        var camera = SelectedCamera ?? throw new InvalidOperationException("No HuaTeng camera selected.");
+        var deviceId = string.IsNullOrWhiteSpace(camera.SerialNumber)
+            ? $"{camera.Index}:{camera.DisplayName}"
+            : camera.SerialNumber;
+        var sessionId = new DeviceSessionId("HuaTengCamera", deviceId);
+        return _sessionRegistry.GetOrAdd(
+            sessionId,
+            () => new HuaTengCameraSession(_probeClient, deviceId, camera.Index, camera.DisplayName));
+    }
+
+    private void BindSession(HuaTengCameraSession session)
+    {
+        if (ReferenceEquals(_session, session))
+        {
+            return;
+        }
+
+        UnbindSession();
+        _session = session;
+        session.State.Changed += OnSessionStateChanged;
+        session.Diagnostics.Changed += OnSessionDiagnosticsChanged;
+        session.AppliedSettings.Changed += OnSessionAppliedSettingsChanged;
+        session.SessionEnd.Changed += OnSessionEndChanged;
+        session.LatestFrame.Changed += OnSessionFrameChanged;
+
+        ApplySessionState(session.State.Current!);
+        ApplySessionDiagnostics(session.Diagnostics.Current!);
+        ApplySessionAppliedSettings(session.AppliedSettings.Current);
+        ApplySessionEnd(session.SessionEnd.Current);
+        if (session.LatestFrame.Current is not null)
+        {
+            ApplySessionFrame(session.LatestFrame.Current);
+        }
+    }
+
+    private void UnbindSession()
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        _session.State.Changed -= OnSessionStateChanged;
+        _session.Diagnostics.Changed -= OnSessionDiagnosticsChanged;
+        _session.AppliedSettings.Changed -= OnSessionAppliedSettingsChanged;
+        _session.SessionEnd.Changed -= OnSessionEndChanged;
+        _session.LatestFrame.Changed -= OnSessionFrameChanged;
+        _session = null;
+    }
+
+    private void OnSessionStateChanged(HuaTengSessionState state) => _ = RunOnUiAsync(() => ApplySessionState(state));
+    private void OnSessionDiagnosticsChanged(DeviceDiagnosticsSnapshot snapshot) => _ = RunOnUiAsync(() => ApplySessionDiagnostics(snapshot));
+    private void OnSessionAppliedSettingsChanged(HuaTengCaptureSettings? settings) => _ = RunOnUiAsync(() => ApplySessionAppliedSettings(settings));
+    private void OnSessionEndChanged(DeviceSessionEndSnapshot? snapshot) => _ = RunOnUiAsync(() => ApplySessionEnd(snapshot));
+    private void OnSessionFrameChanged(HuaTengFrame? frame)
+    {
+        if (frame is not null)
+        {
+            _ = RunOnUiAsync(() => ApplySessionFrame(frame));
+        }
+    }
+
     private bool HasPendingSettings()
     {
         return !string.Equals(_selectedPixelFormat, _draftSelectedPixelFormat, StringComparison.OrdinalIgnoreCase)
@@ -1063,6 +966,226 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
             stride);
         image.Freeze();
         return image;
+    }
+
+    private static ImageSource LoadImage(HuaTengFrame frame)
+    {
+        var pixelFormat = frame.IsMono ? PixelFormats.Gray8 : PixelFormats.Bgr24;
+        var stride = frame.IsMono ? frame.Width : frame.Width * 3;
+        var image = BitmapSource.Create(
+            frame.Width,
+            frame.Height,
+            96,
+            96,
+            pixelFormat,
+            null,
+            frame.PixelData,
+            stride);
+        image.Freeze();
+        return image;
+    }
+
+    private void ApplySessionState(HuaTengSessionState state)
+    {
+        _isBusy = state.Busy;
+        IsConnected = state.Connected;
+        IsLivePreviewing = state.LivePreviewing;
+        StatusMessage = state.StatusMessage;
+        _selectedPixelFormat = state.PixelFormat;
+        _draftSelectedPixelFormat = state.PixelFormat;
+        _selectedTriggerMode = state.TriggerMode;
+        _draftSelectedTriggerMode = state.TriggerMode;
+        _selectedColorTone = state.ColorTone;
+        _draftSelectedColorTone = state.ColorTone;
+        _exposureInput = state.ExposureUs?.ToString("0.###", CultureInfo.InvariantCulture) ?? _exposureInput;
+        _draftExposureInput = _exposureInput;
+        _frameRateInput = state.TargetFrameRate.ToString("0.###", CultureInfo.InvariantCulture);
+        _draftFrameRateInput = _frameRateInput;
+        _lastFrameCapturedAt = state.LastFrameCapturedAt;
+        _frameSequence = state.FrameSequence;
+        _lastSourceMode = state.LastSourceMode;
+        if (state.AppliedRoi is not null)
+        {
+            _appliedRoiPixels = ToRect(state.AppliedRoi);
+            _hasRoiSelection = true;
+            UpdateNormalizedRoiFromAppliedPixels();
+        }
+        else if (!IsLivePreviewing)
+        {
+            _appliedRoiPixels = null;
+            _hasRoiSelection = false;
+        }
+
+        SyncFooter();
+        RaiseCommandState();
+        RefreshAppliedSettingsOutput();
+    }
+
+    private void ApplySessionDiagnostics(DeviceDiagnosticsSnapshot snapshot)
+    {
+        _lastCommand = snapshot.LastCommand;
+        _lastHardwareResponse = snapshot.LastHardwareResponse;
+        _lastError = snapshot.LastError;
+        _lastStateTransition = snapshot.LastStateTransition;
+        _lastValidationResult = snapshot.LastValidationResult;
+        RefreshDiagnosticsOutput();
+        RefreshStatusOutput();
+    }
+
+    private void ApplySessionAppliedSettings(HuaTengCaptureSettings? settings)
+    {
+        if (settings is null)
+        {
+            return;
+        }
+
+        _selectedPixelFormat = settings.PixelFormat;
+        _draftSelectedPixelFormat = settings.PixelFormat;
+        _selectedTriggerMode = settings.TriggerMode;
+        _draftSelectedTriggerMode = settings.TriggerMode;
+        _selectedColorTone = settings.ColorTone;
+        _draftSelectedColorTone = settings.ColorTone;
+        _exposureInput = settings.ExposureUs?.ToString("0.###", CultureInfo.InvariantCulture) ?? _exposureInput;
+        _draftExposureInput = _exposureInput;
+        _frameRateInput = settings.TargetFrameRate.ToString("0.###", CultureInfo.InvariantCulture);
+        _draftFrameRateInput = _frameRateInput;
+        _appliedRoiPixels = ToRect(settings.Roi);
+        _hasRoiSelection = settings.Roi is not null;
+        if (_hasRoiSelection)
+        {
+            UpdateNormalizedRoiFromAppliedPixels();
+        }
+
+        SyncFooter();
+        RefreshAppliedSettingsOutput();
+        OnPropertyChanged(nameof(CanApplySettings));
+        OnPropertyChanged(nameof(SelectedColorOptionDraft));
+        OnPropertyChanged(nameof(SelectedTriggerModeDraft));
+        RaiseCommandState();
+    }
+
+    private void ApplySessionEnd(DeviceSessionEndSnapshot? snapshot)
+    {
+        if (snapshot is null)
+        {
+            SessionEndOutput = null;
+            return;
+        }
+
+        SessionEndOutput = new IntegrationPanelSessionEndOutput
+        {
+            EndedAt = snapshot.EndedAt,
+            ExitReason = $"{snapshot.ReasonCode}: {snapshot.ReasonMessage}",
+            ConnectionClosed = snapshot.ConnectionClosed,
+            LiveStopped = snapshot.LiveStopped,
+            AppliedSettingsSnapshot = AppliedSettingsOutput,
+            FinalStatus = BuildStatusOutput()
+        };
+    }
+
+    private void ApplySessionFrame(HuaTengFrame frame)
+    {
+        _latestDiagnostics = frame.Diagnostics.ToList();
+        if (!frame.Ok)
+        {
+            return;
+        }
+
+        PreviewImage = LoadImage(frame);
+        _currentFrameWidth = frame.Width;
+        _currentFrameHeight = frame.Height;
+        if (!_hasRoiSelection)
+        {
+            _fullFrameWidth = frame.Width;
+            _fullFrameHeight = frame.Height;
+        }
+
+        CurrentFrameValue = $"{frame.Width} x {frame.Height}";
+        ResolutionText = $"{frame.Width} x {frame.Height}";
+        PixelFormatText = frame.PixelFormat;
+        ExposureText = $"{frame.ExposureUs:0} us";
+        UpdateMeasuredFrameRate(frame.TimestampTenthsOfMilliseconds);
+        StatusMessage = frame.Summary;
+        FooterSystemStateLabel = IsLivePreviewing ? "Streaming" : "Frame ready";
+        FooterFormatLabel = frame.PixelFormat;
+        FooterTriggerLabel = frame.TriggerMode;
+        _appliedRoiPixels = ToRect(frame.Roi);
+        _hasRoiSelection = frame.Roi is not null;
+        if (_hasRoiSelection)
+        {
+            UpdateNormalizedRoiFromAppliedPixels();
+        }
+
+        UpdateRoiSummary();
+        CaptureFrameOutput(frame, _lastSourceMode ?? "session");
+    }
+
+    private void RefreshAppliedSettingsOutput()
+    {
+        var settings = _session?.AppliedSettings.Current;
+        if (settings is null)
+        {
+            return;
+        }
+
+        AppliedSettingsOutput = new IntegrationPanelAppliedSettingsOutput
+        {
+            AppliedAt = DateTimeOffset.Now,
+            DeviceSettings = new Dictionary<string, string?>
+            {
+                ["Device"] = Title,
+                ["Camera"] = settings.DisplayName
+            },
+            EndpointSettings = new Dictionary<string, string?>
+            {
+                ["PixelFormat"] = settings.PixelFormat,
+                ["TriggerMode"] = settings.TriggerMode,
+                ["ColorTone"] = settings.ColorTone,
+                ["ExposureUs"] = settings.ExposureUs?.ToString("0.###", CultureInfo.InvariantCulture),
+                ["TargetFrameRateFps"] = settings.TargetFrameRate.ToString("0.###", CultureInfo.InvariantCulture)
+            },
+            SessionSettings = new Dictionary<string, string?>
+            {
+                ["LivePreviewing"] = IsLivePreviewing ? "true" : "false",
+                ["AppliedRoi"] = _appliedRoiPixels.HasValue ? CurrentRoiValue : "Full frame"
+            },
+            NormalizationNotes = ["Mapped from runtime session settings."]
+        };
+    }
+
+    private static CaptureRegion? ToCaptureRegion(Rect? rect)
+    {
+        return rect is null ? null : new CaptureRegion(rect.Value.X, rect.Value.Y, rect.Value.Width, rect.Value.Height);
+    }
+
+    private static Rect? ToRect(CaptureRegion? region)
+    {
+        return region is null ? null : new Rect(region.X, region.Y, region.Width, region.Height);
+    }
+
+    private static Task RunOnUiAsync(Action action)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+        {
+            action();
+            return Task.CompletedTask;
+        }
+
+        return dispatcher.InvokeAsync(action).Task;
+    }
+
+    private static async Task RunSessionDisposeAsync(HuaTengCameraSession session, string reason)
+    {
+        try
+        {
+            await session.DisconnectAsync(StopReason.UserRequested(reason)).ConfigureAwait(false);
+            await session.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[HuaTengPanelViewModel] Session dispose failed: {ex}");
+        }
     }
 
     private Task ApplyLiveFrameAsync(HuaTengFrameResult result)
@@ -1131,11 +1254,16 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
 
     private void UpdateMeasuredFrameRate(HuaTengFrameResult result)
     {
-        if (result.TimestampTenthsOfMilliseconds > 0)
+        UpdateMeasuredFrameRate(result.TimestampTenthsOfMilliseconds);
+    }
+
+    private void UpdateMeasuredFrameRate(int timestampTenthsOfMilliseconds)
+    {
+        if (timestampTenthsOfMilliseconds > 0)
         {
             if (_lastCaptureTimestampTenths.HasValue)
             {
-                var deltaTenths = result.TimestampTenthsOfMilliseconds - _lastCaptureTimestampTenths.Value;
+                var deltaTenths = timestampTenthsOfMilliseconds - _lastCaptureTimestampTenths.Value;
                 if (deltaTenths > 0)
                 {
                     var seconds = deltaTenths / 10000.0;
@@ -1148,7 +1276,7 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
                 }
             }
 
-            _lastCaptureTimestampTenths = result.TimestampTenthsOfMilliseconds;
+            _lastCaptureTimestampTenths = timestampTenthsOfMilliseconds;
             _lastFrameTimestamp = Stopwatch.GetTimestamp();
             if (!_smoothedFrameRate.HasValue)
             {
@@ -1314,6 +1442,26 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
             SourceMode = _lastSourceMode
         };
         CaptureAppliedSettingsSnapshot($"Verified during {sourceMode}.");
+    }
+
+    private void CaptureFrameOutput(HuaTengFrame frame, string sourceMode)
+    {
+        _lastFrameCapturedAt = DateTimeOffset.Now;
+        _frameSequence++;
+        _lastSourceMode = sourceMode;
+        DataOutput = new IntegrationPanelDataOutput
+        {
+            Timestamp = _lastFrameCapturedAt,
+            DeviceId = frame.DeviceId,
+            EndpointId = SelectedCamera?.SerialNumber ?? SelectedCamera?.DisplayName,
+            PayloadType = "CameraFrame",
+            PayloadValue = $"{frame.Width}x{frame.Height}; ROI={CurrentRoiValue}",
+            Units = "pixels",
+            SequenceNumber = _frameSequence,
+            CaptureRate = _smoothedFrameRate,
+            SourceMode = _lastSourceMode
+        };
+        RefreshAppliedSettingsOutput();
     }
 
     private void CaptureAppliedSettingsSnapshot(string note)

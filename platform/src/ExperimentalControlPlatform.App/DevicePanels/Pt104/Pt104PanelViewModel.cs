@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -14,6 +15,7 @@ using ExperimentalControlPlatform.App.DevicePanels.Contracts;
 using ExperimentalControlPlatform.App.DevicePanels;
 using ExperimentalControlPlatform.App.DevicePanels.Scalar;
 using ExperimentalControlPlatform.App.Widgets;
+using ExperimentalControlPlatform.Runtime;
 using MahApps.Metro.IconPacks;
 using Microsoft.Win32;
 
@@ -75,9 +77,11 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
     }
 
     private readonly Pt104Driver _driver;
+    private readonly IDeviceSessionRegistry _sessionRegistry;
     private readonly Dictionary<int, ChannelState> _channelStates;
     private readonly IReadOnlyList<ChannelTabOption> _channelOptions;
     private readonly AsyncRelayCommand _lifecycleActionCommand;
+    private Pt104Session? _session;
     private List<(DateTime Timestamp, double Value)> _samples;
     private CancellationTokenSource? _liveReadCancellation;
     private Task? _liveReadTask;
@@ -131,9 +135,10 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
     private string? _lastStateTransition;
     private string? _lastValidationResult;
 
-    public Pt104PanelViewModel(Pt104Driver driver)
+    public Pt104PanelViewModel(Pt104Driver driver, IDeviceSessionRegistry sessionRegistry)
     {
         _driver = driver ?? throw new ArgumentNullException(nameof(driver));
+        _sessionRegistry = sessionRegistry ?? throw new ArgumentNullException(nameof(sessionRegistry));
         _lifecycleActionCommand = new AsyncRelayCommand(ExecuteLifecycleActionAsync, CanExecuteLifecycleAction, HandleLifecycleCommandException);
         _channelOptions = new[] { 1, 2, 3, 4 }.Select(channel => new ChannelTabOption(channel)).ToArray();
         _channelStates = _channelOptions.ToDictionary(channel => channel.ChannelNumber, _ => new ChannelState());
@@ -626,107 +631,70 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
 
     public async Task ConnectAsync()
     {
-        await RunBusyOperationAsync(async () =>
-        {
-            var settings = BuildSettings();
-            SetLastCommand($"Connect channel {SelectedChannel}");
-            await Task.Run(() => _driver.Connect(settings));
-            await VerifyChannelAvailabilityAsync();
-            settings = BuildSettings();
-            await Task.Run(() => _driver.ApplySettings(settings));
+        var session = GetOrCreateSession();
+        BindSession(session);
 
-            IsConnected = true;
-            ConnectedDeviceId = _driver.ConnectedDeviceId ?? "PT-104 connected";
-            StatusMessage = $"Connected. {ChannelOptions.Count} active channel(s) verified.";
-            SystemHealthLabel = "Nominal Operation";
-            FooterConnectionLabel = "Hardware: Connected";
-            FooterSystemStateLabel = "System Ready";
-            CaptureAppliedSettingsSnapshot(settings, "Applied to connected PT-104 hardware.");
-            SessionEndOutput = null;
-            ClearLastError();
-            SetLastHardwareResponse($"Connected to {ConnectedDeviceId}.");
-            SetLastStateTransition("Disconnected -> Connected");
-        });
+        try
+        {
+            await session.ConnectAsync(BuildRuntimeSettings()).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[Pt104PanelViewModel] Connect failed: {ex}");
+        }
     }
 
     public async Task DisconnectAsync()
     {
-        if (!IsConnected)
+        if (_session is null)
         {
             return;
         }
 
-        await RunBusyOperationAsync(async () =>
+        var session = _session;
+        try
         {
-            var hadLiveReads = AnyChannelLiveReading;
-            SetLastCommand($"Disconnect channel {SelectedChannel}");
-            StopAllLiveReads();
-            await Task.Run(() => _driver.Disconnect());
-            IsConnected = false;
-            ConnectedDeviceId = "Logger-Offline";
-            StatusMessage = "Disconnected.";
-            SystemHealthLabel = "Idle";
-            FooterConnectionLabel = "Hardware: Disconnected";
-            FooterSystemStateLabel = "Idle";
-            ClearLastError();
-            SetLastHardwareResponse("PT-104 connection closed.");
-            SetLastStateTransition("Connected -> Disconnected");
-            SessionEndOutput = new IntegrationPanelSessionEndOutput
-            {
-                EndedAt = DateTimeOffset.Now,
-                ExitReason = "Disconnected from PT-104 panel.",
-                ConnectionClosed = true,
-                LiveStopped = hadLiveReads,
-                AppliedSettingsSnapshot = AppliedSettingsOutput,
-                FinalStatus = BuildStatusOutput(),
-                OpenIssues = null
-            };
-        });
+            await session.DisconnectAsync(StopReason.UserRequested("Disconnected PT-104 panel.")).ConfigureAwait(true);
+        }
+        finally
+        {
+            _sessionRegistry.Remove(session.SessionId);
+            UnbindSession();
+            await session.DisposeAsync().ConfigureAwait(true);
+        }
     }
 
     public async Task ReadOnceAsync()
     {
-        await RunBusyOperationAsync(async () =>
+        if (_session is null)
         {
-            var settings = BuildSettings();
-            SetLastCommand($"Read once on channel {SelectedChannel}");
-            await Task.Run(() => _driver.ApplySettings(settings));
-            CaptureAppliedSettingsSnapshot(settings, "Applied to connected PT-104 hardware before a single read.");
-            var reading = await Task.Run(() => _driver.ReadTemperatureC(FilteredRead));
-            SetChannelAvailability(CurrentChannelTab, true);
-            ApplyReading(SelectedChannel, reading, "ReadOnce");
-            StatusMessage = $"Read channel {SelectedChannel} successfully.";
-            ClearLastError();
-            SetLastHardwareResponse($"Read {reading:F3} C from channel {SelectedChannel}.");
-        });
+            return;
+        }
+
+        try
+        {
+            await _session.ReadOnceAsync(BuildRuntimeSettings()).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[Pt104PanelViewModel] Read once failed: {ex}");
+        }
     }
 
     public Task StartLiveReadAsync()
     {
-        if (!CanStartLive)
+        if (_session is null || !CanStartLive)
         {
             return Task.CompletedTask;
         }
 
         try
         {
-            SetLastCommand($"Start live read on channel {SelectedChannel}");
-            CurrentChannelState.IsLiveReading = true;
-            SetChannelAvailability(CurrentChannelTab, true);
-            RaiseLiveStateChanged();
-            EnsureLiveReadLoop();
-            StatusMessage = $"Live read started on channel {SelectedChannel}.";
-            SystemHealthLabel = "Streaming";
-            FooterSystemStateLabel = "Streaming";
-            ClearLastError();
-            SetLastStateTransition($"Channel {SelectedChannel} idle -> live");
+            return _session.StartLiveAsync(SelectedChannel);
         }
         catch (Exception ex)
         {
-            StatusMessage = ex.Message;
-            SystemHealthLabel = "Fault";
-            FooterSystemStateLabel = "Fault";
-            SetLastError(ex.Message);
+            Debug.WriteLine($"[Pt104PanelViewModel] Start live failed: {ex}");
         }
 
         return Task.CompletedTask;
@@ -734,31 +702,12 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
 
     public void StopLiveRead()
     {
-        if (!CurrentChannelState.IsLiveReading)
+        if (_session is null || !CurrentChannelState.IsLiveReading)
         {
             return;
         }
 
-        SetLastCommand($"Stop live read on channel {SelectedChannel}");
-        CurrentChannelState.IsLiveReading = false;
-        RaiseLiveStateChanged();
-
-        if (!AnyChannelLiveReading)
-        {
-            _liveReadCancellation?.Cancel();
-            StatusMessage = "Live read stopped.";
-            SystemHealthLabel = IsConnected ? "Nominal Operation" : "Idle";
-            FooterSystemStateLabel = IsConnected ? "System Ready" : "Idle";
-        }
-        else
-        {
-            StatusMessage = $"Live read stopped on channel {SelectedChannel}.";
-            SystemHealthLabel = "Streaming";
-            FooterSystemStateLabel = "Streaming";
-        }
-
-        SetLastHardwareResponse($"Live acquisition stopped on channel {SelectedChannel}.");
-        SetLastStateTransition($"Channel {SelectedChannel} live -> idle");
+        _ = StopLiveReadCoreAsync();
     }
 
     public void ClearData()
@@ -849,10 +798,19 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
 
     public void Dispose()
     {
-        StopAllLiveReads();
-        _liveReadCancellation?.Cancel();
-        _liveReadCancellation?.Dispose();
-        _driver.Dispose();
+        if (_session is null)
+        {
+            StopAllLiveReads();
+            _liveReadCancellation?.Cancel();
+            _liveReadCancellation?.Dispose();
+            _driver.Dispose();
+            return;
+        }
+
+        var session = _session;
+        _sessionRegistry.Remove(session.SessionId);
+        UnbindSession();
+        _ = RunSessionDisposeAsync(session, "Disposed PT-104 panel.");
     }
 
     private Pt104ConnectionSettings BuildSettings()
@@ -931,6 +889,12 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
 
     private async Task ReconfigureCurrentChannelAsync()
     {
+        if (_session is not null)
+        {
+            await ApplyCurrentSettingsAsync().ConfigureAwait(true);
+            return;
+        }
+
         try
         {
             IsBusy = true;
@@ -1407,26 +1371,21 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
 
     private async Task ApplyCurrentSettingsAsync()
     {
-        if (!IsConnected || AnyChannelLiveReading)
+        if (!IsConnected || AnyChannelLiveReading || _session is null)
         {
             return;
         }
 
-        await RunBusyOperationAsync(async () =>
+        try
         {
-            var settings = BuildSettings();
             SetLastCommand($"Apply settings for channel {SelectedChannel}");
-            await Task.Run(() => _driver.ApplySettings(settings));
-            SetLastHardwareResponse($"Applied settings to channel {SelectedChannel}.");
-            StatusMessage = $"Applied settings for channel {SelectedChannel}.";
-            SystemHealthLabel = "Nominal Operation";
-            FooterSystemStateLabel = "System Ready";
-            CaptureAppliedSettingsSnapshot(settings, "Applied to connected PT-104 hardware.");
-
-            SessionEndOutput = null;
-            ClearLastError();
-            SetLastStateTransition($"Applied settings for channel {SelectedChannel}");
-        });
+            await _session.ApplySettingsAsync(BuildRuntimeSettings()).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            SetLastError(ex.Message);
+            StatusMessage = ex.Message;
+        }
     }
 
     private void HandleLifecycleCommandException(Exception exception)
@@ -1569,6 +1528,237 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
     {
         _lastValidationResult = value;
         RefreshDiagnosticsOutput();
+    }
+
+    private Pt104ChannelConfiguration BuildRuntimeSettings()
+    {
+        return new Pt104ChannelConfiguration(
+            SelectedChannel,
+            MapMeasurementMode(SelectedMeasurementType),
+            SelectedWireCount,
+            SelectedMainsFrequency,
+            FilteredRead);
+    }
+
+    private Pt104Session GetOrCreateSession()
+    {
+        var sessionId = new DeviceSessionId("Pt104", "usb-default");
+        return _sessionRegistry.GetOrAdd(sessionId, () => new Pt104Session(_driver));
+    }
+
+    private void BindSession(Pt104Session session)
+    {
+        if (ReferenceEquals(_session, session))
+        {
+            return;
+        }
+
+        UnbindSession();
+        _session = session;
+        session.State.Changed += OnSessionStateChanged;
+        session.Diagnostics.Changed += OnSessionDiagnosticsChanged;
+        session.AppliedSettings.Changed += OnSessionAppliedSettingsChanged;
+        session.SessionEnd.Changed += OnSessionEndChanged;
+        session.LatestReading.Changed += OnSessionReadingChanged;
+
+        ApplySessionState(session.State.Current!);
+        ApplySessionDiagnostics(session.Diagnostics.Current!);
+        ApplySessionAppliedSettings(session.AppliedSettings.Current);
+        ApplySessionEnd(session.SessionEnd.Current);
+        ApplySessionReading(session.LatestReading.Current);
+    }
+
+    private void UnbindSession()
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        _session.State.Changed -= OnSessionStateChanged;
+        _session.Diagnostics.Changed -= OnSessionDiagnosticsChanged;
+        _session.AppliedSettings.Changed -= OnSessionAppliedSettingsChanged;
+        _session.SessionEnd.Changed -= OnSessionEndChanged;
+        _session.LatestReading.Changed -= OnSessionReadingChanged;
+        _session = null;
+    }
+
+    private void OnSessionStateChanged(Pt104SessionState state) => _ = RunOnUiAsync(() => ApplySessionState(state));
+    private void OnSessionDiagnosticsChanged(DeviceDiagnosticsSnapshot snapshot) => _ = RunOnUiAsync(() => ApplySessionDiagnostics(snapshot));
+    private void OnSessionAppliedSettingsChanged(Pt104ChannelConfiguration? configuration) => _ = RunOnUiAsync(() => ApplySessionAppliedSettings(configuration));
+    private void OnSessionEndChanged(DeviceSessionEndSnapshot? snapshot) => _ = RunOnUiAsync(() => ApplySessionEnd(snapshot));
+    private void OnSessionReadingChanged(Pt104Reading? reading) => _ = RunOnUiAsync(() => ApplySessionReading(reading));
+
+    private void ApplySessionState(Pt104SessionState state)
+    {
+        IsBusy = state.Busy;
+        IsConnected = state.Connected;
+        ConnectedDeviceId = state.DeviceId;
+        StatusMessage = state.StatusMessage;
+        SystemHealthLabel = state.Connected
+            ? AnyChannelLiveReading ? "Streaming" : "Nominal Operation"
+            : "Idle";
+        FooterConnectionLabel = state.Connected ? "Hardware: Connected" : "Hardware: Disconnected";
+
+        foreach (var option in _channelOptions)
+        {
+            if (!state.Channels.TryGetValue(option.ChannelNumber, out var runtimeChannel))
+            {
+                continue;
+            }
+
+            option.IsAvailable = runtimeChannel.Available;
+            var channelState = _channelStates[option.ChannelNumber];
+            channelState.MeasurementType = MapMeasurementType(runtimeChannel.MeasurementMode);
+            channelState.WireCount = runtimeChannel.WireCount;
+            channelState.MainsFrequency = runtimeChannel.MainsFrequencyHz;
+            channelState.FilteredRead = runtimeChannel.FilteredRead;
+            channelState.IsLiveReading = runtimeChannel.LiveReading;
+            channelState.LastSampleTimestamp = runtimeChannel.LastSampleTimestamp;
+            channelState.LastSampleValue = runtimeChannel.LastSampleValue;
+            channelState.LastSourceMode = runtimeChannel.LastSourceMode;
+        }
+
+        LoadSelectedChannelState();
+        SyncFooterConfig();
+        FooterSystemStateLabel = AnyChannelLiveReading ? "Streaming" : "System Ready";
+        OnPropertyChanged(nameof(ChannelOptions));
+        OnPropertyChanged(nameof(CanConnect));
+        OnPropertyChanged(nameof(CanDisconnect));
+        OnPropertyChanged(nameof(CanToggleConnection));
+        OnPropertyChanged(nameof(CanReadOnce));
+        OnPropertyChanged(nameof(CanStartLive));
+        OnPropertyChanged(nameof(CanStopLive));
+        OnPropertyChanged(nameof(CanToggleLive));
+        OnPropertyChanged(nameof(ConnectionToggleLabel));
+        OnPropertyChanged(nameof(ConnectionToggleIconKind));
+        OnPropertyChanged(nameof(LiveToggleLabel));
+        OnPropertyChanged(nameof(LiveToggleIconKind));
+        OnPropertyChanged(nameof(SupportedLifecycleActions));
+        _lifecycleActionCommand.NotifyCanExecuteChanged();
+        RefreshStatusOutput();
+    }
+
+    private void ApplySessionDiagnostics(DeviceDiagnosticsSnapshot snapshot)
+    {
+        _lastCommand = snapshot.LastCommand;
+        _lastHardwareResponse = snapshot.LastHardwareResponse;
+        _lastError = snapshot.LastError;
+        _lastStateTransition = snapshot.LastStateTransition;
+        _lastValidationResult = snapshot.LastValidationResult;
+        RefreshDiagnosticsOutput();
+        RefreshStatusOutput();
+    }
+
+    private void ApplySessionAppliedSettings(Pt104ChannelConfiguration? configuration)
+    {
+        if (configuration is null)
+        {
+            return;
+        }
+
+        if (_channelStates.TryGetValue(configuration.Channel, out var channelState))
+        {
+            channelState.MeasurementType = MapMeasurementType(configuration.MeasurementMode);
+            channelState.WireCount = configuration.WireCount;
+            channelState.MainsFrequency = configuration.MainsFrequencyHz;
+            channelState.FilteredRead = configuration.FilteredRead;
+        }
+
+        if (configuration.Channel == SelectedChannel)
+        {
+            SelectedMeasurementType = MapMeasurementType(configuration.MeasurementMode);
+            SelectedWireCount = configuration.WireCount;
+            SelectedMainsFrequency = configuration.MainsFrequencyHz;
+            FilteredRead = configuration.FilteredRead;
+        }
+
+        CaptureAppliedSettingsSnapshot(BuildSettings(configuration.Channel), "Applied to PT-104 runtime session.");
+        SyncFooterConfig();
+        RefreshStatusOutput();
+    }
+
+    private void ApplySessionEnd(DeviceSessionEndSnapshot? snapshot)
+    {
+        if (snapshot is null)
+        {
+            SessionEndOutput = null;
+            return;
+        }
+
+        SessionEndOutput = new IntegrationPanelSessionEndOutput
+        {
+            EndedAt = snapshot.EndedAt,
+            ExitReason = $"{snapshot.ReasonCode}: {snapshot.ReasonMessage}",
+            ConnectionClosed = snapshot.ConnectionClosed,
+            LiveStopped = snapshot.LiveStopped,
+            FinalStatus = BuildStatusOutput(),
+            OpenIssues = snapshot.LiveStopped
+                ? []
+                : null
+        };
+    }
+
+    private void ApplySessionReading(Pt104Reading? reading)
+    {
+        if (reading is null)
+        {
+            return;
+        }
+
+        ApplyReading(reading.Channel, reading.ValueCelsius, reading.SourceMode);
+    }
+
+    private async Task StopLiveReadCoreAsync()
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _session.StopLiveAsync(SelectedChannel).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[Pt104PanelViewModel] Stop live failed: {ex}");
+        }
+    }
+
+    private static Pt104MeasurementMode MapMeasurementMode(Pt104MeasurementType type)
+    {
+        return type == Pt104MeasurementType.Pt1000 ? Pt104MeasurementMode.Pt1000 : Pt104MeasurementMode.Pt100;
+    }
+
+    private static Pt104MeasurementType MapMeasurementType(Pt104MeasurementMode mode)
+    {
+        return mode == Pt104MeasurementMode.Pt1000 ? Pt104MeasurementType.Pt1000 : Pt104MeasurementType.Pt100;
+    }
+
+    private static Task RunOnUiAsync(Action action)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+        {
+            action();
+            return Task.CompletedTask;
+        }
+
+        return dispatcher.InvokeAsync(action).Task;
+    }
+
+    private async Task RunSessionDisposeAsync(Pt104Session session, string reasonMessage)
+    {
+        try
+        {
+            await session.StopAsync(StopReason.UserRequested(reasonMessage)).ConfigureAwait(false);
+        }
+        catch
+        {
+        }
+
+        await session.DisposeAsync().ConfigureAwait(false);
     }
 }
 
