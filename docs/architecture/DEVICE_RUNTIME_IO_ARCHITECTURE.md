@@ -112,9 +112,15 @@ The current branch also already reflects these architectural consequences:
 
 - panels for those devices are moving to session-client behavior instead of owning hardware loops directly,
 - the application host owns session-registry behavior,
+- session-local validation now exists as a shared runtime unit with structured `SessionValidationResult` output,
 - controlled-device sessions can define device-level `EmergencyStop`,
 - acquisition-style panels can expose a small operator-facing output-settings surface,
 - and `ApplyAndExit` is treated as a session-lifecycle action rather than only a UI close action.
+
+The current coordinator status is still only foundational:
+
+- `RuntimeCoordinator` exists for run start/stop snapshots,
+- but it is not yet the full experiment-level orchestration layer for multiple active sessions.
 
 ## How
 

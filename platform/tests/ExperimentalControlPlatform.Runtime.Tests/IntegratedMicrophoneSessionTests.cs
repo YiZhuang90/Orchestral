@@ -235,6 +235,25 @@ public sealed class IntegratedMicrophoneSessionTests
         Assert.Equal(0, service.CaptureSnapshotCallCount);
     }
 
+    [Fact]
+    public void ValidateSettings_ReturnsInvalidResult_WhenWindowIsNonPositive()
+    {
+        var service = new FakeMicrophoneService
+        {
+            SnapshotFrames =
+            [
+                CreateFrame(rmsDbfs: -24.5, peakDbfs: -12.0, windowMilliseconds: 50)
+            ]
+        };
+        var session = new IntegratedMicrophoneSession(service, TestDevice);
+        var invalidSettings = new MicrophoneCaptureSettings(TestDevice.DeviceId, 20, 0, MicrophoneChannelMode.MonoMix);
+
+        var result = session.ValidateSettings(invalidSettings);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Issues, issue => issue.Field == "WindowMilliseconds");
+    }
+
     private static MicrophoneFrame CreateFrame(double rmsDbfs, double peakDbfs, int windowMilliseconds)
     {
         return new MicrophoneFrame(

@@ -47,11 +47,13 @@ public sealed class Pt104Session : IDeviceSession
 
     public async Task ConnectAsync(Pt104ChannelConfiguration configuration, CancellationToken cancellationToken = default)
     {
-        ValidateConfiguration(configuration);
+        var validation = ValidateConfiguration(configuration);
+        validation.ThrowIfInvalid();
         PublishSessionEnd(null);
         PublishDiagnostics(Diagnostics.Current! with
         {
             LastCommand = $"Connect channel {configuration.Channel}",
+            LastValidationResult = validation.Summary,
             LastError = null
         });
         PublishState(State.Current! with { Busy = true, StatusMessage = "Connecting PT-104..." });
@@ -93,7 +95,8 @@ public sealed class Pt104Session : IDeviceSession
 
     public async Task ApplySettingsAsync(Pt104ChannelConfiguration configuration, CancellationToken cancellationToken = default)
     {
-        ValidateConfiguration(configuration);
+        var validation = ValidateConfiguration(configuration);
+        validation.ThrowIfInvalid();
         EnsureConnected();
         if (AnyLiveChannels())
         {
@@ -103,7 +106,7 @@ public sealed class Pt104Session : IDeviceSession
         PublishDiagnostics(Diagnostics.Current! with
         {
             LastCommand = $"Apply settings for channel {configuration.Channel}",
-            LastValidationResult = "Validated PT-104 channel settings.",
+            LastValidationResult = validation.Summary,
             LastError = null
         });
         PublishState(State.Current! with
@@ -151,7 +154,8 @@ public sealed class Pt104Session : IDeviceSession
 
     public async Task ReadOnceAsync(Pt104ChannelConfiguration configuration, CancellationToken cancellationToken = default)
     {
-        ValidateConfiguration(configuration);
+        var validation = ValidateConfiguration(configuration);
+        validation.ThrowIfInvalid();
         EnsureConnected();
         if (AnyLiveChannels())
         {
@@ -161,6 +165,7 @@ public sealed class Pt104Session : IDeviceSession
         PublishDiagnostics(Diagnostics.Current! with
         {
             LastCommand = $"Read once on channel {configuration.Channel}",
+            LastValidationResult = validation.Summary,
             LastError = null
         });
         PublishState(State.Current! with
@@ -587,22 +592,31 @@ public sealed class Pt104Session : IDeviceSession
             channel => new Pt104ChannelState(channel, false, Pt104MeasurementMode.Pt100, 4, 50, true, false, null, null, null));
     }
 
-    private static void ValidateConfiguration(Pt104ChannelConfiguration configuration)
+    public static SessionValidationResult ValidateConfiguration(Pt104ChannelConfiguration configuration)
     {
+        var issues = new List<SessionValidationIssue>();
         if (configuration.Channel is < 1 or > 4)
         {
-            throw new InvalidOperationException("PT-104 channel must be between 1 and 4.");
+            issues.Add(new SessionValidationIssue(
+                "Channel",
+                "PT-104 channel must be between 1 and 4."));
         }
 
         if (configuration.WireCount is not (2 or 3 or 4))
         {
-            throw new InvalidOperationException("PT-104 wire count must be 2, 3, or 4.");
+            issues.Add(new SessionValidationIssue(
+                "WireCount",
+                "PT-104 wire count must be 2, 3, or 4."));
         }
 
         if (configuration.MainsFrequencyHz is not (50 or 60))
         {
-            throw new InvalidOperationException("PT-104 mains frequency must be 50 or 60 Hz.");
+            issues.Add(new SessionValidationIssue(
+                "MainsFrequencyHz",
+                "PT-104 mains frequency must be 50 or 60 Hz."));
         }
+
+        return SessionValidationResult.FromIssues("Validated PT-104 channel settings.", issues);
     }
 
     private void EnsureConnected()

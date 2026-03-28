@@ -160,6 +160,7 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
             {
                 OnPropertyChanged(nameof(SelectedColorOptionDraft));
                 OnPropertyChanged(nameof(CanApplySettings));
+                OnPropertyChanged(nameof(CanToggleConnection));
                 _lifecycleActionCommand.NotifyCanExecuteChanged();
             }
         }
@@ -179,6 +180,7 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
             if (SetProperty(ref _draftSelectedTriggerMode, value))
             {
                 OnPropertyChanged(nameof(CanApplySettings));
+                OnPropertyChanged(nameof(CanToggleConnection));
                 _lifecycleActionCommand.NotifyCanExecuteChanged();
             }
         }
@@ -192,6 +194,7 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
             if (SetProperty(ref _draftExposureInput, value))
             {
                 OnPropertyChanged(nameof(CanApplySettings));
+                OnPropertyChanged(nameof(CanToggleConnection));
                 _lifecycleActionCommand.NotifyCanExecuteChanged();
             }
         }
@@ -211,6 +214,7 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
             if (SetProperty(ref _draftFrameRateInput, value))
             {
                 OnPropertyChanged(nameof(CanApplySettings));
+                OnPropertyChanged(nameof(CanToggleConnection));
                 _lifecycleActionCommand.NotifyCanExecuteChanged();
             }
         }
@@ -415,13 +419,16 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
         }
     }
 
-    public bool CanToggleConnection => !_isConnecting;
+    public bool CanToggleConnection => !_isConnecting &&
+                                       (IsConnected || TryBuildDraftCaptureSettings(out _).IsValid);
 
     public bool CanToggleLive => !_isConnecting && IsConnected;
 
     public bool CanSnapFrame => !_isConnecting && IsConnected && !IsLivePreviewing;
 
-    public bool CanApplySettings => !_isConnecting && HasPendingSettings();
+    public bool CanApplySettings => !_isConnecting &&
+                                    HasPendingSettings() &&
+                                    TryBuildDraftCaptureSettings(out _).IsValid;
 
     public bool CanSetRoi => PreviewImage is not null;
 
@@ -530,27 +537,21 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
 
     private async Task<bool> ApplySettingsCoreAsync()
     {
-        if (!TryParsePositiveDouble(_draftExposureInput, out _))
+        var validation = TryBuildDraftCaptureSettings(out var settings);
+        if (!validation.IsValid || settings is null)
         {
-            SetLastValidationResult("Exposure must be a positive number.");
-            StatusMessage = "Exposure must be a positive number.";
+            SetLastValidationResult(validation.Summary);
+            StatusMessage = validation.Summary;
             FooterSystemStateLabel = "Invalid setting";
             return false;
         }
 
-        if (!TryParsePositiveDouble(_draftFrameRateInput, out _))
-        {
-            SetLastValidationResult("Target frame rate must be a positive number.");
-            StatusMessage = "Target frame rate must be a positive number.";
-            FooterSystemStateLabel = "Invalid setting";
-            return false;
-        }
-
-        SetLastValidationResult("Validated settings.");
-        _selectedPixelFormat = _draftSelectedPixelFormat;
-        _selectedTriggerMode = _draftSelectedTriggerMode;
-        _exposureInput = _draftExposureInput;
-        _frameRateInput = _draftFrameRateInput;
+        SetLastValidationResult(validation.Summary);
+        _selectedPixelFormat = settings.PixelFormat;
+        _selectedTriggerMode = settings.TriggerMode;
+        _selectedColorTone = settings.ColorTone;
+        _exposureInput = settings.ExposureUs?.ToString("0.###", CultureInfo.InvariantCulture) ?? string.Empty;
+        _frameRateInput = settings.TargetFrameRate.ToString("0.###", CultureInfo.InvariantCulture);
 
         SyncFooter();
         OnPropertyChanged(nameof(CanApplySettings));
@@ -565,7 +566,7 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
 
         try
         {
-            await _session.ApplySettingsAsync(BuildCaptureSettings()).ConfigureAwait(true);
+            await _session.ApplySettingsAsync(settings).ConfigureAwait(true);
             return true;
         }
         catch (Exception ex)
@@ -904,6 +905,48 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
             ParseExposure(_exposureInput),
             ParseFrameRate(),
             ToCaptureRegion(_appliedRoiPixels ?? GetAppliedRoiPixels()));
+    }
+
+    private SessionValidationResult TryBuildDraftCaptureSettings(out HuaTengCaptureSettings? settings)
+    {
+        settings = null;
+        var camera = SelectedCamera;
+        if (camera is null)
+        {
+            return SessionValidationResult.Invalid("DeviceId", "No HuaTeng camera selected.");
+        }
+
+        if (!TryParsePositiveDouble(_draftExposureInput, out var exposureUs))
+        {
+            return SessionValidationResult.Invalid("ExposureUs", "Exposure must be a positive number.");
+        }
+
+        if (!TryParsePositiveDouble(_draftFrameRateInput, out var frameRate))
+        {
+            return SessionValidationResult.Invalid("TargetFrameRate", "Target frame rate must be a positive number.");
+        }
+
+        var deviceId = string.IsNullOrWhiteSpace(camera.SerialNumber)
+            ? $"{camera.Index}:{camera.DisplayName}"
+            : camera.SerialNumber;
+        var candidate = new HuaTengCaptureSettings(
+            deviceId,
+            camera.Index,
+            camera.DisplayName,
+            _draftSelectedPixelFormat,
+            _draftSelectedTriggerMode,
+            _draftSelectedColorTone,
+            exposureUs,
+            frameRate,
+            ToCaptureRegion(_appliedRoiPixels ?? GetAppliedRoiPixels()));
+        var validation = HuaTengCameraSession.ValidateSettings(deviceId, camera.Index, candidate);
+        if (!validation.IsValid)
+        {
+            return validation;
+        }
+
+        settings = candidate;
+        return validation;
     }
 
     private HuaTengCameraSession GetOrCreateSession()

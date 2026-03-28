@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using ExperimentalControlPlatform.Devices.Audio;
@@ -46,11 +47,13 @@ public sealed class IntegratedMicrophoneSession : IDeviceSession
 
     public async Task ConnectAsync(MicrophoneCaptureSettings settings, CancellationToken cancellationToken = default)
     {
-        ValidateSettings(settings);
+        var validation = ValidateSettings(settings);
+        validation.ThrowIfInvalid();
         PublishSessionEnd(null);
         PublishDiagnostics(Diagnostics.Current! with
         {
             LastCommand = "Connect integrated microphone session",
+            LastValidationResult = validation.Summary,
             LastError = null
         });
         PublishState(State.Current! with
@@ -146,12 +149,13 @@ public sealed class IntegratedMicrophoneSession : IDeviceSession
 
     public async Task ApplySettingsAsync(MicrophoneCaptureSettings settings, CancellationToken cancellationToken = default)
     {
-        ValidateSettings(settings);
+        var validation = ValidateSettings(settings);
+        validation.ThrowIfInvalid();
         var previousSettings = AppliedSettings.Current;
         PublishDiagnostics(Diagnostics.Current! with
         {
             LastCommand = "Apply integrated microphone settings",
-            LastValidationResult = "Validated microphone settings.",
+            LastValidationResult = validation.Summary,
             LastError = null
         });
 
@@ -423,22 +427,34 @@ public sealed class IntegratedMicrophoneSession : IDeviceSession
         StatePort.Publish(state);
     }
 
-    private void ValidateSettings(MicrophoneCaptureSettings settings)
+    public SessionValidationResult ValidateSettings(MicrophoneCaptureSettings settings) =>
+        ValidateSettings(_device.DeviceId, settings);
+
+    public static SessionValidationResult ValidateSettings(string expectedDeviceId, MicrophoneCaptureSettings settings)
     {
-        if (!string.Equals(settings.DeviceId, _device.DeviceId, StringComparison.Ordinal))
+        var issues = new List<SessionValidationIssue>();
+        if (!string.Equals(settings.DeviceId, expectedDeviceId, StringComparison.Ordinal))
         {
-            throw new InvalidOperationException($"Settings target '{settings.DeviceId}' do not match session device '{_device.DeviceId}'.");
+            issues.Add(new SessionValidationIssue(
+                "DeviceId",
+                $"Settings target '{settings.DeviceId}' do not match session device '{expectedDeviceId}'."));
         }
 
         if (settings.TargetUpdateRateHz <= 0)
         {
-            throw new InvalidOperationException("Target update rate must be positive.");
+            issues.Add(new SessionValidationIssue(
+                "TargetUpdateRateHz",
+                "Target update rate must be positive."));
         }
 
         if (settings.WindowMilliseconds <= 0)
         {
-            throw new InvalidOperationException("Window must be positive.");
+            issues.Add(new SessionValidationIssue(
+                "WindowMilliseconds",
+                "Window must be positive."));
         }
+
+        return SessionValidationResult.FromIssues("Validated microphone settings.", issues);
     }
 
     private void EnsureConnected()

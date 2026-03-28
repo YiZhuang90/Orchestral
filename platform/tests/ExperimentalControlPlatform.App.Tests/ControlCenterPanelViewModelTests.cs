@@ -65,6 +65,20 @@ public sealed class ControlCenterPanelViewModelTests
         Assert.True(closeRequested);
     }
 
+    [Fact]
+    public async Task CanApplyCommand_IsFalse_WhenDraftStepCountIsNegative()
+    {
+        var service = new FakeControlCenterService();
+        var registry = new DeviceSessionRegistry();
+        var viewModel = new ControlCenterPanelViewModel(service, registry);
+
+        await viewModel.RefreshDevicesAsync();
+        await viewModel.ConnectAsync();
+        viewModel.StepCountInputDraft = "-1";
+
+        Assert.False(viewModel.CanApplyCommand);
+    }
+
     private sealed class FakeControlCenterService : IControlCenterService
     {
         private readonly FakeConnection _connection = new(TestDevice);
