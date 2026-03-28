@@ -15,11 +15,12 @@ using MahApps.Metro.IconPacks;
 
 namespace ExperimentalControlPlatform.App.DevicePanels.HyperCam;
 
-public sealed class HyperCamPanelViewModel : ObservableObject, ICameraPanelViewModel, IOutputSettingsPanelViewModel
+public sealed class HyperCamPanelViewModel : ObservableObject, ICameraPanelViewModel, IOutputSettingsPanelViewModel, IPanelCloseViewModel
 {
     private static readonly IReadOnlyList<IntegrationPanelLifecycleAction> ConnectedLifecycleActions =
     [
-        IntegrationPanelLifecycleAction.Apply
+        IntegrationPanelLifecycleAction.Apply,
+        IntegrationPanelLifecycleAction.ApplyAndExit
     ];
 
     private readonly AsyncRelayCommand _lifecycleActionCommand;
@@ -78,6 +79,8 @@ public sealed class HyperCamPanelViewModel : ObservableObject, ICameraPanelViewM
     }
 
     public string Title => "HyperCam";
+
+    public event EventHandler? CloseRequested;
 
     IEnumerable ICameraPanelViewModel.CameraOptions => CameraOptions;
 
@@ -385,6 +388,8 @@ public sealed class HyperCamPanelViewModel : ObservableObject, ICameraPanelViewM
         return Task.CompletedTask;
     }
 
+    public Task CloseWithoutApplyAsync() => DisconnectAsync();
+
     public Task SnapFrameAsync()
     {
         PreviewImage = CreatePreviewImage(liveVariant: false);
@@ -497,17 +502,29 @@ public sealed class HyperCamPanelViewModel : ObservableObject, ICameraPanelViewM
 
     private bool CanExecuteLifecycleAction(object? parameter)
     {
-        return parameter is IntegrationPanelLifecycleAction.Apply && CanApplySettings;
+        return parameter switch
+        {
+            IntegrationPanelLifecycleAction.Apply => CanApplySettings,
+            IntegrationPanelLifecycleAction.ApplyAndExit => IsConnected,
+            _ => false
+        };
     }
 
     private async Task ExecuteLifecycleActionAsync(object? parameter)
     {
-        if (parameter is not IntegrationPanelLifecycleAction.Apply)
+        switch (parameter)
         {
-            return;
+            case IntegrationPanelLifecycleAction.Apply:
+                await ApplySettingsAsync().ConfigureAwait(false);
+                return;
+            case IntegrationPanelLifecycleAction.ApplyAndExit:
+                await ApplySettingsAsync().ConfigureAwait(true);
+                await DisconnectAsync().ConfigureAwait(true);
+                CloseRequested?.Invoke(this, EventArgs.Empty);
+                return;
+            default:
+                return;
         }
-
-        await ApplySettingsAsync().ConfigureAwait(false);
     }
 
     private void HandleLifecycleCommandException(Exception exception)

@@ -19,12 +19,13 @@ using MahApps.Metro.IconPacks;
 
 namespace ExperimentalControlPlatform.App.DevicePanels.Integrated;
 
-public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPanelViewModel, IOutputSettingsPanelViewModel
+public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPanelViewModel, IOutputSettingsPanelViewModel, IPanelCloseViewModel
 {
     private const double MaxDisplayFps = 20.0;
     private static readonly IReadOnlyList<IntegrationPanelLifecycleAction> ConnectedLifecycleActions =
     [
-        IntegrationPanelLifecycleAction.Apply
+        IntegrationPanelLifecycleAction.Apply,
+        IntegrationPanelLifecycleAction.ApplyAndExit
     ];
     private readonly IntegratedCameraClient _client;
     private readonly IDeviceSessionRegistry _sessionRegistry;
@@ -85,6 +86,8 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
     }
 
     public string Title => "Integrated Camera";
+
+    public event EventHandler? CloseRequested;
 
     System.Collections.IEnumerable ICameraPanelViewModel.CameraOptions => CameraOptions;
 
@@ -438,6 +441,8 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
         }
     }
 
+    public Task CloseWithoutApplyAsync() => DisconnectAsync();
+
     public async Task SnapFrameAsync()
     {
         if (_session is null)
@@ -489,13 +494,15 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
         }
     }
 
-    public async Task ApplySettingsAsync()
+    public Task ApplySettingsAsync() => ApplySettingsCoreAsync();
+
+    private async Task<bool> ApplySettingsCoreAsync()
     {
         if (!double.TryParse(_draftFrameRateInput, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedFrameRate) || parsedFrameRate <= 0)
         {
             SetLastValidationResult("Target frame rate must be a positive number.");
             _statusMessage = "Target frame rate must be a positive number.";
-            return;
+            return false;
         }
 
         SetLastValidationResult("Validated settings.");
@@ -508,16 +515,18 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
         if (_session is null)
         {
             _statusMessage = "Integrated camera settings staged for the next capture.";
-            return;
+            return true;
         }
 
         try
         {
             await _session.ApplySettingsAsync(BuildCaptureSettings()).ConfigureAwait(true);
+            return true;
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[IntegratedCameraPanelViewModel] Apply settings failed: {ex}");
+            return false;
         }
     }
 
@@ -646,24 +655,46 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
 
     private bool CanExecuteLifecycleAction(object? parameter)
     {
-        return parameter is IntegrationPanelLifecycleAction.Apply && IsConnected && CanApplySettings;
+        return parameter switch
+        {
+            IntegrationPanelLifecycleAction.Apply => IsConnected && CanApplySettings,
+            IntegrationPanelLifecycleAction.ApplyAndExit => IsConnected,
+            _ => false
+        };
     }
 
     private async Task ExecuteLifecycleActionAsync(object? parameter)
     {
-        if (parameter is not IntegrationPanelLifecycleAction.Apply)
+        switch (parameter)
         {
-            return;
+            case IntegrationPanelLifecycleAction.Apply:
+                SetLastCommand("Apply integrated camera settings");
+                await ApplySettingsAsync().ConfigureAwait(false);
+                return;
+            case IntegrationPanelLifecycleAction.ApplyAndExit:
+                await ApplyAndExitAsync().ConfigureAwait(false);
+                return;
+            default:
+                return;
         }
-
-        SetLastCommand("Apply integrated camera settings");
-        await ApplySettingsAsync().ConfigureAwait(false);
     }
 
     private void HandleLifecycleCommandException(Exception exception)
     {
         SetLastError(exception.Message);
         _statusMessage = exception.Message;
+    }
+
+    private async Task ApplyAndExitAsync()
+    {
+        SetLastCommand("Apply and exit integrated camera settings");
+        if (!await ApplySettingsCoreAsync().ConfigureAwait(true))
+        {
+            return;
+        }
+
+        await DisconnectAsync().ConfigureAwait(true);
+        CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private void CaptureAppliedSettingsSnapshot(string note)

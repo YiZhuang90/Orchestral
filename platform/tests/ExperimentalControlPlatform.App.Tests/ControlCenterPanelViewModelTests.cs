@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using ExperimentalControlPlatform.App.DevicePanels;
 using ExperimentalControlPlatform.App.DevicePanels.Contracts;
 using ExperimentalControlPlatform.App.DevicePanels.ControlCenter;
 using ExperimentalControlPlatform.Devices.ControlCenter;
@@ -33,6 +34,9 @@ public sealed class ControlCenterPanelViewModelTests
         var service = new FakeControlCenterService();
         var registry = new DeviceSessionRegistry();
         var viewModel = new ControlCenterPanelViewModel(service, registry);
+        var closeAware = (IPanelCloseViewModel)viewModel;
+        var closeRequested = false;
+        closeAware.CloseRequested += (_, _) => closeRequested = true;
 
         await viewModel.RefreshDevicesAsync();
         await viewModel.ConnectAsync();
@@ -58,6 +62,7 @@ public sealed class ControlCenterPanelViewModelTests
         var sessionEndEndpointSettings = Assert.IsAssignableFrom<IReadOnlyDictionary<string, string?>>(sessionEndSnapshot.EndpointSettings);
         Assert.Equal("0", sessionEndEndpointSettings["StepCount"]);
         Assert.True(service.ConnectionDisposed);
+        Assert.True(closeRequested);
     }
 
     private sealed class FakeControlCenterService : IControlCenterService

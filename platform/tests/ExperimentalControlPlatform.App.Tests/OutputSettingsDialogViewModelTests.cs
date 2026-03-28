@@ -49,4 +49,24 @@ public sealed class OutputSettingsDialogViewModelTests
 
         Assert.Contains("positive number", exception.Message);
     }
+
+    [Fact]
+    public void OutputFrequency_RelevanceTracksEmissionMode()
+    {
+        var dialog = new OutputSettingsDialogViewModel(
+            [IntegrationPanelOutputPayloadType.Image],
+            new IntegrationPanelOutputSettings(
+                IntegrationPanelOutputPayloadType.Image,
+                IntegrationPanelOutputEmissionMode.Periodic,
+                3.0,
+                true));
+
+        Assert.True(dialog.IsOutputFrequencyRelevant);
+        Assert.Contains("throttle periodic output", dialog.OutputFrequencyHint);
+
+        dialog.SelectedEmissionMode = IntegrationPanelOutputEmissionMode.OnChange;
+
+        Assert.False(dialog.IsOutputFrequencyRelevant);
+        Assert.Contains("Only used when emission mode is set to Periodic", dialog.OutputFrequencyHint);
+    }
 }

@@ -15,7 +15,7 @@ using MahApps.Metro.IconPacks;
 
 namespace ExperimentalControlPlatform.App.DevicePanels.ControlCenter;
 
-public sealed class ControlCenterPanelViewModel : ObservableObject, IControlCenterPanelViewModel
+public sealed class ControlCenterPanelViewModel : ObservableObject, IControlCenterPanelViewModel, IPanelCloseViewModel
 {
     private static readonly IReadOnlyList<IntegrationPanelLifecycleAction> ConnectedLifecycleActions =
     [
@@ -77,6 +77,8 @@ public sealed class ControlCenterPanelViewModel : ObservableObject, IControlCent
     }
 
     public string Title => "Control Center";
+
+    public event EventHandler? CloseRequested;
 
     IEnumerable IControlCenterPanelViewModel.DeviceOptions => DeviceOptions;
 
@@ -332,8 +334,8 @@ public sealed class ControlCenterPanelViewModel : ObservableObject, IControlCent
 
         var stagedCommandNote = BuildStagedCommandNote(command);
 
-        await _session.EmergencyStopAsync().ConfigureAwait(false);
-        await DisconnectWithReasonAsync(new StopReason("ApplyAndExit", "Applied settings were staged and the control center returned to idle wait state.")).ConfigureAwait(false);
+        await _session.EmergencyStopAsync().ConfigureAwait(true);
+        await DisconnectWithReasonAsync(new StopReason("ApplyAndExit", "Applied settings were staged and the control center returned to idle wait state.")).ConfigureAwait(true);
         RunOnUi(() =>
         {
             if (AppliedSettingsOutput is not null)
@@ -353,6 +355,8 @@ public sealed class ControlCenterPanelViewModel : ObservableObject, IControlCent
                 }
             }
         });
+
+        CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 
     public void ClearLog()
@@ -387,6 +391,8 @@ public sealed class ControlCenterPanelViewModel : ObservableObject, IControlCent
         var session = _session;
         _ = DisposeSessionAsync(session, _sessionRegistry, UnbindSession);
     }
+
+    public Task CloseWithoutApplyAsync() => DisconnectAsync();
 
     private bool CanExecuteLifecycleAction(object? parameter)
     {

@@ -49,7 +49,14 @@ public sealed class OutputSettingsDialogViewModel : ObservableObject
     public IntegrationPanelOutputEmissionMode SelectedEmissionMode
     {
         get => _selectedEmissionMode;
-        set => SetProperty(ref _selectedEmissionMode, value);
+        set
+        {
+            if (SetProperty(ref _selectedEmissionMode, value))
+            {
+                OnPropertyChanged(nameof(IsOutputFrequencyRelevant));
+                OnPropertyChanged(nameof(OutputFrequencyHint));
+            }
+        }
     }
 
     public string OutputFrequencyHzInput
@@ -63,6 +70,12 @@ public sealed class OutputSettingsDialogViewModel : ObservableObject
         get => _includeMetadata;
         set => SetProperty(ref _includeMetadata, value);
     }
+
+    public bool IsOutputFrequencyRelevant => SelectedEmissionMode == IntegrationPanelOutputEmissionMode.Periodic;
+
+    public string OutputFrequencyHint => IsOutputFrequencyRelevant
+        ? "Used to throttle periodic output on the runtime bus."
+        : "Only used when emission mode is set to Periodic.";
 
     public IntegrationPanelOutputSettings BuildSettings()
     {
