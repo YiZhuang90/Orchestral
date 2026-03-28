@@ -119,7 +119,9 @@ The current branch also already reflects these architectural consequences:
 
 The current coordinator status is still only foundational:
 
-- `RuntimeCoordinator` exists for run start/stop snapshots,
+- `RuntimeCoordinator` now owns truthful run-level `Idle -> Running -> Stopping -> Idle` stop transitions,
+- it delegates run-level stop to `IDeviceSessionRegistry.StopAllAsync(...)`,
+- and the application host can join an in-flight stop through `EnsureStoppedAsync(...)`,
 - but it is not yet the full experiment-level orchestration layer for multiple active sessions.
 
 ## How
@@ -226,7 +228,9 @@ The recommended ownership model is:
 3. `Registry`
    - returns the existing session for that device identity, or creates one if needed
 4. `RuntimeCoordinator`
-   - does not own sessions directly, but should be able to trigger `StopAll()` through a host-level bridge
+   - does not own sessions directly
+   - triggers `StopAll()` through the registry as the run-level stop hub
+   - exposes a host-safe `EnsureStoppedAsync(...)` path so shutdown can join an in-flight stop instead of bypassing coordinator state
 
 Default first-generation rules:
 

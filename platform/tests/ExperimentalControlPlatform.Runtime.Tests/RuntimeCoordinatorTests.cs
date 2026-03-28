@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace ExperimentalControlPlatform.Runtime.Tests;
@@ -8,7 +11,7 @@ public sealed class RuntimeCoordinatorTests
     [Fact]
     public void InitialState_IsIdle()
     {
-        var coordinator = new RuntimeCoordinator();
+        var coordinator = new RuntimeCoordinator(new FakeRegistry());
 
         Assert.Equal(RunState.Idle, coordinator.LatestSnapshot.State);
     }
@@ -16,7 +19,7 @@ public sealed class RuntimeCoordinatorTests
     [Fact]
     public void Start_TransitionsRuntimeToRunning()
     {
-        var coordinator = new RuntimeCoordinator();
+        var coordinator = new RuntimeCoordinator(new FakeRegistry());
 
         var context = coordinator.Start();
 
@@ -25,27 +28,35 @@ public sealed class RuntimeCoordinatorTests
     }
 
     [Fact]
-    public void StopRequest_ReturnsCompletedStopSnapshot()
+    public async Task RequestStopAsync_TransitionsThroughStoppingAndThenReturnsCompletedStopSnapshot()
     {
-        var coordinator = new RuntimeCoordinator();
-        coordinator.Start();
+        var registry = new FakeRegistry(blockStopUntilReleased: true);
+        var coordinator = new RuntimeCoordinator(registry);
+        var started = coordinator.Start();
+        var reason = StopReason.UserRequested("Operator stopped the run.");
 
-        var stopped = coordinator.RequestStop(StopReason.UserRequested("Operator stopped the run."));
+        var stopTask = coordinator.RequestStopAsync(reason);
+        await registry.StopEntered.Task;
+
+        Assert.Equal(RunState.Stopping, coordinator.LatestSnapshot.State);
+        Assert.Equal(reason, coordinator.LatestSnapshot.StopReason);
+        Assert.Null(coordinator.LatestSnapshot.StoppedAtUtc);
+
+        registry.ReleaseStop();
+        var stopped = await stopTask;
 
         Assert.Equal(RunState.Idle, stopped.State);
+        Assert.Equal(started.RunId, stopped.RunId);
         Assert.NotNull(stopped.StartedAtUtc);
         Assert.NotNull(stopped.StoppedAtUtc);
-        Assert.NotNull(stopped.StopReason);
-        Assert.Equal("UserRequested", stopped.StopReason!.Code);
-        Assert.Equal("Operator stopped the run.", stopped.StopReason.Message);
-        Assert.Equal(RunState.Idle, coordinator.LatestSnapshot.State);
+        Assert.Equal(reason, stopped.StopReason);
         Assert.Equal(stopped, coordinator.LatestSnapshot);
     }
 
     [Fact]
     public void Start_RejectsDuplicateStartWhileAlreadyActive()
     {
-        var coordinator = new RuntimeCoordinator();
+        var coordinator = new RuntimeCoordinator(new FakeRegistry());
         coordinator.Start();
 
         var exception = Assert.Throws<InvalidOperationException>(() => coordinator.Start());
@@ -54,22 +65,96 @@ public sealed class RuntimeCoordinatorTests
     }
 
     [Fact]
-    public void Stop_RejectsRequestWhileIdle()
+    public async Task Start_RejectsDuplicateStartWhileStopIsInProgress()
     {
-        var coordinator = new RuntimeCoordinator();
+        var registry = new FakeRegistry(blockStopUntilReleased: true);
+        var coordinator = new RuntimeCoordinator(registry);
+        coordinator.Start();
 
-        var exception = Assert.Throws<InvalidOperationException>(
-            () => coordinator.RequestStop(StopReason.UserRequested("Operator stopped the run.")));
+        var stopTask = coordinator.RequestStopAsync(StopReason.UserRequested("Operator stopped the run."));
+        await registry.StopEntered.Task;
+
+        var exception = Assert.Throws<InvalidOperationException>(() => coordinator.Start());
+
+        Assert.Contains("already active", exception.Message, StringComparison.OrdinalIgnoreCase);
+
+        registry.ReleaseStop();
+        await stopTask;
+    }
+
+    [Fact]
+    public async Task RequestStopAsync_RejectsRequestWhileIdle()
+    {
+        var coordinator = new RuntimeCoordinator(new FakeRegistry());
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => coordinator.RequestStopAsync(StopReason.UserRequested("Operator stopped the run.")));
 
         Assert.Contains("not active", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void Start_AfterStop_BeginsNewRunAndClearsPreviousStopRequest()
+    public async Task RequestStopAsync_RejectsDuplicateStopWhileAlreadyStopping()
     {
-        var coordinator = new RuntimeCoordinator();
+        var registry = new FakeRegistry(blockStopUntilReleased: true);
+        var coordinator = new RuntimeCoordinator(registry);
+        coordinator.Start();
+
+        var stopTask = coordinator.RequestStopAsync(StopReason.UserRequested("Operator stopped the run."));
+        await registry.StopEntered.Task;
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => coordinator.RequestStopAsync(StopReason.UserRequested("Second stop request.")));
+
+        Assert.Contains("already in progress", exception.Message, StringComparison.OrdinalIgnoreCase);
+
+        registry.ReleaseStop();
+        await stopTask;
+    }
+
+    [Fact]
+    public async Task EnsureStoppedAsync_ReusesInFlightStopPathWhileStopping()
+    {
+        var registry = new FakeRegistry(blockStopUntilReleased: true);
+        var coordinator = new RuntimeCoordinator(registry);
+        coordinator.Start();
+        var reason = StopReason.UserRequested("Operator stopped the run.");
+
+        var firstStopTask = coordinator.RequestStopAsync(reason);
+        await registry.StopEntered.Task;
+
+        var ensuredStopTask = coordinator.EnsureStoppedAsync(StopReason.UserRequested("Application shutdown."));
+
+        registry.ReleaseStop();
+        var firstResult = await firstStopTask;
+        var finalSnapshot = await ensuredStopTask;
+
+        Assert.Equal(1, registry.StopAllCallCount);
+        Assert.Equal(firstResult, finalSnapshot);
+        Assert.Equal(RunState.Idle, finalSnapshot.State);
+        Assert.Equal(reason, finalSnapshot.StopReason);
+    }
+
+    [Fact]
+    public async Task RequestStopAsync_InvokesRegistryStopAllWithProvidedReason()
+    {
+        var registry = new FakeRegistry();
+        var coordinator = new RuntimeCoordinator(registry);
+        coordinator.Start();
+        var reason = StopReason.UserRequested("Operator requested global stop.");
+
+        await coordinator.RequestStopAsync(reason);
+
+        Assert.Equal(1, registry.StopAllCallCount);
+        Assert.Equal(reason, registry.LastReason);
+    }
+
+    [Fact]
+    public async Task Start_AfterStop_BeginsNewRunAndClearsPreviousStopRequest()
+    {
+        var coordinator = new RuntimeCoordinator(new FakeRegistry());
         var firstRun = coordinator.Start();
-        coordinator.RequestStop(StopReason.UserRequested("Operator stopped the run."));
+        await coordinator.RequestStopAsync(StopReason.UserRequested("Operator stopped the run."));
 
         var restarted = coordinator.Start();
 
@@ -80,15 +165,127 @@ public sealed class RuntimeCoordinatorTests
     }
 
     [Fact]
-    public void LatestSnapshot_RetainsStoppedRunDetailsAfterStopCompletes()
+    public async Task LatestSnapshot_RetainsStoppedRunDetailsAfterStopCompletes()
     {
-        var coordinator = new RuntimeCoordinator();
+        var coordinator = new RuntimeCoordinator(new FakeRegistry());
         var started = coordinator.Start();
 
-        var stopped = coordinator.RequestStop(StopReason.UserRequested("Operator stopped the run."));
+        var stopped = await coordinator.RequestStopAsync(StopReason.UserRequested("Operator stopped the run."));
 
         Assert.Equal(started.RunId, coordinator.LatestSnapshot.RunId);
         Assert.Equal(stopped.StoppedAtUtc, coordinator.LatestSnapshot.StoppedAtUtc);
         Assert.Equal(stopped.StopReason, coordinator.LatestSnapshot.StopReason);
+    }
+
+    [Fact]
+    public async Task RequestStopAsync_FinalizesStoppedSnapshotEvenWhenRegistryStopFails()
+    {
+        var registry = new FakeRegistry(stopFailure: new InvalidOperationException("Stop failed."));
+        var coordinator = new RuntimeCoordinator(registry);
+        coordinator.Start();
+        var reason = StopReason.UserRequested("Operator stopped the run.");
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => coordinator.RequestStopAsync(reason));
+
+        Assert.Equal("Stop failed.", exception.Message);
+        Assert.Equal(RunState.Idle, coordinator.LatestSnapshot.State);
+        Assert.NotNull(coordinator.LatestSnapshot.StoppedAtUtc);
+        Assert.Equal(reason, coordinator.LatestSnapshot.StopReason);
+    }
+
+    [Fact]
+    public async Task Start_AfterFailedStop_BeginsNewRunAndClearsPreviousStopRequest()
+    {
+        var coordinator = new RuntimeCoordinator(new FakeRegistry(stopFailure: new InvalidOperationException("Stop failed.")));
+        coordinator.Start();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => coordinator.RequestStopAsync(StopReason.UserRequested("Operator stopped the run.")));
+
+        var restarted = coordinator.Start();
+
+        Assert.Equal(RunState.Running, restarted.State);
+        Assert.Null(restarted.StoppedAtUtc);
+        Assert.Null(restarted.StopReason);
+    }
+
+    [Fact]
+    public async Task RequestStopAsync_CancellationStillFinalizesStoppedSnapshot()
+    {
+        var registry = new FakeRegistry(blockStopUntilReleased: true);
+        var coordinator = new RuntimeCoordinator(registry);
+        coordinator.Start();
+        using var cancellationSource = new CancellationTokenSource();
+
+        var stopTask = coordinator.RequestStopAsync(
+            StopReason.UserRequested("Operator stopped the run."),
+            cancellationSource.Token);
+
+        await registry.StopEntered.Task;
+        cancellationSource.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => stopTask);
+
+        Assert.Equal(RunState.Idle, coordinator.LatestSnapshot.State);
+        Assert.NotNull(coordinator.LatestSnapshot.StoppedAtUtc);
+        Assert.NotNull(coordinator.LatestSnapshot.StopReason);
+    }
+
+    private sealed class FakeRegistry : IDeviceSessionRegistry
+    {
+        private readonly TaskCompletionSource<object?>? _stopRelease;
+        private readonly Exception? _stopFailure;
+
+        public FakeRegistry(bool blockStopUntilReleased = false, Exception? stopFailure = null)
+        {
+            _stopFailure = stopFailure;
+            if (blockStopUntilReleased)
+            {
+                _stopRelease = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+        }
+
+        public IReadOnlyCollection<IDeviceSession> Sessions => Array.Empty<IDeviceSession>();
+
+        public int StopAllCallCount { get; private set; }
+
+        public StopReason? LastReason { get; private set; }
+
+        public TaskCompletionSource<object?> StopEntered { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TSession GetOrAdd<TSession>(DeviceSessionId sessionId, Func<TSession> factory)
+            where TSession : class, IDeviceSession => throw new NotSupportedException();
+
+        public bool TryGet<TSession>(DeviceSessionId sessionId, out TSession? session)
+            where TSession : class, IDeviceSession
+        {
+            session = null;
+            return false;
+        }
+
+        public bool Remove(DeviceSessionId sessionId) => false;
+
+        public async Task StopAllAsync(StopReason reason, CancellationToken cancellationToken = default)
+        {
+            StopAllCallCount++;
+            LastReason = reason;
+            StopEntered.TrySetResult(null);
+
+            if (_stopFailure is not null)
+            {
+                throw _stopFailure;
+            }
+
+            if (_stopRelease is not null)
+            {
+                await _stopRelease.Task.WaitAsync(cancellationToken);
+            }
+        }
+
+        public void ReleaseStop()
+        {
+            _stopRelease?.TrySetResult(null);
+        }
     }
 }

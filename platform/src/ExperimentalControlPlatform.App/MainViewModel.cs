@@ -45,12 +45,20 @@ public sealed class MainViewModel : IDisposable
 
     public void StopRuntime()
     {
+        _ = StopRuntimeAsync();
+    }
+
+    public async Task StopRuntimeAsync()
+    {
         try
         {
-            RuntimeStatus.Update(_runtimeCoordinator.RequestStop(StopReason.UserRequested("Stopped from app shell placeholder control.")));
+            var stopTask = _runtimeCoordinator.RequestStopAsync(StopReason.UserRequested("Stopped from app shell placeholder control."));
+            RuntimeStatus.Update(_runtimeCoordinator.LatestSnapshot);
+            RuntimeStatus.Update(await stopTask);
         }
         catch (Exception ex)
         {
+            RuntimeStatus.Update(_runtimeCoordinator.LatestSnapshot);
             RuntimeStatus.ShowOperationError("Unable to stop runtime.", ex.Message);
         }
     }
