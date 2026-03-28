@@ -21,14 +21,15 @@ using Microsoft.Win32;
 
 namespace ExperimentalControlPlatform.App.DevicePanels.Pt104;
 
-public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelViewModel, IOutputSettingsPanelViewModel
+public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelViewModel, IOutputSettingsPanelViewModel, IPanelCloseViewModel
 {
     private const double PlotCanvasWidth = 504;
     private const double PlotCanvasHeight = 280;
     private const int MaxSamples = 120;
     private static readonly IReadOnlyList<IntegrationPanelLifecycleAction> ConnectedLifecycleActions =
     [
-        IntegrationPanelLifecycleAction.Apply
+        IntegrationPanelLifecycleAction.Apply,
+        IntegrationPanelLifecycleAction.ApplyAndExit
     ];
 
     private sealed class ChannelState
@@ -157,6 +158,8 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
     }
 
     public string Title => "PT-104";
+
+    public event EventHandler? CloseRequested;
 
     public string Subtitle => "USB PT-104 RTD logger test panel";
 
@@ -678,6 +681,8 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
             await session.DisposeAsync().ConfigureAwait(true);
         }
     }
+
+    public Task CloseWithoutApplyAsync() => DisconnectAsync();
 
     public async Task ReadOnceAsync()
     {
@@ -1384,35 +1389,47 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
 
     private bool CanExecuteLifecycleAction(object? parameter)
     {
-        return parameter is IntegrationPanelLifecycleAction.Apply && IsConnected && !IsBusy && !AnyChannelLiveReading;
+        return parameter switch
+        {
+            IntegrationPanelLifecycleAction.Apply => IsConnected && !IsBusy && !AnyChannelLiveReading,
+            IntegrationPanelLifecycleAction.ApplyAndExit => IsConnected && !IsBusy && !AnyChannelLiveReading,
+            _ => false
+        };
     }
 
     private async Task ExecuteLifecycleActionAsync(object? parameter)
     {
-        if (parameter is not IntegrationPanelLifecycleAction.Apply)
+        switch (parameter)
         {
-            return;
+            case IntegrationPanelLifecycleAction.Apply:
+                await ApplyCurrentSettingsAsync().ConfigureAwait(false);
+                return;
+            case IntegrationPanelLifecycleAction.ApplyAndExit:
+                await ApplyAndExitAsync().ConfigureAwait(false);
+                return;
+            default:
+                return;
         }
-
-        await ApplyCurrentSettingsAsync();
     }
 
-    private async Task ApplyCurrentSettingsAsync()
+    private async Task<bool> ApplyCurrentSettingsAsync()
     {
         if (!IsConnected || AnyChannelLiveReading || _session is null)
         {
-            return;
+            return false;
         }
 
         try
         {
             SetLastCommand($"Apply settings for channel {SelectedChannel}");
             await _session.ApplySettingsAsync(BuildRuntimeSettings()).ConfigureAwait(true);
+            return true;
         }
         catch (Exception ex)
         {
             SetLastError(ex.Message);
             StatusMessage = ex.Message;
+            return false;
         }
     }
 
@@ -1420,6 +1437,17 @@ public sealed class Pt104PanelViewModel : ObservableObject, IScalarSensorPanelVi
     {
         SetLastError(exception.Message);
         StatusMessage = exception.Message;
+    }
+
+    private async Task ApplyAndExitAsync()
+    {
+        if (!await ApplyCurrentSettingsAsync().ConfigureAwait(true))
+        {
+            return;
+        }
+
+        await DisconnectAsync().ConfigureAwait(true);
+        CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private void CaptureAppliedSettingsSnapshot(Pt104ConnectionSettings settings, string note)

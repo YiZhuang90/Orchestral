@@ -18,12 +18,13 @@ using MahApps.Metro.IconPacks;
 
 namespace ExperimentalControlPlatform.App.DevicePanels.HuaTeng;
 
-public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewModel, IOutputSettingsPanelViewModel
+public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewModel, IOutputSettingsPanelViewModel, IPanelCloseViewModel
 {
     private const double MaxDisplayFps = 20.0;
     private static readonly IReadOnlyList<IntegrationPanelLifecycleAction> ConnectedLifecycleActions =
     [
-        IntegrationPanelLifecycleAction.Apply
+        IntegrationPanelLifecycleAction.Apply,
+        IntegrationPanelLifecycleAction.ApplyAndExit
     ];
     private readonly HuaTengCameraProbeClient _probeClient;
     private readonly IDeviceSessionRegistry _sessionRegistry;
@@ -102,6 +103,8 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
     }
 
     public string Title => "HuaTeng Camera";
+
+    public event EventHandler? CloseRequested;
 
     System.Collections.IEnumerable ICameraPanelViewModel.CameraOptions => CameraOptions;
 
@@ -523,14 +526,16 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
             _draftSelectedColorTone);
     }
 
-    public async Task ApplySettingsAsync()
+    public Task ApplySettingsAsync() => ApplySettingsCoreAsync();
+
+    private async Task<bool> ApplySettingsCoreAsync()
     {
         if (!TryParsePositiveDouble(_draftExposureInput, out _))
         {
             SetLastValidationResult("Exposure must be a positive number.");
             StatusMessage = "Exposure must be a positive number.";
             FooterSystemStateLabel = "Invalid setting";
-            return;
+            return false;
         }
 
         if (!TryParsePositiveDouble(_draftFrameRateInput, out _))
@@ -538,7 +543,7 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
             SetLastValidationResult("Target frame rate must be a positive number.");
             StatusMessage = "Target frame rate must be a positive number.";
             FooterSystemStateLabel = "Invalid setting";
-            return;
+            return false;
         }
 
         SetLastValidationResult("Validated settings.");
@@ -555,16 +560,18 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
         {
             StatusMessage = "Camera settings staged for the next capture.";
             FooterSystemStateLabel = "System Ready";
-            return;
+            return true;
         }
 
         try
         {
             await _session.ApplySettingsAsync(BuildCaptureSettings()).ConfigureAwait(true);
+            return true;
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[HuaTengPanelViewModel] Apply settings failed: {ex}");
+            return false;
         }
     }
 
@@ -705,6 +712,8 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
             await session.DisposeAsync().ConfigureAwait(true);
         }
     }
+
+    public Task CloseWithoutApplyAsync() => DisconnectAsync();
 
     public async Task SnapFrameAsync()
     {
@@ -1444,24 +1453,46 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
 
     private bool CanExecuteLifecycleAction(object? parameter)
     {
-        return parameter is IntegrationPanelLifecycleAction.Apply && IsConnected && CanApplySettings;
+        return parameter switch
+        {
+            IntegrationPanelLifecycleAction.Apply => IsConnected && CanApplySettings,
+            IntegrationPanelLifecycleAction.ApplyAndExit => IsConnected,
+            _ => false
+        };
     }
 
     private async Task ExecuteLifecycleActionAsync(object? parameter)
     {
-        if (parameter is not IntegrationPanelLifecycleAction.Apply)
+        switch (parameter)
         {
-            return;
+            case IntegrationPanelLifecycleAction.Apply:
+                SetLastCommand("Apply camera settings");
+                await ApplySettingsAsync().ConfigureAwait(false);
+                return;
+            case IntegrationPanelLifecycleAction.ApplyAndExit:
+                await ApplyAndExitAsync().ConfigureAwait(false);
+                return;
+            default:
+                return;
         }
-
-        SetLastCommand("Apply camera settings");
-        await ApplySettingsAsync().ConfigureAwait(false);
     }
 
     private void HandleLifecycleCommandException(Exception exception)
     {
         SetLastError(exception.Message);
         StatusMessage = exception.Message;
+    }
+
+    private async Task ApplyAndExitAsync()
+    {
+        SetLastCommand("Apply and exit HuaTeng camera settings");
+        if (!await ApplySettingsCoreAsync().ConfigureAwait(true))
+        {
+            return;
+        }
+
+        await DisconnectAsync().ConfigureAwait(true);
+        CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private void CaptureFrameOutput(HuaTengFrameResult result, string sourceMode)

@@ -22,14 +22,15 @@ using Microsoft.Win32;
 
 namespace ExperimentalControlPlatform.App.DevicePanels.Microphone;
 
-public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudioInputPanelViewModel, IOutputSettingsPanelViewModel
+public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudioInputPanelViewModel, IOutputSettingsPanelViewModel, IPanelCloseViewModel
 {
     private const double PlotCanvasWidth = 504;
     private const double PlotCanvasHeight = 280;
     private const int PlotPointCount = 180;
     private static readonly IReadOnlyList<IntegrationPanelLifecycleAction> ConnectedLifecycleActions =
     [
-        IntegrationPanelLifecycleAction.Apply
+        IntegrationPanelLifecycleAction.Apply,
+        IntegrationPanelLifecycleAction.ApplyAndExit
     ];
 
     private readonly IMicrophoneService _microphoneService;
@@ -99,6 +100,8 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
     }
 
     public string Title => "Integrated Microphone";
+
+    public event EventHandler? CloseRequested;
 
     IEnumerable IAudioInputPanelViewModel.DeviceOptions => DeviceOptions;
 
@@ -569,20 +572,24 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
         _ = RunSessionDisposeAsync(session, "Panel disposed.");
     }
 
-    public async Task ApplySettingsAsync()
+    public Task CloseWithoutApplyAsync() => DisconnectAsync();
+
+    public Task ApplySettingsAsync() => ApplySettingsCoreAsync();
+
+    private async Task<bool> ApplySettingsCoreAsync()
     {
         if (!TryParsePositiveDouble(_draftTargetUpdateRateInput, out _))
         {
             SetLastValidationResult("Target update rate must be a positive number.");
             _statusMessage = "Target update rate must be a positive number.";
-            return;
+            return false;
         }
 
         if (!TryParsePositiveInt(_draftWindowMillisecondsInput, out _))
         {
             SetLastValidationResult("Window must be a positive integer.");
             _statusMessage = "Window must be a positive integer.";
-            return;
+            return false;
         }
 
         SetLastValidationResult("Validated microphone settings.");
@@ -598,16 +605,18 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
             OnPropertyChanged(nameof(CanApplySettings));
             _lifecycleActionCommand.NotifyCanExecuteChanged();
             await Task.CompletedTask;
-            return;
+            return true;
         }
 
         try
         {
             await _session.ApplySettingsAsync(BuildCaptureSettings()).ConfigureAwait(true);
+            return true;
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[IntegratedMicrophonePanelViewModel] Apply settings failed: {ex}");
+            return false;
         }
     }
 
@@ -755,24 +764,46 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
 
     private bool CanExecuteLifecycleAction(object? parameter)
     {
-        return parameter is IntegrationPanelLifecycleAction.Apply && IsConnected && CanApplySettings;
+        return parameter switch
+        {
+            IntegrationPanelLifecycleAction.Apply => IsConnected && CanApplySettings,
+            IntegrationPanelLifecycleAction.ApplyAndExit => IsConnected,
+            _ => false
+        };
     }
 
     private async Task ExecuteLifecycleActionAsync(object? parameter)
     {
-        if (parameter is not IntegrationPanelLifecycleAction.Apply)
+        switch (parameter)
         {
-            return;
+            case IntegrationPanelLifecycleAction.Apply:
+                SetLastCommand("Apply integrated microphone settings");
+                await ApplySettingsAsync().ConfigureAwait(false);
+                return;
+            case IntegrationPanelLifecycleAction.ApplyAndExit:
+                await ApplyAndExitAsync().ConfigureAwait(false);
+                return;
+            default:
+                return;
         }
-
-        SetLastCommand("Apply integrated microphone settings");
-        await ApplySettingsAsync().ConfigureAwait(false);
     }
 
     private void HandleLifecycleCommandException(Exception exception)
     {
         SetLastError(exception.Message);
         _statusMessage = exception.Message;
+    }
+
+    private async Task ApplyAndExitAsync()
+    {
+        SetLastCommand("Apply and exit integrated microphone settings");
+        if (!await ApplySettingsCoreAsync().ConfigureAwait(true))
+        {
+            return;
+        }
+
+        await DisconnectAsync().ConfigureAwait(true);
+        CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private void CaptureAppliedSettingsSnapshot(string note)

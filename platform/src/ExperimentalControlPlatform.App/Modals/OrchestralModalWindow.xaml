@@ -264,9 +264,14 @@
                    FontSize="12"
                    FontFamily="Inter, Segoe UI"
                    Foreground="#2E3430"
+                   IsEnabled="{Binding IsOutputFrequencyRelevant}"
                    Text="{Binding OutputFrequencyHzInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                    VerticalContentAlignment="Center" />
         </Border>
+        <TextBlock Margin="0,4,0,0"
+                   FontSize="11"
+                   Foreground="#6A706C"
+                   Text="{Binding OutputFrequencyHint}" />
 
         <CheckBox Margin="0,16,0,0"
                   IsChecked="{Binding IncludeMetadata, Mode=TwoWay}">

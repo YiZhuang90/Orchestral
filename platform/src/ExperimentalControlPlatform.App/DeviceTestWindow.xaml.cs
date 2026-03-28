@@ -1,7 +1,10 @@
 using System;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Interop;
+using ExperimentalControlPlatform.App.DevicePanels;
 
 namespace ExperimentalControlPlatform.App;
 
@@ -10,12 +13,20 @@ public partial class DeviceTestWindow : Window
     private const int WmGetMinMaxInfoMessage = 0x0024;
     private const uint MonitorDefaultToNearest = 0x00000002;
     private readonly MainViewModel _viewModel;
+    private readonly IPanelCloseViewModel? _closeAwarePanel;
+    private bool _closeInProgress;
+    private bool _allowImmediateClose;
 
     public DeviceTestWindow(MainViewModel viewModel)
     {
         InitializeComponent();
         _viewModel = viewModel;
         DataContext = _viewModel;
+        _closeAwarePanel = _viewModel.CurrentDevicePanel as IPanelCloseViewModel;
+        if (_closeAwarePanel is not null)
+        {
+            _closeAwarePanel.CloseRequested += OnPanelCloseRequested;
+        }
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -28,10 +39,58 @@ public partial class DeviceTestWindow : Window
         }
     }
 
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        if (_allowImmediateClose || _closeAwarePanel is null)
+        {
+            base.OnClosing(e);
+            return;
+        }
+
+        e.Cancel = true;
+        if (!_closeInProgress)
+        {
+            _ = CompleteSafeCloseAsync(_closeAwarePanel);
+        }
+    }
+
     protected override void OnClosed(EventArgs e)
     {
+        if (_closeAwarePanel is not null)
+        {
+            _closeAwarePanel.CloseRequested -= OnPanelCloseRequested;
+        }
+
         _viewModel.Dispose();
         base.OnClosed(e);
+    }
+
+    private async Task CompleteSafeCloseAsync(IPanelCloseViewModel panel)
+    {
+        _closeInProgress = true;
+        try
+        {
+            await panel.CloseWithoutApplyAsync().ConfigureAwait(true);
+            _allowImmediateClose = true;
+            Close();
+        }
+        finally
+        {
+            _allowImmediateClose = false;
+            _closeInProgress = false;
+        }
+    }
+
+    private void OnPanelCloseRequested(object? sender, EventArgs e)
+    {
+        if (_closeInProgress)
+        {
+            return;
+        }
+
+        _allowImmediateClose = true;
+        Close();
+        _allowImmediateClose = false;
     }
 
     private IntPtr WindowProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
