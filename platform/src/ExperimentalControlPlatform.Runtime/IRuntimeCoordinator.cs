@@ -1,3 +1,6 @@
+using System.Threading;
+using System.Threading.Tasks;
+
 namespace ExperimentalControlPlatform.Runtime;
 
 public interface IRuntimeCoordinator
@@ -6,5 +9,7 @@ public interface IRuntimeCoordinator
 
     RuntimeRunContext Start();
 
-    RuntimeRunContext RequestStop(StopReason reason);
+    Task<RuntimeRunContext> RequestStopAsync(StopReason reason, CancellationToken cancellationToken = default);
+
+    Task<RuntimeRunContext> EnsureStoppedAsync(StopReason reason, CancellationToken cancellationToken = default);
 }

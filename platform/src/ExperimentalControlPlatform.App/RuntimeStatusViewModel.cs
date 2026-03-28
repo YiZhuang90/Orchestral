@@ -40,6 +40,7 @@ public sealed class RuntimeStatusViewModel : INotifyPropertyChanged
         Snapshot.State switch
         {
             RunState.Running => "Running",
+            RunState.Stopping => "Stopping",
             _ => "Ready"
         };
 
@@ -49,6 +50,8 @@ public sealed class RuntimeStatusViewModel : INotifyPropertyChanged
            {
                RunState.Running when Snapshot.StartedAtUtc is not null =>
                    $"Running since {Snapshot.StartedAtUtc.Value.ToLocalTime():HH:mm:ss}",
+               RunState.Stopping when Snapshot.StopReason is not null =>
+                   $"Stopping: {Snapshot.StopReason.Message}",
                RunState.Idle when Snapshot.StopReason is not null =>
                    $"Ready after stop: {Snapshot.StopReason.Message}",
                _ => "Ready to start"

@@ -15,6 +15,7 @@ namespace ExperimentalControlPlatform.App;
 public partial class App : Application
 {
     private DeviceSessionRegistry? _sessionRegistry;
+    private RuntimeCoordinator? _runtimeCoordinator;
     private MainViewModel? _mainViewModel;
 
     protected override void OnStartup(StartupEventArgs e)
@@ -22,9 +23,9 @@ public partial class App : Application
         base.OnStartup(e);
 
         _sessionRegistry = new DeviceSessionRegistry();
-        var runtimeCoordinator = new RuntimeCoordinator();
+        _runtimeCoordinator = new RuntimeCoordinator(_sessionRegistry);
         var controlCenterPanel = new ControlCenterPanelViewModel(new SerialControlCenterService(), _sessionRegistry);
-        _mainViewModel = new MainViewModel(runtimeCoordinator, new[] { controlCenterPanel });
+        _mainViewModel = new MainViewModel(_runtimeCoordinator, new[] { controlCenterPanel });
         var deviceTestWindow = new DeviceTestWindow(_mainViewModel);
 
         MainWindow = deviceTestWindow;
@@ -35,7 +36,15 @@ public partial class App : Application
     {
         try
         {
-            _sessionRegistry?.StopAllAsync(StopReason.UserRequested("Application shutdown.")).GetAwaiter().GetResult();
+            if (_runtimeCoordinator is not null
+                && _runtimeCoordinator.LatestSnapshot.State is RunState.Running or RunState.Stopping)
+            {
+                _runtimeCoordinator.EnsureStoppedAsync(StopReason.UserRequested("Application shutdown.")).GetAwaiter().GetResult();
+            }
+            else
+            {
+                _sessionRegistry?.StopAllAsync(StopReason.UserRequested("Application shutdown.")).GetAwaiter().GetResult();
+            }
         }
         finally
         {
