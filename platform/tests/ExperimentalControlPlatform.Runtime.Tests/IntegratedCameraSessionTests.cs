@@ -69,6 +69,22 @@ public sealed class IntegratedCameraSessionTests
         Assert.Contains("Unable to connect", state.StatusMessage, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void ValidateSettings_ReturnsInvalidResult_WhenFrameRateIsNonPositive()
+    {
+        var service = new FakeIntegratedCameraService
+        {
+            SnapshotFrames = [CreateFrame(320, 240, 1)]
+        };
+        var session = new IntegratedCameraSession(service, TestSettings.DeviceId, TestSettings.CameraIndex, TestSettings.DisplayName);
+        var invalidSettings = TestSettings with { TargetFrameRate = 0 };
+
+        var result = session.ValidateSettings(invalidSettings);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Issues, issue => issue.Field == "TargetFrameRate");
+    }
+
     private static IntegratedCameraFrame CreateFrame(int width, int height, byte seed)
     {
         return new IntegratedCameraFrame(TestSettings.DeviceId, TestSettings.DisplayName, width, height, [seed, seed, seed], true, DateTime.UtcNow.Ticks);

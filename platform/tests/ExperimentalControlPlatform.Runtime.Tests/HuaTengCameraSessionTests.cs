@@ -61,6 +61,22 @@ public sealed class HuaTengCameraSessionTests
         Assert.Equal(40, state.AppliedRoi!.Height);
     }
 
+    [Fact]
+    public void ValidateSettings_ReturnsInvalidResult_WhenCameraIndexDoesNotMatch()
+    {
+        var service = new FakeHuaTengService
+        {
+            SnapshotFrames = [CreateFrame(ok: true, summary: "Connected", timestampTenths: 10)]
+        };
+        var session = new HuaTengCameraSession(service, TestSettings.DeviceId, TestSettings.CameraIndex, TestSettings.DisplayName);
+        var invalidSettings = TestSettings with { CameraIndex = 2 };
+
+        var result = session.ValidateSettings(invalidSettings);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Issues, issue => issue.Field == "CameraIndex");
+    }
+
     private static HuaTengFrame CreateFrame(bool ok, string summary, int timestampTenths, CaptureRegion? roi = null)
     {
         return new HuaTengFrame(

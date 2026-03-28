@@ -49,6 +49,20 @@ public sealed class IntegratedMicrophonePanelViewModelTests
         Assert.Empty(registry.Sessions);
     }
 
+    [Fact]
+    public async Task CanApplySettings_IsFalse_WhenDraftWindowIsInvalid()
+    {
+        var service = new FakeMicrophoneService();
+        var registry = new DeviceSessionRegistry();
+        var viewModel = new IntegratedMicrophonePanelViewModel(service, registry);
+
+        await viewModel.RefreshDevicesAsync();
+        await viewModel.ConnectAsync();
+        viewModel.WindowMillisecondsInputDraft = "0";
+
+        Assert.False(viewModel.CanApplySettings);
+    }
+
     private sealed class FakeMicrophoneService : IMicrophoneService
     {
         public IReadOnlyList<MicrophoneDeviceInfo> ListCaptureDevices() => [TestDevice];

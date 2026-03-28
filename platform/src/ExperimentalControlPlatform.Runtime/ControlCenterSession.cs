@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using ExperimentalControlPlatform.Devices.ControlCenter;
@@ -98,13 +99,14 @@ public sealed class ControlCenterSession : IDeviceSession
 
     public async Task ApplyCommandAsync(ControlCenterCommand command, CancellationToken cancellationToken = default)
     {
-        ValidateCommand(command);
+        var validation = ValidateCommand(command);
+        validation.ThrowIfInvalid();
         var connection = RequireConnection();
 
         PublishDiagnostics(Diagnostics.Current! with
         {
             LastCommand = "Send control center command",
-            LastValidationResult = "Validated control center command.",
+            LastValidationResult = validation.Summary,
             LastError = null
         });
         PublishState(State.Current! with
@@ -377,11 +379,16 @@ public sealed class ControlCenterSession : IDeviceSession
         }
     }
 
-    private static void ValidateCommand(ControlCenterCommand command)
+    public static SessionValidationResult ValidateCommand(ControlCenterCommand command)
     {
+        var issues = new List<SessionValidationIssue>();
         if (command.StepCount < 0)
         {
-            throw new InvalidOperationException("Step count must be zero or greater.");
+            issues.Add(new SessionValidationIssue(
+                "StepCount",
+                "Step count must be zero or greater."));
         }
+
+        return SessionValidationResult.FromIssues("Validated control center command.", issues);
     }
 }

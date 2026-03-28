@@ -175,6 +175,15 @@ public sealed class ControlCenterSessionTests
         Assert.Contains("not connected", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void ValidateCommand_ReturnsInvalidResult_WhenStepCountIsNegative()
+    {
+        var result = ControlCenterSession.ValidateCommand(new ControlCenterCommand(PuffEnabled: false, LaserEnabled: true, StepCount: -1));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Issues, issue => issue.Field == "StepCount");
+    }
+
     private sealed class FakeControlCenterService : IControlCenterService
     {
         private readonly FakeConnection _connection;

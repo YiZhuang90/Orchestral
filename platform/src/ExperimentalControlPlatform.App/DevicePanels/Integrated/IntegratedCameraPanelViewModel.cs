@@ -136,6 +136,7 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
             if (SetProperty(ref _draftFrameRateInput, value))
             {
                 OnPropertyChanged(nameof(CanApplySettings));
+                OnPropertyChanged(nameof(CanToggleConnection));
                 _lifecycleActionCommand.NotifyCanExecuteChanged();
             }
         }
@@ -150,6 +151,7 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
             {
                 OnPropertyChanged(nameof(SelectedColorOptionDraft));
                 OnPropertyChanged(nameof(CanApplySettings));
+                OnPropertyChanged(nameof(CanToggleConnection));
                 _lifecycleActionCommand.NotifyCanExecuteChanged();
             }
         }
@@ -351,15 +353,18 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
         ? PackIconMaterialKind.Stop
         : PackIconMaterialKind.Play;
 
-    public bool CanToggleConnection => SelectedCamera is not null && !_isBusy && !IsLivePreviewing;
+    public bool CanToggleConnection => SelectedCamera is not null &&
+                                       !_isBusy &&
+                                       !IsLivePreviewing &&
+                                       TryBuildDraftCaptureSettings(out _).IsValid;
 
     public bool CanSnapFrame => IsConnected && !_isBusy && !IsLivePreviewing;
 
     public bool CanToggleLive => IsConnected && !_isBusy;
 
     public bool CanApplySettings => !_isBusy &&
-                                    (!string.Equals(_frameRateInput, _draftFrameRateInput, StringComparison.Ordinal) ||
-                                     !string.Equals(_colorMode, _draftColorMode, StringComparison.Ordinal));
+                                    HasPendingSettings() &&
+                                    TryBuildDraftCaptureSettings(out _).IsValid;
 
     public string EmptyStateText => _statusMessage;
 
@@ -498,16 +503,17 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
 
     private async Task<bool> ApplySettingsCoreAsync()
     {
-        if (!double.TryParse(_draftFrameRateInput, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedFrameRate) || parsedFrameRate <= 0)
+        var validation = TryBuildDraftCaptureSettings(out var settings);
+        if (!validation.IsValid || settings is null)
         {
-            SetLastValidationResult("Target frame rate must be a positive number.");
-            _statusMessage = "Target frame rate must be a positive number.";
+            SetLastValidationResult(validation.Summary);
+            _statusMessage = validation.Summary;
             return false;
         }
 
-        SetLastValidationResult("Validated settings.");
-        _frameRateInput = _draftFrameRateInput;
-        _colorMode = _draftColorMode;
+        SetLastValidationResult(validation.Summary);
+        _frameRateInput = settings.TargetFrameRate.ToString("0.###", CultureInfo.InvariantCulture);
+        _colorMode = settings.ColorEnabled ? "Color" : "Mono";
         SyncFooter();
         OnPropertyChanged(nameof(CanApplySettings));
         _lifecycleActionCommand.NotifyCanExecuteChanged();
@@ -520,7 +526,7 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
 
         try
         {
-            await _session.ApplySettingsAsync(BuildCaptureSettings()).ConfigureAwait(true);
+            await _session.ApplySettingsAsync(settings).ConfigureAwait(true);
             return true;
         }
         catch (Exception ex)
@@ -825,16 +831,48 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
         _ = RunSessionDisposeAsync(session, "Disposed integrated camera panel.");
     }
 
-    private IntegratedCameraCaptureSettings BuildCaptureSettings()
+    private bool HasPendingSettings()
     {
-        var camera = SelectedCamera ?? throw new InvalidOperationException("No integrated camera selected.");
+        return !string.Equals(_frameRateInput, _draftFrameRateInput, StringComparison.Ordinal) ||
+               !string.Equals(_colorMode, _draftColorMode, StringComparison.Ordinal);
+    }
+
+    private SessionValidationResult TryBuildDraftCaptureSettings(out IntegratedCameraCaptureSettings? settings)
+    {
+        settings = null;
+        var camera = SelectedCamera;
+        if (camera is null)
+        {
+            return SessionValidationResult.Invalid("DeviceId", "No integrated camera selected.");
+        }
+
+        if (!double.TryParse(_draftFrameRateInput, NumberStyles.Float, CultureInfo.InvariantCulture, out var frameRate) || frameRate <= 0)
+        {
+            return SessionValidationResult.Invalid("TargetFrameRate", "Target frame rate must be a positive number.");
+        }
+
         var deviceId = camera.InstanceId ?? $"{camera.Index}:{camera.DisplayName}";
-        return new IntegratedCameraCaptureSettings(
+        var candidate = new IntegratedCameraCaptureSettings(
             deviceId,
             camera.Index,
             camera.DisplayName,
-            ParseFrameRate(),
-            _colorMode == "Color");
+            frameRate,
+            _draftColorMode == "Color");
+        var validation = IntegratedCameraSession.ValidateSettings(deviceId, camera.Index, candidate);
+        if (!validation.IsValid)
+        {
+            return validation;
+        }
+
+        settings = candidate;
+        return validation;
+    }
+
+    private IntegratedCameraCaptureSettings BuildCaptureSettings()
+    {
+        var validation = TryBuildDraftCaptureSettings(out var settings);
+        validation.ThrowIfInvalid();
+        return settings!;
     }
 
     private IntegratedCameraSession GetOrCreateSession()

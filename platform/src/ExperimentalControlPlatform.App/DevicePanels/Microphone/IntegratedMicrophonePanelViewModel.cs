@@ -161,6 +161,7 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
             if (SetProperty(ref _draftSelectedChannelModeLabel, value))
             {
                 OnPropertyChanged(nameof(CanApplySettings));
+                OnPropertyChanged(nameof(CanToggleConnection));
                 _lifecycleActionCommand.NotifyCanExecuteChanged();
             }
         }
@@ -174,6 +175,7 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
             if (SetProperty(ref _draftTargetUpdateRateInput, value))
             {
                 OnPropertyChanged(nameof(CanApplySettings));
+                OnPropertyChanged(nameof(CanToggleConnection));
                 _lifecycleActionCommand.NotifyCanExecuteChanged();
             }
         }
@@ -187,6 +189,7 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
             if (SetProperty(ref _draftWindowMillisecondsInput, value))
             {
                 OnPropertyChanged(nameof(CanApplySettings));
+                OnPropertyChanged(nameof(CanToggleConnection));
                 _lifecycleActionCommand.NotifyCanExecuteChanged();
             }
         }
@@ -317,8 +320,6 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
         }
     }
 
-    public bool CanToggleConnection => SelectedDevice is not null && !_isBusy && !IsLiveReading;
-
     public bool CanReadOnce => IsConnected && !_isBusy && !IsLiveReading;
 
     public bool CanToggleLive => IsConnected && !_isBusy;
@@ -327,10 +328,14 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
 
     public bool CanExportData => _latestWaveformSamples.Length > 0 && !_isBusy;
 
+    public bool CanToggleConnection => SelectedDevice is not null &&
+                                       !_isBusy &&
+                                       !IsLiveReading &&
+                                       TryBuildDraftCaptureSettings(out _).IsValid;
+
     public bool CanApplySettings => !_isBusy &&
-                                    (!string.Equals(_targetUpdateRateInput, _draftTargetUpdateRateInput, StringComparison.Ordinal) ||
-                                     !string.Equals(_windowMillisecondsInput, _draftWindowMillisecondsInput, StringComparison.Ordinal) ||
-                                     !string.Equals(_selectedChannelModeLabel, _draftSelectedChannelModeLabel, StringComparison.Ordinal));
+                                    HasPendingSettings() &&
+                                    TryBuildDraftCaptureSettings(out _).IsValid;
 
     public string ConnectionToggleLabel => IsConnected ? "Disconnect" : "Connect";
 
@@ -578,27 +583,21 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
 
     private async Task<bool> ApplySettingsCoreAsync()
     {
-        if (!TryParsePositiveDouble(_draftTargetUpdateRateInput, out _))
+        var validation = TryBuildDraftCaptureSettings(out var settings);
+        if (!validation.IsValid || settings is null)
         {
-            SetLastValidationResult("Target update rate must be a positive number.");
-            _statusMessage = "Target update rate must be a positive number.";
+            SetLastValidationResult(validation.Summary);
+            _statusMessage = validation.Summary;
             return false;
         }
 
-        if (!TryParsePositiveInt(_draftWindowMillisecondsInput, out _))
-        {
-            SetLastValidationResult("Window must be a positive integer.");
-            _statusMessage = "Window must be a positive integer.";
-            return false;
-        }
-
-        SetLastValidationResult("Validated microphone settings.");
+        SetLastValidationResult(validation.Summary);
         if (_session is null)
         {
-            _targetUpdateRateInput = _draftTargetUpdateRateInput;
-            _windowMillisecondsInput = _draftWindowMillisecondsInput;
-            _selectedChannelModeLabel = _draftSelectedChannelModeLabel;
-            SyncXAxisLabels(ParseWindowMilliseconds(_windowMillisecondsInput));
+            _targetUpdateRateInput = settings.TargetUpdateRateHz.ToString("0.###", CultureInfo.InvariantCulture);
+            _windowMillisecondsInput = settings.WindowMilliseconds.ToString(CultureInfo.InvariantCulture);
+            _selectedChannelModeLabel = FormatChannelMode(settings.ChannelMode);
+            SyncXAxisLabels(settings.WindowMilliseconds);
             SyncFooter();
             SetLastStateTransition("Staged settings for the next capture");
             _statusMessage = "Microphone settings staged for the next capture.";
@@ -610,7 +609,7 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
 
         try
         {
-            await _session.ApplySettingsAsync(BuildCaptureSettings()).ConfigureAwait(true);
+            await _session.ApplySettingsAsync(settings).ConfigureAwait(true);
             return true;
         }
         catch (Exception ex)
@@ -1172,20 +1171,52 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
         };
     }
 
-    private MicrophoneCaptureSettings BuildCaptureSettings()
+    private bool HasPendingSettings()
     {
-        var device = SelectedDevice ?? throw new InvalidOperationException("No microphone selected.");
-        var targetUpdateRate = TryParsePositiveDouble(_draftTargetUpdateRateInput, out var parsedTargetUpdateRate)
-            ? parsedTargetUpdateRate
-            : ParseTargetUpdateRate();
-        var windowMilliseconds = TryParsePositiveInt(_draftWindowMillisecondsInput, out var parsedWindowMilliseconds)
-            ? parsedWindowMilliseconds
-            : ParseWindowMilliseconds(_windowMillisecondsInput);
-        return new MicrophoneCaptureSettings(
+        return !string.Equals(_targetUpdateRateInput, _draftTargetUpdateRateInput, StringComparison.Ordinal) ||
+               !string.Equals(_windowMillisecondsInput, _draftWindowMillisecondsInput, StringComparison.Ordinal) ||
+               !string.Equals(_selectedChannelModeLabel, _draftSelectedChannelModeLabel, StringComparison.Ordinal);
+    }
+
+    private SessionValidationResult TryBuildDraftCaptureSettings(out MicrophoneCaptureSettings? settings)
+    {
+        settings = null;
+        var device = SelectedDevice;
+        if (device is null)
+        {
+            return SessionValidationResult.Invalid("DeviceId", "No microphone selected.");
+        }
+
+        if (!TryParsePositiveDouble(_draftTargetUpdateRateInput, out var targetUpdateRate))
+        {
+            return SessionValidationResult.Invalid("TargetUpdateRateHz", "Target update rate must be a positive number.");
+        }
+
+        if (!TryParsePositiveInt(_draftWindowMillisecondsInput, out var windowMilliseconds))
+        {
+            return SessionValidationResult.Invalid("WindowMilliseconds", "Window must be a positive integer.");
+        }
+
+        var candidate = new MicrophoneCaptureSettings(
             device.DeviceId,
             targetUpdateRate,
             windowMilliseconds,
             ParseChannelMode(_draftSelectedChannelModeLabel));
+        var validation = IntegratedMicrophoneSession.ValidateSettings(device.DeviceId, candidate);
+        if (!validation.IsValid)
+        {
+            return validation;
+        }
+
+        settings = candidate;
+        return validation;
+    }
+
+    private MicrophoneCaptureSettings BuildCaptureSettings()
+    {
+        var validation = TryBuildDraftCaptureSettings(out var settings);
+        validation.ThrowIfInvalid();
+        return settings!;
     }
 
     private static async Task RunSessionDisposeAsync(IntegratedMicrophoneSession session, string reason)

@@ -94,6 +94,17 @@ public sealed class Pt104SessionTests
         Assert.Contains("not connected", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void ValidateConfiguration_ReturnsInvalidResult_WhenWireCountIsUnsupported()
+    {
+        var invalidConfiguration = new Pt104ChannelConfiguration(2, Pt104MeasurementMode.Pt100, 5, 50, true);
+
+        var result = Pt104Session.ValidateConfiguration(invalidConfiguration);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Issues, issue => issue.Field == "WireCount");
+    }
+
     private static async Task WaitForConditionAsync(Func<bool> condition)
     {
         var started = DateTime.UtcNow;

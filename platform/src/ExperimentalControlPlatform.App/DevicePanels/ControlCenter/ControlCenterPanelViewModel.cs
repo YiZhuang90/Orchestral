@@ -650,6 +650,13 @@ public sealed class ControlCenterPanelViewModel : ObservableObject, IControlCent
             _selectedPuffState.Enabled,
             _selectedLaserState.Enabled,
             stepCount);
+
+        if (!ControlCenterSession.ValidateCommand(command).IsValid)
+        {
+            command = new ControlCenterCommand(false, false, 0);
+            return false;
+        }
+
         return true;
     }
 

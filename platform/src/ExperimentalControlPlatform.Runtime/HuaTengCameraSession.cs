@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -47,11 +48,13 @@ public sealed class HuaTengCameraSession : IDeviceSession
 
     public async Task ConnectAsync(HuaTengCaptureSettings settings, CancellationToken cancellationToken = default)
     {
-        ValidateSettings(settings);
+        var validation = ValidateSettings(settings);
+        validation.ThrowIfInvalid();
         PublishSessionEnd(null);
         PublishDiagnostics(Diagnostics.Current! with
         {
             LastCommand = "Connect HuaTeng camera session",
+            LastValidationResult = validation.Summary,
             LastError = null
         });
         PublishState(State.Current! with
@@ -147,12 +150,13 @@ public sealed class HuaTengCameraSession : IDeviceSession
 
     public async Task ApplySettingsAsync(HuaTengCaptureSettings settings, CancellationToken cancellationToken = default)
     {
-        ValidateSettings(settings);
+        var validation = ValidateSettings(settings);
+        validation.ThrowIfInvalid();
         var previousSettings = AppliedSettings.Current;
         PublishDiagnostics(Diagnostics.Current! with
         {
             LastCommand = "Apply HuaTeng camera settings",
-            LastValidationResult = "Validated HuaTeng camera settings.",
+            LastValidationResult = validation.Summary,
             LastError = null
         });
 
@@ -409,22 +413,44 @@ public sealed class HuaTengCameraSession : IDeviceSession
     private void PublishSessionEnd(DeviceSessionEndSnapshot? snapshot) => SessionEndPort.Publish(snapshot);
     private void PublishState(HuaTengSessionState state) => StatePort.Publish(state);
 
-    private void ValidateSettings(HuaTengCaptureSettings settings)
+    public SessionValidationResult ValidateSettings(HuaTengCaptureSettings settings) =>
+        ValidateSettings(SessionId.DeviceId, _cameraIndex, settings);
+
+    public static SessionValidationResult ValidateSettings(
+        string expectedDeviceId,
+        int expectedCameraIndex,
+        HuaTengCaptureSettings settings)
     {
-        if (!string.Equals(settings.DeviceId, SessionId.DeviceId, StringComparison.Ordinal))
+        var issues = new List<SessionValidationIssue>();
+        if (!string.Equals(settings.DeviceId, expectedDeviceId, StringComparison.Ordinal))
         {
-            throw new InvalidOperationException($"Settings target '{settings.DeviceId}' does not match session device '{SessionId.DeviceId}'.");
+            issues.Add(new SessionValidationIssue(
+                "DeviceId",
+                $"Settings target '{settings.DeviceId}' does not match session device '{expectedDeviceId}'."));
         }
 
-        if (settings.CameraIndex != _cameraIndex)
+        if (settings.CameraIndex != expectedCameraIndex)
         {
-            throw new InvalidOperationException("HuaTeng camera index does not match the session.");
+            issues.Add(new SessionValidationIssue(
+                "CameraIndex",
+                "HuaTeng camera index does not match the session."));
         }
 
         if (settings.TargetFrameRate <= 0)
         {
-            throw new InvalidOperationException("Target frame rate must be positive.");
+            issues.Add(new SessionValidationIssue(
+                "TargetFrameRate",
+                "Target frame rate must be positive."));
         }
+
+        if (settings.ExposureUs is <= 0)
+        {
+            issues.Add(new SessionValidationIssue(
+                "ExposureUs",
+                "Exposure must be a positive number when provided."));
+        }
+
+        return SessionValidationResult.FromIssues("Validated HuaTeng camera settings.", issues);
     }
 
     private void EnsureConnected()
