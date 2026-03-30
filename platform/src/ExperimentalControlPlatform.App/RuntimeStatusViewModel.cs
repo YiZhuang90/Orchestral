@@ -48,6 +48,8 @@ public sealed class RuntimeStatusViewModel : INotifyPropertyChanged
         _statusMessageOverride
         ?? Snapshot.State switch
            {
+               RunState.Running when Snapshot.StartedAtUtc is not null && Snapshot.Experiment is not null =>
+                   $"Running {Snapshot.Experiment.Experiment.Name} since {Snapshot.StartedAtUtc.Value.ToLocalTime():HH:mm:ss}",
                RunState.Running when Snapshot.StartedAtUtc is not null =>
                    $"Running since {Snapshot.StartedAtUtc.Value.ToLocalTime():HH:mm:ss}",
                RunState.Stopping when Snapshot.StopReason is not null =>

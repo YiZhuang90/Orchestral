@@ -21,6 +21,13 @@ public sealed class RunManifestDefinitionTests
             {
                 [new ArtifactId("role.upstream_camera")] = new ArtifactId("protocol.sdk_camera_v1")
             },
+            new Dictionary<ArtifactId, IReadOnlyDictionary<ArtifactId, string>>
+            {
+                [new ArtifactId("role.upstream_camera")] = new Dictionary<ArtifactId, string>
+                {
+                    [new ArtifactId("param.camera_exposure_ms")] = "0.35"
+                }
+            },
             new Dictionary<ArtifactId, string>
             {
                 [new ArtifactId("param.sample_period_ms")] = "50"
@@ -37,5 +44,8 @@ public sealed class RunManifestDefinitionTests
         Assert.Equal(
             new ArtifactId("protocol.sdk_camera_v1"),
             manifest.ProtocolBindings[new ArtifactId("role.upstream_camera")]);
+        Assert.Equal(
+            "0.35",
+            manifest.RoleBindingParameterValues[new ArtifactId("role.upstream_camera")][new ArtifactId("param.camera_exposure_ms")]);
     }
 }

@@ -20,12 +20,46 @@ public sealed record class RunManifestDefinition
         IReadOnlyList<ArtifactId> outputIds,
         IReadOnlyList<string> runtimeEvents,
         IReadOnlyList<string> warningsOrFaults)
+        : this(
+            id,
+            experimentId,
+            experimentVersion,
+            roleBindings,
+            protocolBindings,
+            new Dictionary<ArtifactId, IReadOnlyDictionary<ArtifactId, string>>(),
+            parameterValues,
+            startedAt,
+            stoppedAt,
+            activatedStopConditionId,
+            stopReason,
+            outputIds,
+            runtimeEvents,
+            warningsOrFaults)
+    {
+    }
+
+    public RunManifestDefinition(
+        ArtifactId id,
+        ArtifactId experimentId,
+        string experimentVersion,
+        IReadOnlyDictionary<ArtifactId, ArtifactId> roleBindings,
+        IReadOnlyDictionary<ArtifactId, ArtifactId> protocolBindings,
+        IReadOnlyDictionary<ArtifactId, IReadOnlyDictionary<ArtifactId, string>> roleBindingParameterValues,
+        IReadOnlyDictionary<ArtifactId, string> parameterValues,
+        DateTimeOffset startedAt,
+        DateTimeOffset? stoppedAt,
+        ArtifactId? activatedStopConditionId,
+        string? stopReason,
+        IReadOnlyList<ArtifactId> outputIds,
+        IReadOnlyList<string> runtimeEvents,
+        IReadOnlyList<string> warningsOrFaults)
     {
         Id = ArtifactId.Require(id, nameof(id));
         ExperimentId = ArtifactId.Require(experimentId, nameof(experimentId));
         ExperimentVersion = RequireText(experimentVersion, nameof(experimentVersion));
         RoleBindings = CopyArtifactDictionary(roleBindings, nameof(roleBindings));
         ProtocolBindings = CopyArtifactDictionary(protocolBindings, nameof(protocolBindings));
+        RoleBindingParameterValues = CopyNestedArtifactDictionary(roleBindingParameterValues, nameof(roleBindingParameterValues));
         ParameterValues = CopyArtifactKeyedStrings(parameterValues, nameof(parameterValues));
         StartedAt = startedAt;
         StoppedAt = stoppedAt;
@@ -45,6 +79,8 @@ public sealed record class RunManifestDefinition
     public IReadOnlyDictionary<ArtifactId, ArtifactId> RoleBindings { get; }
 
     public IReadOnlyDictionary<ArtifactId, ArtifactId> ProtocolBindings { get; }
+
+    public IReadOnlyDictionary<ArtifactId, IReadOnlyDictionary<ArtifactId, string>> RoleBindingParameterValues { get; }
 
     public IReadOnlyDictionary<ArtifactId, string> ParameterValues { get; }
 
@@ -87,6 +123,22 @@ public sealed record class RunManifestDefinition
         return values.ToDictionary(
             entry => ArtifactId.Require(entry.Key, paramName),
             entry => ArtifactId.Require(entry.Value, paramName));
+    }
+
+    private static IReadOnlyDictionary<ArtifactId, IReadOnlyDictionary<ArtifactId, string>> CopyNestedArtifactDictionary(
+        IReadOnlyDictionary<ArtifactId, IReadOnlyDictionary<ArtifactId, string>> values,
+        string paramName)
+    {
+        if (values is null)
+        {
+            throw new ArgumentNullException(paramName);
+        }
+
+        return values.ToDictionary(
+            entry => ArtifactId.Require(entry.Key, paramName),
+            entry => (IReadOnlyDictionary<ArtifactId, string>)entry.Value.ToDictionary(
+                nested => ArtifactId.Require(nested.Key, paramName),
+                nested => RequireText(nested.Value, paramName)));
     }
 
     private static IReadOnlyList<T> CopyList<T>(IReadOnlyList<T> values, string paramName)

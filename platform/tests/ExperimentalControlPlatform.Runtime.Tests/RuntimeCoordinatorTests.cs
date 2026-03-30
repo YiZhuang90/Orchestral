@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using ExperimentalControlPlatform.Core.Artifacts;
 using Xunit;
 
 namespace ExperimentalControlPlatform.Runtime.Tests;
@@ -25,6 +26,18 @@ public sealed class RuntimeCoordinatorTests
 
         Assert.Equal(RunState.Running, context.State);
         Assert.Equal(RunState.Running, coordinator.LatestSnapshot.State);
+    }
+
+    [Fact]
+    public void Start_WithResolvedExperiment_Captures_Experiment_Identity()
+    {
+        var coordinator = new RuntimeCoordinator(new FakeRegistry());
+        var experiment = CreateResolvedExperimentDefinition();
+
+        var context = coordinator.Start(experiment);
+
+        Assert.Equal(experiment, context.Experiment);
+        Assert.Equal(experiment, coordinator.LatestSnapshot.Experiment);
     }
 
     [Fact]
@@ -287,5 +300,58 @@ public sealed class RuntimeCoordinatorTests
         {
             _stopRelease?.TrySetResult(null);
         }
+    }
+
+    private static ResolvedExperimentDefinition CreateResolvedExperimentDefinition()
+    {
+        var experiment = new ExperimentDefinition(
+            new ArtifactId("exp.turbulence_transition_v1"),
+            "Turbulence Transition",
+            "Observe the flow with a camera and a controller.",
+            [
+                new DeviceRoleDefinition(
+                    new ArtifactId("role.camera_upstream"),
+                    "Upstream Camera",
+                    "Captures the upstream flow region.",
+                    [new ArtifactId("cap.frame_stream"), new ArtifactId("cap.exposure_control")],
+                    new ArtifactId("protocol.vendor_sdk_camera_v1"))
+            ],
+            [],
+            [],
+            [],
+            [],
+            [],
+            []);
+        var device = new DeviceDefinition(
+            new ArtifactId("device.camera_01"),
+            "Camera 01",
+            "camera_01",
+            new ProtocolDefinition(
+                new ArtifactId("protocol.vendor_sdk_camera_v1"),
+                "Vendor SDK Camera",
+                "sdk",
+                "request-response",
+                "session",
+                "best-effort",
+                "fail-fast",
+                "manual"),
+            [
+                new CapabilityDefinition(new ArtifactId("cap.frame_stream"), "frame_stream", "Produces image frames."),
+                new CapabilityDefinition(new ArtifactId("cap.exposure_control"), "exposure_control", "Adjusts camera exposure.")
+            ],
+            [],
+            "healthy");
+        var binding = new RoleBindingDefinition(
+            new ArtifactId("role.camera_upstream"),
+            device.Id,
+            device.Protocol.Id,
+            [new ArtifactId("cap.frame_stream"), new ArtifactId("cap.exposure_control")]);
+
+        return new ResolvedExperimentDefinition(
+            experiment,
+            "1.0.0",
+            [device],
+            [binding],
+            new Dictionary<ArtifactId, string>());
     }
 }
