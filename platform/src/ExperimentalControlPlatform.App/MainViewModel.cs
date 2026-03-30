@@ -10,11 +10,16 @@ namespace ExperimentalControlPlatform.App;
 public sealed class MainViewModel : IDisposable
 {
     private readonly IRuntimeCoordinator _runtimeCoordinator;
+    private readonly IRunRecorder _runRecorder;
 
-    public MainViewModel(IRuntimeCoordinator runtimeCoordinator, IEnumerable<IDeviceTestPanelViewModel> devicePanels)
+    public MainViewModel(
+        IRuntimeCoordinator runtimeCoordinator,
+        IEnumerable<IDeviceTestPanelViewModel> devicePanels,
+        IRunRecorder? runRecorder = null)
     {
         _runtimeCoordinator = runtimeCoordinator ?? throw new ArgumentNullException(nameof(runtimeCoordinator));
         ArgumentNullException.ThrowIfNull(devicePanels);
+        _runRecorder = runRecorder ?? new NullRunRecorder();
         RuntimeStatus = new RuntimeStatusViewModel(_runtimeCoordinator.LatestSnapshot);
         DevicePanels = new ReadOnlyCollection<IDeviceTestPanelViewModel>(new List<IDeviceTestPanelViewModel>(devicePanels));
     }
@@ -31,11 +36,15 @@ public sealed class MainViewModel : IDisposable
 
     public IDeviceTestPanelViewModel? CurrentDevicePanel => DevicePanels.FirstOrDefault();
 
+    public RunRecordingResult? LastRunRecording { get; private set; }
+
     public void StartRuntime()
     {
         try
         {
-            RuntimeStatus.Update(_runtimeCoordinator.Start());
+            var started = _runtimeCoordinator.Start();
+            _runRecorder.BeginRun(started);
+            RuntimeStatus.Update(started);
         }
         catch (Exception ex)
         {
@@ -48,19 +57,56 @@ public sealed class MainViewModel : IDisposable
         _ = StopRuntimeAsync();
     }
 
-    public async Task StopRuntimeAsync()
+    public Task StopRuntimeAsync() =>
+        StopRuntimeCoreAsync(
+            StopReason.UserRequested("Stopped from app shell placeholder control."),
+            ensureStopped: false,
+            errorPrefix: "Unable to stop runtime.");
+
+    public Task EnsureRuntimeStoppedAsync(string reasonMessage) =>
+        StopRuntimeCoreAsync(
+            StopReason.UserRequested(reasonMessage),
+            ensureStopped: true,
+            errorPrefix: "Unable to finalize runtime stop.");
+
+    public void FinalizeRunRecordingForLatestStoppedRun()
+    {
+        var snapshot = _runtimeCoordinator.LatestSnapshot;
+        if (snapshot.State is not RunState.Idle || snapshot.StoppedAtUtc is null)
+        {
+            return;
+        }
+
+        FinalizeRunRecording(snapshot);
+    }
+
+    private async Task StopRuntimeCoreAsync(StopReason reason, bool ensureStopped, string errorPrefix)
     {
         try
         {
-            var stopTask = _runtimeCoordinator.RequestStopAsync(StopReason.UserRequested("Stopped from app shell placeholder control."));
+            var stopTask = ensureStopped
+                ? _runtimeCoordinator.EnsureStoppedAsync(reason)
+                : _runtimeCoordinator.RequestStopAsync(reason);
             RuntimeStatus.Update(_runtimeCoordinator.LatestSnapshot);
-            RuntimeStatus.Update(await stopTask);
+            var stopped = await stopTask;
+            RuntimeStatus.Update(stopped);
+            FinalizeRunRecording(stopped);
         }
         catch (Exception ex)
         {
             RuntimeStatus.Update(_runtimeCoordinator.LatestSnapshot);
-            RuntimeStatus.ShowOperationError("Unable to stop runtime.", ex.Message);
+            RuntimeStatus.ShowOperationError(errorPrefix, ex.Message);
         }
+    }
+
+    private void FinalizeRunRecording(RuntimeRunContext stopped)
+    {
+        if (LastRunRecording?.RunId == stopped.RunId)
+        {
+            return;
+        }
+
+        LastRunRecording = _runRecorder.CompleteRun(stopped, DevicePanels);
     }
 
     public void Dispose()
@@ -69,5 +115,14 @@ public sealed class MainViewModel : IDisposable
         {
             panel.Dispose();
         }
+    }
+
+    private sealed class NullRunRecorder : IRunRecorder
+    {
+        public void BeginRun(RuntimeRunContext snapshot)
+        {
+        }
+
+        public RunRecordingResult? CompleteRun(RuntimeRunContext snapshot, IReadOnlyList<IDeviceTestPanelViewModel> panels) => null;
     }
 }

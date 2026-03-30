@@ -126,6 +126,11 @@ The current coordinator status is still only foundational:
 - it delegates run-level stop to `IDeviceSessionRegistry.StopAllAsync(...)`,
 - and the application host can join an in-flight stop through `EnsureStoppedAsync(...)`,
 - it can start either from a bare runtime request, an experiment package, or a structured `RunContextDefinition`,
+- the first-generation `RunRecorder` / `RunArtifactWriter` path now materializes:
+  - `manifest.yaml`
+  - runtime events
+  - warnings/faults
+  - panel snapshot artifacts,
 - but it is not yet the full experiment-level orchestration layer for multiple active sessions.
 
 ## How

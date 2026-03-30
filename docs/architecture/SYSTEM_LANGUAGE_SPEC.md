@@ -222,6 +222,7 @@ It records:
 - start and stop timestamps,
 - activated stop condition and stop reason,
 - output references,
+- file-backed artifact-path references when the run is materialized as a local artifact directory,
 - key runtime events,
 - warnings or faults.
 

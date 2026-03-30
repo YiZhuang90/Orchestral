@@ -35,7 +35,8 @@ Status:
 - experiment definition and role binding now exist as a validated artifact/runtime boundary,
 - high-rate stream buffering and delivery policy now exists for runtime stream ports and the highest-pressure UI consumers,
 - run context and metadata now exist as a first-class experiment-plane unit,
-- next universal slice is run recorder and artifact writer.
+- run recorder and artifact writer now exist as a first-generation manifest/panel-artifact persistence layer,
+- next universal slice is run monitor and alarm surface.
 
 Required foundations:
 
@@ -50,6 +51,7 @@ Active slice plans:
 - [2026-03-30-experiment-definition-and-role-binding-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-30-experiment-definition-and-role-binding-plan.md)
 - [2026-03-30-high-rate-stream-buffering-and-delivery-policy-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-30-high-rate-stream-buffering-and-delivery-policy-plan.md)
 - [2026-03-30-run-context-and-metadata-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-30-run-context-and-metadata-plan.md)
+- [2026-03-30-run-recorder-and-artifact-writer-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-30-run-recorder-and-artifact-writer-plan.md)
 
 ### 2. First Reference Experiment
 
@@ -57,7 +59,6 @@ Status:
 
 - partially unblocked,
 - still waiting on:
-  - run recorder/artifact writer,
   - run monitor/alarm surface,
   - experiment-specific controller sessions as required by the chosen reference experiment.
 
