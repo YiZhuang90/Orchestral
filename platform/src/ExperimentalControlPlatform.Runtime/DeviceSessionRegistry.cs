@@ -10,6 +10,8 @@ public sealed class DeviceSessionRegistry : IDeviceSessionRegistry
     private readonly object _syncRoot = new();
     private readonly Dictionary<DeviceSessionId, IDeviceSession> _sessions = [];
 
+    public event Action? SessionsChanged;
+
     public IReadOnlyCollection<IDeviceSession> Sessions
     {
         get
@@ -24,6 +26,7 @@ public sealed class DeviceSessionRegistry : IDeviceSessionRegistry
     public TSession GetOrAdd<TSession>(DeviceSessionId sessionId, Func<TSession> factory)
         where TSession : class, IDeviceSession
     {
+        TSession created;
         lock (_syncRoot)
         {
             if (_sessions.TryGetValue(sessionId, out var existing))
@@ -31,10 +34,12 @@ public sealed class DeviceSessionRegistry : IDeviceSessionRegistry
                 return (TSession)existing;
             }
 
-            var created = factory();
+            created = factory();
             _sessions.Add(sessionId, created);
-            return created;
         }
+
+        SessionsChanged?.Invoke();
+        return created;
     }
 
     public bool TryGet<TSession>(DeviceSessionId sessionId, out TSession? session)
@@ -55,10 +60,18 @@ public sealed class DeviceSessionRegistry : IDeviceSessionRegistry
 
     public bool Remove(DeviceSessionId sessionId)
     {
+        var removed = false;
         lock (_syncRoot)
         {
-            return _sessions.Remove(sessionId);
+            removed = _sessions.Remove(sessionId);
         }
+
+        if (removed)
+        {
+            SessionsChanged?.Invoke();
+        }
+
+        return removed;
     }
 
     public async Task StopAllAsync(StopReason reason, CancellationToken cancellationToken = default)
@@ -78,9 +91,16 @@ public sealed class DeviceSessionRegistry : IDeviceSessionRegistry
         }
         finally
         {
+            var hadSessions = false;
             lock (_syncRoot)
             {
+                hadSessions = _sessions.Count > 0;
                 _sessions.Clear();
+            }
+
+            if (hadSessions)
+            {
+                SessionsChanged?.Invoke();
             }
         }
     }

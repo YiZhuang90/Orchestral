@@ -17,6 +17,8 @@ public sealed class RuntimeCoordinator : IRuntimeCoordinator
         _sessionRegistry = sessionRegistry ?? throw new ArgumentNullException(nameof(sessionRegistry));
     }
 
+    public event Action<RuntimeRunContext>? SnapshotChanged;
+
     public RuntimeRunContext LatestSnapshot
     {
         get
@@ -47,6 +49,7 @@ public sealed class RuntimeCoordinator : IRuntimeCoordinator
 
     private RuntimeRunContext StartCore(ResolvedExperimentDefinition? experiment, RunContextDefinition? runContext)
     {
+        RuntimeRunContext startedSnapshot;
         lock (_syncRoot)
         {
             if (IsActive(_latestSnapshot.State))
@@ -63,9 +66,11 @@ public sealed class RuntimeCoordinator : IRuntimeCoordinator
                 startedAtUtc: startedAtUtc,
                 experiment: experiment,
                 runContext: runContext);
-
-            return _latestSnapshot;
+            startedSnapshot = _latestSnapshot;
         }
+
+        PublishSnapshotChanged(startedSnapshot);
+        return startedSnapshot;
     }
 
     public async Task<RuntimeRunContext> RequestStopAsync(StopReason reason, CancellationToken cancellationToken = default)
@@ -131,6 +136,7 @@ public sealed class RuntimeCoordinator : IRuntimeCoordinator
     private Task<RuntimeRunContext> BeginStop(StopReason reason, CancellationToken cancellationToken)
     {
         RuntimeRunContext stoppingSnapshot;
+        Task<RuntimeRunContext> stopTask;
 
         lock (_syncRoot)
         {
@@ -144,8 +150,11 @@ public sealed class RuntimeCoordinator : IRuntimeCoordinator
                 _latestSnapshot.RunContext);
             stoppingSnapshot = _latestSnapshot;
             _activeStopTask = StopCoreAsync(stoppingSnapshot, reason, cancellationToken);
-            return _activeStopTask;
+            stopTask = _activeStopTask;
         }
+
+        PublishSnapshotChanged(stoppingSnapshot);
+        return stopTask;
     }
 
     private async Task<RuntimeRunContext> StopCoreAsync(
@@ -153,6 +162,7 @@ public sealed class RuntimeCoordinator : IRuntimeCoordinator
         StopReason reason,
         CancellationToken cancellationToken)
     {
+        RuntimeRunContext stoppedSnapshot;
         try
         {
             await _sessionRegistry.StopAllAsync(reason, cancellationToken).ConfigureAwait(false);
@@ -172,9 +182,17 @@ public sealed class RuntimeCoordinator : IRuntimeCoordinator
                     stoppingSnapshot.Experiment,
                     stoppingSnapshot.RunContext);
                 _activeStopTask = null;
+                stoppedSnapshot = _latestSnapshot;
             }
+
+            PublishSnapshotChanged(stoppedSnapshot);
         }
 
-        return LatestSnapshot;
+        return stoppedSnapshot;
+    }
+
+    private void PublishSnapshotChanged(RuntimeRunContext snapshot)
+    {
+        SnapshotChanged?.Invoke(snapshot);
     }
 }

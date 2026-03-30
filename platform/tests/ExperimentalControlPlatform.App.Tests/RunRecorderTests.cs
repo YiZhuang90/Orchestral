@@ -50,6 +50,32 @@ public sealed class RunRecorderTests
     }
 
     [Fact]
+    public void AdHocRunDefinitionFactory_Adds_Primary_Control_Target_When_Target_Value_Is_Provided()
+    {
+        var factory = new AdHocRunDefinitionFactory();
+        var panels = new IDeviceTestPanelViewModel[]
+        {
+            new FakeIntegrationPanel(
+                "Control Center",
+                new IntegrationPanelDataOutput
+                {
+                    DeviceId = "control_center_01",
+                    PayloadType = IntegrationPanelOutputPayloadType.CommandResult.ToString(),
+                    PayloadValue = "PulseCount=42"
+                })
+        };
+
+        var resolved = factory.Create(panels, primaryControlTargetValue: 1600);
+
+        var controlTarget = Assert.Single(resolved.ControlTargets);
+        Assert.Equal("Primary Re Control", controlTarget.Name);
+        Assert.Equal("constant", controlTarget.SetpointProfile);
+        Assert.Equal("closed_loop", controlTarget.RegulationMode);
+        Assert.True(resolved.TryGetParameterValue(new ArtifactId("param.re_target"), out var value));
+        Assert.Equal("1600", value);
+    }
+
+    [Fact]
     public void RunArtifactWriter_Writes_Manifest_And_Panel_Snapshot_Artifacts()
     {
         var rootDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
@@ -126,6 +152,57 @@ public sealed class RunRecorderTests
             Assert.Contains("panelTitle: Integrated Camera", panelYaml);
             Assert.Contains("payloadValue: 640x480", panelYaml);
             Assert.Contains("lastError: Frame buffer overflow", panelYaml);
+        }
+        finally
+        {
+            if (Directory.Exists(rootDirectory))
+            {
+                Directory.Delete(rootDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void RunArtifactWriter_Writes_Monitor_Snapshot_Artifact_And_Includes_Monitor_Warnings()
+    {
+        var rootDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(rootDirectory);
+
+        try
+        {
+            var writer = new RunArtifactWriter(rootDirectory);
+            var runSnapshot = new RuntimeRunContext(
+                Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                RunState.Idle,
+                startedAtUtc: DateTimeOffset.Parse("2026-03-30T14:00:00+02:00"),
+                stoppedAtUtc: DateTimeOffset.Parse("2026-03-30T14:05:00+02:00"),
+                stopReason: StopReason.UserRequested("Operator stopped the run."));
+            var monitorSnapshot = new ExperimentMonitorSnapshot
+            {
+                RunId = runSnapshot.RunId,
+                RunState = RunState.Idle,
+                RunDisplayName = "transition-demo-001",
+                HighestSeverity = ExperimentMonitorSeverity.Warning,
+                WarningCount = 1,
+                Items =
+                [
+                    new ExperimentMonitorItem(
+                        "warn.controller_stale",
+                        ExperimentMonitorSeverity.Warning,
+                        "controller.re_primary",
+                        "Measured value is stale.",
+                        DateTimeOffset.Parse("2026-03-30T14:04:59+02:00"))
+                ]
+            };
+
+            var result = writer.Write(runSnapshot, [], ["Run started.", "Run stopped."], monitorSnapshot);
+
+            Assert.Contains(result.ArtifactPaths.Values, path => path.EndsWith("monitor-snapshot.yaml", StringComparison.OrdinalIgnoreCase));
+
+            var warningsPath = result.ArtifactPaths.Single(entry => entry.Value.EndsWith("warnings-or-faults.yaml", StringComparison.OrdinalIgnoreCase)).Value;
+            var warningsYaml = File.ReadAllText(warningsPath);
+            Assert.Contains("controller.re_primary", warningsYaml);
+            Assert.Contains("Measured value is stale.", warningsYaml);
         }
         finally
         {

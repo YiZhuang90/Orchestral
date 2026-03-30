@@ -2,11 +2,6 @@ using System;
 using System.IO;
 using System.Windows;
 using ExperimentalControlPlatform.App.DevicePanels.ControlCenter;
-using ExperimentalControlPlatform.App.DevicePanels.HyperCam;
-using ExperimentalControlPlatform.App.DevicePanels.Integrated;
-using ExperimentalControlPlatform.App.DevicePanels.HuaTeng;
-using ExperimentalControlPlatform.App.DevicePanels.Microphone;
-using ExperimentalControlPlatform.App.DevicePanels.Pt104;
 using ExperimentalControlPlatform.Devices.Audio;
 using ExperimentalControlPlatform.Devices.ControlCenter;
 using ExperimentalControlPlatform.Devices.Uvc;
@@ -32,7 +27,7 @@ public partial class App : Application
             "Orchestral",
             "runs");
         var runRecorder = new RunRecorder(runArtifactsRoot);
-        _mainViewModel = new MainViewModel(_runtimeCoordinator, new[] { controlCenterPanel }, runRecorder);
+        _mainViewModel = new MainViewModel(_runtimeCoordinator, _sessionRegistry, new[] { controlCenterPanel }, runRecorder);
         var deviceTestWindow = new DeviceTestWindow(_mainViewModel);
 
         MainWindow = deviceTestWindow;

@@ -21,11 +21,14 @@ public sealed class RuntimeCoordinatorTests
     public void Start_TransitionsRuntimeToRunning()
     {
         var coordinator = new RuntimeCoordinator(new FakeRegistry());
+        RuntimeRunContext? changedSnapshot = null;
+        coordinator.SnapshotChanged += snapshot => changedSnapshot = snapshot;
 
         var context = coordinator.Start();
 
         Assert.Equal(RunState.Running, context.State);
         Assert.Equal(RunState.Running, coordinator.LatestSnapshot.State);
+        Assert.Equal(context, changedSnapshot);
     }
 
     [Fact]
@@ -79,6 +82,24 @@ public sealed class RuntimeCoordinatorTests
         Assert.NotNull(stopped.StoppedAtUtc);
         Assert.Equal(reason, stopped.StopReason);
         Assert.Equal(stopped, coordinator.LatestSnapshot);
+    }
+
+    [Fact]
+    public async Task SnapshotChanged_Fires_For_Stopping_And_Stopped_Snapshots()
+    {
+        var registry = new FakeRegistry(blockStopUntilReleased: true);
+        var coordinator = new RuntimeCoordinator(registry);
+        var seenStates = new List<RunState>();
+        coordinator.SnapshotChanged += snapshot => seenStates.Add(snapshot.State);
+        coordinator.Start();
+
+        var stopTask = coordinator.RequestStopAsync(StopReason.UserRequested("Operator stopped the run."));
+        await registry.StopEntered.Task;
+        registry.ReleaseStop();
+        await stopTask;
+
+        Assert.Contains(RunState.Stopping, seenStates);
+        Assert.Contains(RunState.Idle, seenStates);
     }
 
     [Fact]
@@ -261,6 +282,7 @@ public sealed class RuntimeCoordinatorTests
 
     private sealed class FakeRegistry : IDeviceSessionRegistry
     {
+#pragma warning disable CS0067
         private readonly TaskCompletionSource<object?>? _stopRelease;
         private readonly Exception? _stopFailure;
 
@@ -272,6 +294,9 @@ public sealed class RuntimeCoordinatorTests
                 _stopRelease = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
             }
         }
+
+        public event Action? SessionsChanged;
+#pragma warning restore CS0067
 
         public IReadOnlyCollection<IDeviceSession> Sessions => Array.Empty<IDeviceSession>();
 

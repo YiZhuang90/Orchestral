@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using ExperimentalControlPlatform.Core.Artifacts;
@@ -6,6 +7,8 @@ namespace ExperimentalControlPlatform.Runtime;
 
 public interface IRuntimeCoordinator
 {
+    event Action<RuntimeRunContext>? SnapshotChanged;
+
     RuntimeRunContext LatestSnapshot { get; }
 
     RuntimeRunContext Start();

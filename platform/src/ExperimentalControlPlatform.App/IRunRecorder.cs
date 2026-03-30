@@ -8,5 +8,8 @@ public interface IRunRecorder
 {
     void BeginRun(RuntimeRunContext snapshot);
 
-    RunRecordingResult? CompleteRun(RuntimeRunContext snapshot, IReadOnlyList<IDeviceTestPanelViewModel> panels);
+    RunRecordingResult? CompleteRun(
+        RuntimeRunContext snapshot,
+        IReadOnlyList<IDeviceTestPanelViewModel> panels,
+        ExperimentMonitorSnapshot? monitorSnapshot = null);
 }

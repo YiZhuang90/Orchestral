@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -6,6 +7,8 @@ namespace ExperimentalControlPlatform.Runtime;
 
 public interface IDeviceSessionRegistry
 {
+    event Action? SessionsChanged;
+
     IReadOnlyCollection<IDeviceSession> Sessions { get; }
 
     TSession GetOrAdd<TSession>(DeviceSessionId sessionId, Func<TSession> factory)

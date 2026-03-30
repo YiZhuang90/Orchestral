@@ -36,7 +36,8 @@ public sealed class RunArtifactWriter
     public RunRecordingResult Write(
         RuntimeRunContext snapshot,
         IReadOnlyList<IDeviceTestPanelViewModel> panels,
-        IReadOnlyList<string> runtimeEvents)
+        IReadOnlyList<string> runtimeEvents,
+        ExperimentMonitorSnapshot? monitorSnapshot = null)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(panels);
@@ -51,7 +52,14 @@ public sealed class RunArtifactWriter
         Directory.CreateDirectory(panelsDirectoryPath);
 
         var panelSnapshots = CapturePanelSnapshots(panels);
-        var warningsOrFaults = CollectWarnings(snapshot, panelSnapshots);
+        var warningsOrFaults = CollectWarnings(snapshot, panelSnapshots).ToList();
+        if (monitorSnapshot is not null)
+        {
+            warningsOrFaults.AddRange(
+                monitorSnapshot.Items
+                    .Where(static item => item.Severity is ExperimentMonitorSeverity.Warning or ExperimentMonitorSeverity.Alarm)
+                    .Select(static item => $"{item.Source}: {item.Message}"));
+        }
         var runKey = snapshot.RunId.ToString("N")[..8];
         var artifactPaths = new Dictionary<ArtifactId, string>();
         var outputArtifactIds = new List<ArtifactId>();
@@ -86,6 +94,52 @@ public sealed class RunArtifactWriter
             });
         artifactPaths[warningsId] = warningsPath;
         outputArtifactIds.Add(warningsId);
+
+        if (monitorSnapshot is not null)
+        {
+            var monitorSnapshotId = new ArtifactId($"artifact.monitor_snapshot.{runKey}");
+            var monitorSnapshotPath = Path.Combine(runDirectoryPath, "monitor-snapshot.yaml");
+            WriteYaml(
+                monitorSnapshotPath,
+                new Dictionary<string, object?>
+                {
+                    ["kind"] = "monitor_snapshot",
+                    ["runId"] = snapshot.RunId.ToString(),
+                    ["runState"] = monitorSnapshot.RunState.ToString(),
+                    ["runDisplayName"] = monitorSnapshot.RunDisplayName,
+                    ["stateSummary"] = monitorSnapshot.StateSummary,
+                    ["highestSeverity"] = monitorSnapshot.HighestSeverity.ToString(),
+                    ["warningCount"] = monitorSnapshot.WarningCount,
+                    ["alarmCount"] = monitorSnapshot.AlarmCount,
+                    ["primaryControlSummary"] = monitorSnapshot.PrimaryControlSummary,
+                    ["items"] = monitorSnapshot.Items.Select(
+                        static item => new Dictionary<string, object?>
+                        {
+                            ["id"] = item.Id,
+                            ["severity"] = item.Severity.ToString(),
+                            ["source"] = item.Source,
+                            ["message"] = item.Message,
+                            ["observedAt"] = item.ObservedAtUtc.ToString("O")
+                        }).ToArray(),
+                    ["devices"] = monitorSnapshot.Devices.Select(
+                        static device => new Dictionary<string, object?>
+                        {
+                            ["sourceId"] = device.SourceId,
+                            ["displayName"] = device.DisplayName,
+                            ["deviceId"] = device.DeviceId,
+                            ["sessionFamily"] = device.SessionFamily,
+                            ["connected"] = device.Connected,
+                            ["busy"] = device.Busy,
+                            ["liveActive"] = device.LiveActive,
+                            ["isCriticalControl"] = device.IsCriticalControl,
+                            ["statusMessage"] = device.StatusMessage,
+                            ["lastError"] = device.LastError,
+                            ["lastObservedAt"] = FormatTimestamp(device.LastObservedAtUtc)
+                        }).ToArray()
+                });
+            artifactPaths[monitorSnapshotId] = monitorSnapshotPath;
+            outputArtifactIds.Add(monitorSnapshotId);
+        }
 
         var usedPanelSlugs = new HashSet<string>(StringComparer.Ordinal);
         foreach (var panelSnapshot in panelSnapshots)
