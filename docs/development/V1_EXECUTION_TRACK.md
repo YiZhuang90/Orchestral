@@ -36,7 +36,11 @@ Status:
 - high-rate stream buffering and delivery policy now exists for runtime stream ports and the highest-pressure UI consumers,
 - run context and metadata now exist as a first-class experiment-plane unit,
 - run recorder and artifact writer now exist as a first-generation manifest/panel-artifact persistence layer,
-- next universal slice is run monitor and alarm surface.
+- controller-unit session semantics and first implementation now exist for experiment-level control targets,
+- next universal slice is run monitor and alarm surface, implemented as:
+  - a background `ExperimentMonitorSession`,
+  - an experiment monitor panel/client surface,
+  - and a display-only live-view path with explicit decimation choices.
 
 Required foundations:
 
@@ -52,6 +56,7 @@ Active slice plans:
 - [2026-03-30-high-rate-stream-buffering-and-delivery-policy-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-30-high-rate-stream-buffering-and-delivery-policy-plan.md)
 - [2026-03-30-run-context-and-metadata-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-30-run-context-and-metadata-plan.md)
 - [2026-03-30-run-recorder-and-artifact-writer-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-30-run-recorder-and-artifact-writer-plan.md)
+- [2026-03-30-controller-unit-session-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-30-controller-unit-session-plan.md)
 
 ### 2. First Reference Experiment
 
@@ -59,7 +64,7 @@ Status:
 
 - partially unblocked,
 - still waiting on:
-  - run monitor/alarm surface,
+  - run monitor/alarm surface with background monitor session and experiment monitor panel,
   - experiment-specific controller sessions as required by the chosen reference experiment.
 
 ### 3. AI Brain Integration

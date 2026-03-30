@@ -116,6 +116,8 @@ The current branch also already reflects these architectural consequences:
 - high-rate stream ports now support buffered consumer subscriptions with explicit delivery policy instead of only raw synchronous event fan-out,
 - run-context metadata now exists as a first-class experiment-plane artifact through `RunContextDefinition`,
 - coordinator snapshots can now carry stable run-intent metadata and artifact references separately from the ephemeral runtime `RunId`,
+- experiment definitions now carry first-generation `ControlTargetDefinition` artifacts with constant or scheduled setpoint profiles and open-loop or closed-loop regulation modes,
+- `ControllerUnitSession` now exists as the first experiment-plane runtime unit above controlled-device sessions,
 - controlled-device sessions can define device-level `EmergencyStop`,
 - acquisition-style panels can expose a small operator-facing output-settings surface,
 - and `ApplyAndExit` is treated as a session-lifecycle action rather than only a UI close action.
@@ -131,6 +133,11 @@ The current coordinator status is still only foundational:
   - runtime events
   - warnings/faults
   - panel snapshot artifacts,
+- the first-generation `ControllerUnitSession` can now:
+  - resolve one control target from the experiment package,
+  - evaluate constant and scheduled target values,
+  - publish `Target +/- Error` state,
+  - and emit normalized control decisions above device sessions,
 - but it is not yet the full experiment-level orchestration layer for multiple active sessions.
 
 ## How
@@ -248,6 +255,99 @@ Default first-generation rules:
 - connect and disconnect within one panel lifetime normally reuse the same session object
 - a new session is created only when the host intentionally starts a new device-session lifetime
 - controlled-device sessions should define an explicit device-level safe-stop path when the hardware can cause unsafe real-world state
+
+### How experiment monitor and controller units should work
+
+The experiment plane needs its own runtime-owned units above individual device sessions.
+
+The first two planned units are:
+
+- `ExperimentMonitorSession`
+- `ControllerUnitSession`
+
+`ExperimentMonitorSession` should be a background runtime consumer that becomes active once the experiment is initialized.
+
+Responsibilities:
+
+- subscribe to coordinator state, device-session outputs, and derived experiment streams through the runtime bus,
+- evaluate warnings, alarms, stale-stream conditions, and run-level health,
+- produce monitor snapshots and monitor events for the UI and recorder,
+- and never read raw device APIs directly.
+
+The monitor must consume runtime streams or snapshots, not scrape panels and not attach itself to vendor SDK callbacks.
+
+The experiment monitor UI should be a client of that background session, not a second runtime owner.
+
+The recommended panel shape is:
+
+- a left-side experiment control section for:
+  - run index,
+  - initialize,
+  - start,
+  - stop,
+- a main live-information section fed by monitor outputs,
+- and a bottom status bar for run-level summary and stop/alarm state.
+
+The experiment monitor panel should use the same general panel visual language as device panels, but it is an experiment-plane client rather than a device session owner.
+
+Display decimation should be explicit and UI-only.
+
+Recommended first-generation display-rate choices:
+
+- `5 fps`
+- `10 fps`
+- `15 fps`
+- `20 fps`
+- `25 fps`
+- `30 fps`
+
+This display-rate control must only affect panel rendering.
+It must not affect:
+
+- acquisition,
+- detection,
+- recorder fidelity,
+- or alarm evaluation.
+
+`ControllerUnitSession` should be an experiment-plane runtime unit above device sessions.
+
+Its job is to:
+
+- consume measured streams from the runtime bus,
+- compute the desired control output,
+- and send commands to one or more controlled-device sessions.
+
+If a derived experiment value should drive control, it must first be materialized as a named runtime stream. The controller unit should not target monitor identities directly.
+
+This unit should not be treated as the same thing as a serial device session.
+For example, `ControlCenterSession` is a controlled-device session, but it is not yet the experiment-plane controller unit.
+
+Control strategy should be chosen during experiment building, not ad hoc during initialize-time panel interaction.
+The runtime should execute the already-resolved control strategy from the experiment definition.
+
+The controller model should separate two axes:
+
+- `SetpointProfile`
+  - `Constant`
+  - `Scheduled`
+- `RegulationMode`
+  - `OpenLoop`
+  - `ClosedLoop`
+
+This avoids conflating:
+
+- a constant target with an open-loop command,
+- or a scheduled target with feedback behavior.
+
+The data model should allow multiple control targets, but the first-generation monitor and panel should emphasize one primary target clearly.
+
+For the primary controlled variable, the monitor should present the live control state in `Target +/- Error` form.
+
+Example:
+
+- `Re 1600 +/- 12`
+
+That display should come from controller/monitor outputs, not from recomputing values inside the panel.
 
 ## What
 
@@ -624,4 +724,5 @@ This architecture is successful when:
 - downstream modules can consume device outputs directly,
 - commands can be issued without UI scraping,
 - acquisition and control are both modeled truthfully,
+- experiment-plane monitor and controller units can consume runtime outputs without touching raw device APIs,
 - and a new device can plug into the runtime layer using the same conceptual model.
