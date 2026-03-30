@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using ExperimentalControlPlatform.Core.Artifacts;
 
 namespace ExperimentalControlPlatform.Runtime;
 
@@ -29,6 +30,17 @@ public sealed class RuntimeCoordinator : IRuntimeCoordinator
 
     public RuntimeRunContext Start()
     {
+        return StartCore(null);
+    }
+
+    public RuntimeRunContext Start(ResolvedExperimentDefinition experiment)
+    {
+        ArgumentNullException.ThrowIfNull(experiment);
+        return StartCore(experiment);
+    }
+
+    private RuntimeRunContext StartCore(ResolvedExperimentDefinition? experiment)
+    {
         lock (_syncRoot)
         {
             if (IsActive(_latestSnapshot.State))
@@ -42,7 +54,8 @@ public sealed class RuntimeCoordinator : IRuntimeCoordinator
             _latestSnapshot = new RuntimeRunContext(
                 runId,
                 RunState.Running,
-                startedAtUtc: startedAtUtc);
+                startedAtUtc: startedAtUtc,
+                experiment: experiment);
 
             return _latestSnapshot;
         }
@@ -119,7 +132,8 @@ public sealed class RuntimeCoordinator : IRuntimeCoordinator
                 RunState.Stopping,
                 _latestSnapshot.StartedAtUtc,
                 stoppedAtUtc: null,
-                reason);
+                reason,
+                _latestSnapshot.Experiment);
             stoppingSnapshot = _latestSnapshot;
             _activeStopTask = StopCoreAsync(stoppingSnapshot, reason, cancellationToken);
             return _activeStopTask;
@@ -146,7 +160,8 @@ public sealed class RuntimeCoordinator : IRuntimeCoordinator
                     RunState.Idle,
                     stoppingSnapshot.StartedAtUtc,
                     stoppedAtUtc,
-                    reason);
+                    reason,
+                    stoppingSnapshot.Experiment);
                 _activeStopTask = null;
             }
         }

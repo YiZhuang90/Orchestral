@@ -50,6 +50,7 @@ public sealed class ArtifactBoundaryValidationTests
                 "1.0.0",
                 new Dictionary<ArtifactId, ArtifactId> { [default] = new ArtifactId("device.camera_01") },
                 new Dictionary<ArtifactId, ArtifactId> { [new ArtifactId("role.upstream_camera")] = new ArtifactId("protocol.sdk_camera_v1") },
+                new Dictionary<ArtifactId, IReadOnlyDictionary<ArtifactId, string>>(),
                 new Dictionary<ArtifactId, string>(),
                 DateTimeOffset.Parse("2026-03-19T12:00:00+01:00"),
                 null,
@@ -66,6 +67,7 @@ public sealed class ArtifactBoundaryValidationTests
                 "1.0.0",
                 new Dictionary<ArtifactId, ArtifactId> { [new ArtifactId("role.upstream_camera")] = default },
                 new Dictionary<ArtifactId, ArtifactId> { [new ArtifactId("role.upstream_camera")] = new ArtifactId("protocol.sdk_camera_v1") },
+                new Dictionary<ArtifactId, IReadOnlyDictionary<ArtifactId, string>>(),
                 new Dictionary<ArtifactId, string>(),
                 DateTimeOffset.Parse("2026-03-19T12:00:00+01:00"),
                 null,
@@ -82,6 +84,7 @@ public sealed class ArtifactBoundaryValidationTests
                 "1.0.0",
                 new Dictionary<ArtifactId, ArtifactId>(),
                 new Dictionary<ArtifactId, ArtifactId> { [new ArtifactId("role.upstream_camera")] = default },
+                new Dictionary<ArtifactId, IReadOnlyDictionary<ArtifactId, string>>(),
                 new Dictionary<ArtifactId, string>(),
                 DateTimeOffset.Parse("2026-03-19T12:00:00+01:00"),
                 null,
@@ -98,6 +101,7 @@ public sealed class ArtifactBoundaryValidationTests
                 "1.0.0",
                 new Dictionary<ArtifactId, ArtifactId>(),
                 new Dictionary<ArtifactId, ArtifactId>(),
+                new Dictionary<ArtifactId, IReadOnlyDictionary<ArtifactId, string>>(),
                 new Dictionary<ArtifactId, string>(),
                 DateTimeOffset.Parse("2026-03-19T12:00:00+01:00"),
                 null,
@@ -114,7 +118,51 @@ public sealed class ArtifactBoundaryValidationTests
                 "1.0.0",
                 new Dictionary<ArtifactId, ArtifactId>(),
                 new Dictionary<ArtifactId, ArtifactId>(),
+                new Dictionary<ArtifactId, IReadOnlyDictionary<ArtifactId, string>>(),
                 new Dictionary<ArtifactId, string> { [default] = "50" },
+                DateTimeOffset.Parse("2026-03-19T12:00:00+01:00"),
+                null,
+                null,
+                null,
+                [],
+                [],
+                []));
+
+        Assert.Throws<ArgumentException>(() =>
+            new RunManifestDefinition(
+                new ArtifactId("manifest.run_001"),
+                new ArtifactId("exp.turbulence_transition_v1"),
+                "1.0.0",
+                new Dictionary<ArtifactId, ArtifactId>(),
+                new Dictionary<ArtifactId, ArtifactId>(),
+                new Dictionary<ArtifactId, IReadOnlyDictionary<ArtifactId, string>>
+                {
+                    [default] = new Dictionary<ArtifactId, string>()
+                },
+                new Dictionary<ArtifactId, string>(),
+                DateTimeOffset.Parse("2026-03-19T12:00:00+01:00"),
+                null,
+                null,
+                null,
+                [],
+                [],
+                []));
+
+        Assert.Throws<ArgumentException>(() =>
+            new RunManifestDefinition(
+                new ArtifactId("manifest.run_001"),
+                new ArtifactId("exp.turbulence_transition_v1"),
+                "1.0.0",
+                new Dictionary<ArtifactId, ArtifactId>(),
+                new Dictionary<ArtifactId, ArtifactId>(),
+                new Dictionary<ArtifactId, IReadOnlyDictionary<ArtifactId, string>>
+                {
+                    [new ArtifactId("role.upstream_camera")] = new Dictionary<ArtifactId, string>
+                    {
+                        [default] = "0.35"
+                    }
+                },
+                new Dictionary<ArtifactId, string>(),
                 DateTimeOffset.Parse("2026-03-19T12:00:00+01:00"),
                 null,
                 null,
