@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using ExperimentalControlPlatform.Devices.Audio;
 
 namespace ExperimentalControlPlatform.Runtime;
@@ -6,14 +7,20 @@ namespace ExperimentalControlPlatform.Runtime;
 public sealed class MicrophoneFrameJournal : IDisposable
 {
     private readonly object _syncRoot = new();
-    private readonly IStreamOutputPort<MicrophoneFrame> _frames;
+    private readonly IStreamDeliverySubscription _subscription;
     private MicrophoneFrame? _lastFrame;
     private long _frameCount;
 
     public MicrophoneFrameJournal(IStreamOutputPort<MicrophoneFrame> frames)
     {
-        _frames = frames ?? throw new ArgumentNullException(nameof(frames));
-        _frames.Produced += OnProduced;
+        ArgumentNullException.ThrowIfNull(frames);
+        _subscription = frames.Subscribe(
+            StreamDeliveryPolicy.Ordered(),
+            frame =>
+            {
+                OnProduced(frame);
+                return ValueTask.CompletedTask;
+            });
     }
 
     public long FrameCount
@@ -40,7 +47,7 @@ public sealed class MicrophoneFrameJournal : IDisposable
 
     public void Dispose()
     {
-        _frames.Produced -= OnProduced;
+        _subscription.Dispose();
     }
 
     private void OnProduced(MicrophoneFrame frame)

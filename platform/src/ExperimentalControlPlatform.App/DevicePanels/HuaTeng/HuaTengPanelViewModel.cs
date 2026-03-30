@@ -20,7 +20,7 @@ namespace ExperimentalControlPlatform.App.DevicePanels.HuaTeng;
 
 public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewModel, IOutputSettingsPanelViewModel, IPanelCloseViewModel
 {
-    private const double MaxDisplayFps = 20.0;
+    private const double MaxBufferedPreviewFps = 20.0;
     private static readonly IReadOnlyList<IntegrationPanelLifecycleAction> ConnectedLifecycleActions =
     [
         IntegrationPanelLifecycleAction.Apply,
@@ -31,6 +31,7 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
     private readonly AsyncRelayCommand _lifecycleActionCommand;
     private readonly IntegrationPanelOutputPublisher _outputPublisher = new();
     private HuaTengCameraSession? _session;
+    private IStreamDeliverySubscription? _frameSubscription;
     private bool _isBusy;
     private bool _isConnecting;
     private bool _isConnected;
@@ -64,7 +65,6 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
     private List<string> _latestDiagnostics = ["No diagnostics collected yet."];
     private long? _lastFrameTimestamp;
     private int? _lastCaptureTimestampTenths;
-    private long? _lastDisplayTimestamp;
     private double? _smoothedFrameRate;
     private int _currentFrameWidth;
     private int _currentFrameHeight;
@@ -772,7 +772,6 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
         _isRoiEditMode = false;
         _lastFrameTimestamp = null;
         _lastCaptureTimestampTenths = null;
-        _lastDisplayTimestamp = null;
         _smoothedFrameRate = null;
         FrameRateText = "--";
         OnPropertyChanged(nameof(RoiHandleVisibility));
@@ -974,7 +973,15 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
         session.Diagnostics.Changed += OnSessionDiagnosticsChanged;
         session.AppliedSettings.Changed += OnSessionAppliedSettingsChanged;
         session.SessionEnd.Changed += OnSessionEndChanged;
-        session.LatestFrame.Changed += OnSessionFrameChanged;
+        _frameSubscription = session.Frames.Subscribe(
+            StreamDeliveryPolicy.LatestOnly(maxDeliveryRateHz: MaxBufferedPreviewFps),
+            frame => new ValueTask(RunOnUiAsync(() =>
+            {
+                if (ReferenceEquals(_session, session))
+                {
+                    ApplySessionFrame(frame);
+                }
+            })));
 
         ApplySessionState(session.State.Current!);
         ApplySessionDiagnostics(session.Diagnostics.Current!);
@@ -997,7 +1004,8 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
         _session.Diagnostics.Changed -= OnSessionDiagnosticsChanged;
         _session.AppliedSettings.Changed -= OnSessionAppliedSettingsChanged;
         _session.SessionEnd.Changed -= OnSessionEndChanged;
-        _session.LatestFrame.Changed -= OnSessionFrameChanged;
+        _frameSubscription?.Dispose();
+        _frameSubscription = null;
         _session = null;
     }
 
@@ -1005,14 +1013,6 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
     private void OnSessionDiagnosticsChanged(DeviceDiagnosticsSnapshot snapshot) => _ = RunOnUiAsync(() => ApplySessionDiagnostics(snapshot));
     private void OnSessionAppliedSettingsChanged(HuaTengCaptureSettings? settings) => _ = RunOnUiAsync(() => ApplySessionAppliedSettings(settings));
     private void OnSessionEndChanged(DeviceSessionEndSnapshot? snapshot) => _ = RunOnUiAsync(() => ApplySessionEnd(snapshot));
-    private void OnSessionFrameChanged(HuaTengFrame? frame)
-    {
-        if (frame is not null)
-        {
-            _ = RunOnUiAsync(() => ApplySessionFrame(frame));
-        }
-    }
-
     private bool HasPendingSettings()
     {
         return !string.Equals(_selectedPixelFormat, _draftSelectedPixelFormat, StringComparison.OrdinalIgnoreCase)
@@ -1323,13 +1323,7 @@ public sealed class HuaTengPanelViewModel : ObservableObject, ICameraPanelViewMo
                 UpdateNormalizedRoiFromAppliedPixels();
             }
 
-            var nowTicks = Stopwatch.GetTimestamp();
-            var displayIntervalTicks = (long)(Stopwatch.Frequency / MaxDisplayFps);
-            if (!_lastDisplayTimestamp.HasValue || (nowTicks - _lastDisplayTimestamp.Value) >= displayIntervalTicks)
-            {
-                PreviewImage = LoadImage(result);
-                _lastDisplayTimestamp = nowTicks;
-            }
+            PreviewImage = LoadImage(result);
 
             OnPropertyChanged(nameof(CanSetRoi));
             UpdateRoiSummary();

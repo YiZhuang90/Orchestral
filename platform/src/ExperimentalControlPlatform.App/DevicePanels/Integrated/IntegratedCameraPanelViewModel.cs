@@ -21,7 +21,7 @@ namespace ExperimentalControlPlatform.App.DevicePanels.Integrated;
 
 public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPanelViewModel, IOutputSettingsPanelViewModel, IPanelCloseViewModel
 {
-    private const double MaxDisplayFps = 20.0;
+    private const double MaxBufferedPreviewFps = 20.0;
     private static readonly IReadOnlyList<IntegrationPanelLifecycleAction> ConnectedLifecycleActions =
     [
         IntegrationPanelLifecycleAction.Apply,
@@ -32,6 +32,7 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
     private readonly AsyncRelayCommand _lifecycleActionCommand;
     private readonly IntegrationPanelOutputPublisher _outputPublisher = new();
     private IntegratedCameraSession? _session;
+    private IStreamDeliverySubscription? _frameSubscription;
     private bool _isBusy;
     private bool _isConnected;
     private bool _isLivePreviewing;
@@ -55,7 +56,6 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
     private string _statusMessage = "Ready to discover camera";
     private List<string> _latestDiagnostics = ["No diagnostics collected yet."];
     private long? _lastFrameTimestamp;
-    private long? _lastDisplayTimestamp;
     private double? _smoothedFrameRate;
     private IntegrationPanelDataOutput? _dataOutput;
     private IntegrationPanelAppliedSettingsOutput? _appliedSettingsOutput;
@@ -898,7 +898,15 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
         session.Diagnostics.Changed += OnSessionDiagnosticsChanged;
         session.AppliedSettings.Changed += OnSessionAppliedSettingsChanged;
         session.SessionEnd.Changed += OnSessionEndChanged;
-        session.LatestFrame.Changed += OnSessionFrameChanged;
+        _frameSubscription = session.Frames.Subscribe(
+            StreamDeliveryPolicy.LatestOnly(maxDeliveryRateHz: MaxBufferedPreviewFps),
+            frame => new ValueTask(RunOnUiAsync(() =>
+            {
+                if (ReferenceEquals(_session, session))
+                {
+                    ApplySessionFrame(frame);
+                }
+            })));
 
         ApplySessionState(session.State.Current!);
         ApplySessionDiagnostics(session.Diagnostics.Current!);
@@ -921,7 +929,8 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
         _session.Diagnostics.Changed -= OnSessionDiagnosticsChanged;
         _session.AppliedSettings.Changed -= OnSessionAppliedSettingsChanged;
         _session.SessionEnd.Changed -= OnSessionEndChanged;
-        _session.LatestFrame.Changed -= OnSessionFrameChanged;
+        _frameSubscription?.Dispose();
+        _frameSubscription = null;
         _session = null;
     }
 
@@ -929,14 +938,6 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
     private void OnSessionDiagnosticsChanged(DeviceDiagnosticsSnapshot snapshot) => _ = RunOnUiAsync(() => ApplySessionDiagnostics(snapshot));
     private void OnSessionAppliedSettingsChanged(IntegratedCameraCaptureSettings? settings) => _ = RunOnUiAsync(() => ApplySessionAppliedSettings(settings));
     private void OnSessionEndChanged(DeviceSessionEndSnapshot? snapshot) => _ = RunOnUiAsync(() => ApplySessionEnd(snapshot));
-    private void OnSessionFrameChanged(IntegratedCameraFrame? frame)
-    {
-        if (frame is not null)
-        {
-            _ = RunOnUiAsync(() => ApplySessionFrame(frame));
-        }
-    }
-
     private void ApplySessionState(IntegratedCameraSessionState state)
     {
         _isBusy = state.Busy;
@@ -1008,18 +1009,6 @@ public sealed class IntegratedCameraPanelViewModel : ObservableObject, ICameraPa
 
     private void ApplySessionFrame(IntegratedCameraFrame frame)
     {
-        var nowTicks = Stopwatch.GetTimestamp();
-        if ((_lastSourceMode ?? "session") == "live" && _lastDisplayTimestamp.HasValue)
-        {
-            var minTicks = Stopwatch.Frequency / MaxDisplayFps;
-            if (nowTicks - _lastDisplayTimestamp.Value < minTicks)
-            {
-                UpdateMeasuredFrameRate(frame.TimestampTicks);
-                return;
-            }
-        }
-
-        _lastDisplayTimestamp = nowTicks;
         UpdateMeasuredFrameRate(frame.TimestampTicks);
         ApplyFrame(frame);
         RefreshAppliedSettingsOutput();

@@ -33,7 +33,8 @@ Status:
 - session-local validation exists,
 - runtime coordinator and stop authority exist,
 - experiment definition and role binding now exist as a validated artifact/runtime boundary,
-- next slice is high-rate stream buffering and delivery policy.
+- high-rate stream buffering and delivery policy now exists for runtime stream ports and the highest-pressure UI consumers,
+- next slice is end-height controller session.
 
 Required foundations:
 
@@ -46,6 +47,7 @@ Active slice plans:
 - [2026-03-28-session-local-validation-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-28-session-local-validation-plan.md)
 - [2026-03-28-runtime-coordinator-and-stop-authority-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-28-runtime-coordinator-and-stop-authority-plan.md)
 - [2026-03-30-experiment-definition-and-role-binding-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-30-experiment-definition-and-role-binding-plan.md)
+- [2026-03-30-high-rate-stream-buffering-and-delivery-policy-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-30-high-rate-stream-buffering-and-delivery-policy-plan.md)
 
 ### 2. First Reference Experiment
 
@@ -53,7 +55,6 @@ Status:
 
 - partially unblocked,
 - still waiting on:
-  - high-rate stream buffering policy,
   - end-height controller session,
   - run recorder/artifact writer.
 
