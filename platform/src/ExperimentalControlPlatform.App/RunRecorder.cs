@@ -36,7 +36,10 @@ public sealed class RunRecorder : IRunRecorder
         }
     }
 
-    public RunRecordingResult? CompleteRun(RuntimeRunContext snapshot, IReadOnlyList<IDeviceTestPanelViewModel> panels)
+    public RunRecordingResult? CompleteRun(
+        RuntimeRunContext snapshot,
+        IReadOnlyList<IDeviceTestPanelViewModel> panels,
+        ExperimentMonitorSnapshot? monitorSnapshot = null)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(panels);
@@ -53,7 +56,7 @@ public sealed class RunRecorder : IRunRecorder
             _runtimeEvents = [];
         }
 
-        return _writer.Write(snapshot, panels, runtimeEvents);
+        return _writer.Write(snapshot, panels, runtimeEvents, monitorSnapshot);
     }
 
     private static string BuildStartedEvent(RuntimeRunContext snapshot)

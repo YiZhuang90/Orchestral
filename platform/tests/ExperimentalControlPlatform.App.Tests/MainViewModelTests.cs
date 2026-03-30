@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using ExperimentalControlPlatform.App.DevicePanels;
 using ExperimentalControlPlatform.App.DevicePanels.Contracts;
+using ExperimentalControlPlatform.App.ExperimentMonitor;
 using ExperimentalControlPlatform.Runtime;
 
 namespace ExperimentalControlPlatform.App.Tests;
@@ -43,7 +44,9 @@ public sealed class MainViewModelTests
                 });
             var coordinator = new RuntimeCoordinator(new FakeRegistry());
             var recorder = new RunRecorder(rootDirectory);
-            using var viewModel = new MainViewModel(coordinator, new[] { panel }, recorder);
+            using var viewModel = new MainViewModel(coordinator, new FakeRegistry(), new[] { panel }, recorder);
+
+            Assert.IsType<ExperimentMonitorPanelViewModel>(viewModel.CurrentDevicePanel);
 
             viewModel.StartRuntime();
             await viewModel.StopRuntimeAsync();
@@ -79,7 +82,7 @@ public sealed class MainViewModelTests
                 });
             var coordinator = new RuntimeCoordinator(new FakeRegistry());
             var recorder = new RunRecorder(rootDirectory);
-            using var viewModel = new MainViewModel(coordinator, new[] { panel }, recorder);
+            using var viewModel = new MainViewModel(coordinator, new FakeRegistry(), new[] { panel }, recorder);
 
             viewModel.StartRuntime();
             await coordinator.EnsureStoppedAsync(StopReason.UserRequested("Application shutdown."));
@@ -99,6 +102,10 @@ public sealed class MainViewModelTests
 
     private sealed class FakeRegistry : IDeviceSessionRegistry
     {
+#pragma warning disable CS0067
+        public event Action? SessionsChanged;
+#pragma warning restore CS0067
+
         public IReadOnlyCollection<IDeviceSession> Sessions => Array.Empty<IDeviceSession>();
 
         public TSession GetOrAdd<TSession>(DeviceSessionId sessionId, Func<TSession> factory)

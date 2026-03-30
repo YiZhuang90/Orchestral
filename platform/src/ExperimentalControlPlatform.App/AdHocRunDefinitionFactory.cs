@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using ExperimentalControlPlatform.App.DevicePanels;
 using ExperimentalControlPlatform.App.DevicePanels.Contracts;
@@ -10,6 +11,11 @@ namespace ExperimentalControlPlatform.App;
 public sealed class AdHocRunDefinitionFactory
 {
     public ResolvedExperimentDefinition Create(IEnumerable<IDeviceTestPanelViewModel> panels)
+    {
+        return Create(panels, primaryControlTargetValue: null);
+    }
+
+    public ResolvedExperimentDefinition Create(IEnumerable<IDeviceTestPanelViewModel> panels, double? primaryControlTargetValue)
     {
         ArgumentNullException.ThrowIfNull(panels);
 
@@ -29,24 +35,61 @@ public sealed class AdHocRunDefinitionFactory
             ];
         }
 
+        var parameters = new List<ParameterDefinition>();
+        var streams = new List<StreamDefinition>();
+        var controlTargets = new List<ControlTargetDefinition>();
+        var parameterValues = new Dictionary<ArtifactId, string>();
+
+        var controlCenterRole = panelEntries
+            .Select(static entry => entry.Role)
+            .FirstOrDefault(static role => role.Id == new ArtifactId("role.control_center"));
+        if (primaryControlTargetValue.HasValue && controlCenterRole is not null)
+        {
+            var targetParameterId = new ArtifactId("param.re_target");
+            var measuredSourceId = new ArtifactId("stream.reynolds_number");
+            parameters.Add(new ParameterDefinition(
+                targetParameterId,
+                "Re Target",
+                "float",
+                "experiment",
+                unit: "dimensionless"));
+            streams.Add(new StreamDefinition(
+                measuredSourceId,
+                "Reynolds Number",
+                "transform",
+                "scalar<double>",
+                "runtime"));
+            controlTargets.Add(new ControlTargetDefinition(
+                new ArtifactId("control.re_primary"),
+                "Primary Re Control",
+                "Maintains a primary Reynolds-number target for ad hoc runtime experiments.",
+                measuredSourceId,
+                controlCenterRole.Id,
+                "constant",
+                "closed_loop",
+                targetParameterId: targetParameterId));
+            parameterValues[targetParameterId] = primaryControlTargetValue.Value.ToString("0.###", CultureInfo.InvariantCulture);
+        }
+
         var experiment = new ExperimentDefinition(
             new ArtifactId("exp.ad_hoc_runtime_run"),
             "Ad Hoc Runtime Run",
             "Fallback experiment package synthesized from active integration panels when no authored experiment package is attached to the runtime shell.",
             panelEntries.Select(static entry => entry.Role).ToArray(),
+            parameters,
+            streams,
             [],
             [],
             [],
             [],
-            [],
-            []);
+            controlTargets);
 
         return new ResolvedExperimentDefinition(
             experiment,
             "ad-hoc.v1",
             panelEntries.Select(static entry => entry.Device).ToArray(),
             panelEntries.Select(static entry => entry.Binding).ToArray(),
-            new Dictionary<ArtifactId, string>());
+            parameterValues);
     }
 
     private static PanelEntry BuildPanelEntry(

@@ -4,6 +4,7 @@
              xmlns:audio="clr-namespace:ExperimentalControlPlatform.App.DevicePanels.Audio"
              xmlns:camera="clr-namespace:ExperimentalControlPlatform.App.DevicePanels.Camera"
              xmlns:controlCenter="clr-namespace:ExperimentalControlPlatform.App.DevicePanels.ControlCenter"
+             xmlns:experimentMonitor="clr-namespace:ExperimentalControlPlatform.App.ExperimentMonitor"
              xmlns:hypercam="clr-namespace:ExperimentalControlPlatform.App.DevicePanels.HyperCam"
              xmlns:integrated="clr-namespace:ExperimentalControlPlatform.App.DevicePanels.Integrated"
              xmlns:huateng="clr-namespace:ExperimentalControlPlatform.App.DevicePanels.HuaTeng"
@@ -41,6 +42,10 @@
 
       <DataTemplate DataType="{x:Type controlCenter:ControlCenterPanelViewModel}">
         <controlCenter:ControlCenterPanelTemplate />
+      </DataTemplate>
+
+      <DataTemplate DataType="{x:Type experimentMonitor:ExperimentMonitorPanelViewModel}">
+        <experimentMonitor:ExperimentMonitorPanelTemplate />
       </DataTemplate>
     </ResourceDictionary>
   </Application.Resources>

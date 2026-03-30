@@ -132,12 +132,18 @@ The current coordinator status is still only foundational:
   - `manifest.yaml`
   - runtime events
   - warnings/faults
-  - panel snapshot artifacts,
+  - panel snapshot artifacts
+  - monitor snapshot artifacts,
 - the first-generation `ControllerUnitSession` can now:
   - resolve one control target from the experiment package,
   - evaluate constant and scheduled target values,
   - publish `Target +/- Error` state,
   - and emit normalized control decisions above device sessions,
+- the first-generation `ExperimentMonitorSession` can now:
+  - consume coordinator state and runtime-session snapshots through the runtime layer,
+  - normalize device health into monitor snapshots,
+  - surface first warning/alarm items,
+  - and feed those outputs to both the experiment monitor panel and run artifacts,
 - but it is not yet the full experiment-level orchestration layer for multiple active sessions.
 
 ## How
@@ -258,41 +264,44 @@ Default first-generation rules:
 
 ### How experiment monitor and controller units should work
 
-The experiment plane needs its own runtime-owned units above individual device sessions.
-
-The first two planned units are:
+The experiment plane now has two real runtime-owned units above individual device sessions:
 
 - `ExperimentMonitorSession`
 - `ControllerUnitSession`
 
-`ExperimentMonitorSession` should be a background runtime consumer that becomes active once the experiment is initialized.
+`ExperimentMonitorSession` is now the background runtime consumer for the first-generation experiment monitor surface.
 
-Responsibilities:
+Current responsibilities:
 
-- subscribe to coordinator state, device-session outputs, and derived experiment streams through the runtime bus,
-- evaluate warnings, alarms, stale-stream conditions, and run-level health,
-- produce monitor snapshots and monitor events for the UI and recorder,
-- and never read raw device APIs directly.
+- subscribe to coordinator state and session-registry changes,
+- normalize known runtime-session state into monitor device snapshots,
+- classify first warning/alarm items such as:
+  - disconnected critical control devices,
+  - device diagnostics errors,
+  - stale controller measurements,
+- produce monitor snapshots for the experiment monitor panel,
+- and emit monitor truth for run recording.
 
-The monitor must consume runtime streams or snapshots, not scrape panels and not attach itself to vendor SDK callbacks.
+This unit still follows the core rule:
 
-The experiment monitor UI should be a client of that background session, not a second runtime owner.
+- consume runtime streams or snapshots,
+- never read raw device APIs directly,
+- and never become a second UI-owned runtime.
 
-The recommended panel shape is:
+The experiment monitor UI is now a client of that background session, not a second runtime owner.
+
+The current first-generation panel shape is:
 
 - a left-side experiment control section for:
   - run index,
+  - primary target,
   - initialize,
   - start,
   - stop,
 - a main live-information section fed by monitor outputs,
-- and a bottom status bar for run-level summary and stop/alarm state.
+- and a bottom status bar for run-level health and state summary.
 
-The experiment monitor panel should use the same general panel visual language as device panels, but it is an experiment-plane client rather than a device session owner.
-
-Display decimation should be explicit and UI-only.
-
-Recommended first-generation display-rate choices:
+Display decimation is now explicit and UI-only, with first-generation choices:
 
 - `5 fps`
 - `10 fps`
@@ -301,7 +310,7 @@ Recommended first-generation display-rate choices:
 - `25 fps`
 - `30 fps`
 
-This display-rate control must only affect panel rendering.
+This display-rate control must continue to affect only panel rendering.
 It must not affect:
 
 - acquisition,
@@ -309,23 +318,24 @@ It must not affect:
 - recorder fidelity,
 - or alarm evaluation.
 
-`ControllerUnitSession` should be an experiment-plane runtime unit above device sessions.
+`ControllerUnitSession` is now the first experiment-plane runtime control unit above device sessions.
 
-Its job is to:
+Current responsibilities:
 
-- consume measured streams from the runtime bus,
-- compute the desired control output,
-- and send commands to one or more controlled-device sessions.
+- resolve one control target from the experiment package,
+- evaluate constant and scheduled target values,
+- distinguish open-loop and closed-loop semantics,
+- publish normalized control state and decisions,
+- and provide the first runtime-backed `Target +/- Error` seam for the monitor layer.
 
-If a derived experiment value should drive control, it must first be materialized as a named runtime stream. The controller unit should not target monitor identities directly.
+This unit is still distinct from device sessions such as `ControlCenterSession`.
+`ControlCenterSession` owns serial-device transport truth.
+`ControllerUnitSession` owns experiment-level control-target truth.
 
-This unit should not be treated as the same thing as a serial device session.
-For example, `ControlCenterSession` is a controlled-device session, but it is not yet the experiment-plane controller unit.
+Control strategy continues to belong to experiment building rather than ad hoc initialize-time decisions.
+The runtime executes the already-resolved strategy from the experiment definition.
 
-Control strategy should be chosen during experiment building, not ad hoc during initialize-time panel interaction.
-The runtime should execute the already-resolved control strategy from the experiment definition.
-
-The controller model should separate two axes:
+The controller model separates two axes:
 
 - `SetpointProfile`
   - `Constant`
@@ -334,20 +344,14 @@ The controller model should separate two axes:
   - `OpenLoop`
   - `ClosedLoop`
 
-This avoids conflating:
+The data model already allows multiple control targets, but the first-generation monitor surface still emphasizes one primary target.
 
-- a constant target with an open-loop command,
-- or a scheduled target with feedback behavior.
+What remains ahead:
 
-The data model should allow multiple control targets, but the first-generation monitor and panel should emphasize one primary target clearly.
-
-For the primary controlled variable, the monitor should present the live control state in `Target +/- Error` form.
-
-Example:
-
-- `Re 1600 +/- 12`
-
-That display should come from controller/monitor outputs, not from recomputing values inside the panel.
+- measured-stream wiring from real derived experiment values such as Reynolds number,
+- broader multi-target controller orchestration,
+- richer alarm rules and automatic stop-condition linkage,
+- and experiment-specific controller-session projection where required.
 
 ## What
 
