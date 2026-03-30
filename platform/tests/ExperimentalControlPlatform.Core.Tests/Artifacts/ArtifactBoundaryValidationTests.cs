@@ -18,6 +18,61 @@ public sealed class ArtifactBoundaryValidationTests
         Assert.Throws<ArgumentException>(() => new TransformDefinition(default, "Transform", "Computes derived values.", [new ArtifactId("stream.raw")], [new ArtifactId("stream.derived")]));
         Assert.Throws<ArgumentException>(() => new ExperimentDefinition(default, "Experiment", "Purpose", [CreateRole()], [], [], [], [], [], []));
         Assert.Throws<ArgumentException>(() => new DeviceDefinition(default, "Camera 01", "camera_01", CreateProtocol(), [CreateCapability()], [], "healthy"));
+        Assert.Throws<ArgumentException>(() => new RunContextDefinition(default, CreateResolvedExperimentDefinition(), null, null, new Dictionary<ArtifactId, string>(), new Dictionary<ArtifactId, ArtifactId>(), [], []));
+    }
+
+    [Fact]
+    public void RunContextDefinition_Rejects_Default_Ids_In_Collections()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new RunContextDefinition(
+                new ArtifactId("runctx.transition_demo_001"),
+                CreateResolvedExperimentDefinition(),
+                null,
+                null,
+                new Dictionary<ArtifactId, string>
+                {
+                    [default] = "yi"
+                },
+                new Dictionary<ArtifactId, ArtifactId>(),
+                [],
+                []));
+
+        Assert.Throws<ArgumentException>(() =>
+            new RunContextDefinition(
+                new ArtifactId("runctx.transition_demo_001"),
+                CreateResolvedExperimentDefinition(),
+                null,
+                null,
+                new Dictionary<ArtifactId, string>(),
+                new Dictionary<ArtifactId, ArtifactId>
+                {
+                    [new ArtifactId("device.camera_01")] = default
+                },
+                [],
+                []));
+
+        Assert.Throws<ArgumentException>(() =>
+            new RunContextDefinition(
+                new ArtifactId("runctx.transition_demo_001"),
+                CreateResolvedExperimentDefinition(),
+                null,
+                null,
+                new Dictionary<ArtifactId, string>(),
+                new Dictionary<ArtifactId, ArtifactId>(),
+                [default],
+                []));
+
+        Assert.Throws<ArgumentException>(() =>
+            new RunContextDefinition(
+                new ArtifactId("runctx.transition_demo_001"),
+                CreateResolvedExperimentDefinition(),
+                null,
+                null,
+                new Dictionary<ArtifactId, string>(),
+                new Dictionary<ArtifactId, ArtifactId>(),
+                [],
+                [default]));
     }
 
     [Fact]
@@ -193,4 +248,39 @@ public sealed class ArtifactBoundaryValidationTests
             "Captures the upstream flow view.",
             [new ArtifactId("cap.frame_stream")],
             new ArtifactId("protocol.sdk_camera_v1"));
+
+    private static ResolvedExperimentDefinition CreateResolvedExperimentDefinition()
+    {
+        var experiment = new ExperimentDefinition(
+            new ArtifactId("exp.turbulence_transition_v1"),
+            "Turbulence Transition",
+            "Purpose",
+            [CreateRole()],
+            [],
+            [],
+            [],
+            [],
+            [],
+            []);
+        var device = new DeviceDefinition(
+            new ArtifactId("device.camera_01"),
+            "Camera 01",
+            "camera_01",
+            CreateProtocol(),
+            [CreateCapability()],
+            [],
+            "healthy");
+        var binding = new RoleBindingDefinition(
+            new ArtifactId("role.upstream_camera"),
+            device.Id,
+            device.Protocol.Id,
+            [new ArtifactId("cap.frame_stream")]);
+
+        return new ResolvedExperimentDefinition(
+            experiment,
+            "1.0.0",
+            [device],
+            [binding],
+            new Dictionary<ArtifactId, string>());
+    }
 }

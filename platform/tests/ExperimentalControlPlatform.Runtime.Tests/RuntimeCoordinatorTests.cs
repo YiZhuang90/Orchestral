@@ -41,6 +41,21 @@ public sealed class RuntimeCoordinatorTests
     }
 
     [Fact]
+    public async Task Start_WithRunContext_Captures_Run_Metadata_And_Preserves_It_Through_Stop()
+    {
+        var coordinator = new RuntimeCoordinator(new FakeRegistry());
+        var runContext = CreateRunContextDefinition();
+
+        var started = coordinator.Start(runContext);
+        var stopped = await coordinator.RequestStopAsync(StopReason.UserRequested("Operator stopped the run."));
+
+        Assert.Equal(runContext, started.RunContext);
+        Assert.Equal(runContext, coordinator.LatestSnapshot.RunContext);
+        Assert.Equal(runContext.Experiment, started.Experiment);
+        Assert.Equal(runContext, stopped.RunContext);
+    }
+
+    [Fact]
     public async Task RequestStopAsync_TransitionsThroughStoppingAndThenReturnsCompletedStopSnapshot()
     {
         var registry = new FakeRegistry(blockStopUntilReleased: true);
@@ -354,4 +369,21 @@ public sealed class RuntimeCoordinatorTests
             [binding],
             new Dictionary<ArtifactId, string>());
     }
+
+    private static RunContextDefinition CreateRunContextDefinition() =>
+        new(
+            new ArtifactId("runctx.transition_demo_001"),
+            CreateResolvedExperimentDefinition(),
+            "transition-demo-001",
+            "looping mode, RR=0.36",
+            new Dictionary<ArtifactId, string>
+            {
+                [new ArtifactId("meta.operator")] = "yi"
+            },
+            new Dictionary<ArtifactId, ArtifactId>
+            {
+                [new ArtifactId("device.camera_01")] = new ArtifactId("artifact.settings.camera_01")
+            },
+            [new ArtifactId("decision.run_001")],
+            [new ArtifactId("artifact.run_manifest_001")]);
 }

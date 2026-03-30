@@ -114,6 +114,8 @@ The current branch also already reflects these architectural consequences:
 - the application host owns session-registry behavior,
 - session-local validation now exists as a shared runtime unit with structured `SessionValidationResult` output,
 - high-rate stream ports now support buffered consumer subscriptions with explicit delivery policy instead of only raw synchronous event fan-out,
+- run-context metadata now exists as a first-class experiment-plane artifact through `RunContextDefinition`,
+- coordinator snapshots can now carry stable run-intent metadata and artifact references separately from the ephemeral runtime `RunId`,
 - controlled-device sessions can define device-level `EmergencyStop`,
 - acquisition-style panels can expose a small operator-facing output-settings surface,
 - and `ApplyAndExit` is treated as a session-lifecycle action rather than only a UI close action.
@@ -123,6 +125,7 @@ The current coordinator status is still only foundational:
 - `RuntimeCoordinator` now owns truthful run-level `Idle -> Running -> Stopping -> Idle` stop transitions,
 - it delegates run-level stop to `IDeviceSessionRegistry.StopAllAsync(...)`,
 - and the application host can join an in-flight stop through `EnsureStoppedAsync(...)`,
+- it can start either from a bare runtime request, an experiment package, or a structured `RunContextDefinition`,
 - but it is not yet the full experiment-level orchestration layer for multiple active sessions.
 
 ## How

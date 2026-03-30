@@ -45,7 +45,7 @@ Add the first concrete, validated experiment package model so Orchestral can rep
 - cross-session validation against live session registry
 - high-rate stream buffering
 - run recorder / artifact writer
-- end-height controller session
+- experiment-specific controller sessions
 - camera-pair processing logic
 - experiment-definition linting beyond package-local validation
 

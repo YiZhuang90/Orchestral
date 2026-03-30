@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using ExperimentalControlPlatform.Core.Artifacts;
 using ExperimentalControlPlatform.Runtime;
 
 namespace ExperimentalControlPlatform.App;
@@ -48,6 +49,8 @@ public sealed class RuntimeStatusViewModel : INotifyPropertyChanged
         _statusMessageOverride
         ?? Snapshot.State switch
            {
+               RunState.Running when Snapshot.StartedAtUtc is not null && Snapshot.RunContext is not null =>
+                   BuildRunContextSummary(Snapshot.RunContext, Snapshot.StartedAtUtc.Value),
                RunState.Running when Snapshot.StartedAtUtc is not null && Snapshot.Experiment is not null =>
                    $"Running {Snapshot.Experiment.Experiment.Name} since {Snapshot.StartedAtUtc.Value.ToLocalTime():HH:mm:ss}",
                RunState.Running when Snapshot.StartedAtUtc is not null =>
@@ -79,5 +82,17 @@ public sealed class RuntimeStatusViewModel : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    private static string BuildRunContextSummary(RunContextDefinition runContext, DateTimeOffset startedAtUtc)
+    {
+        var primaryLabel = runContext.DisplayName ?? runContext.Experiment.Experiment.Name;
+        var summary = $"Running {primaryLabel} since {startedAtUtc.ToLocalTime():HH:mm:ss}";
+        if (!string.IsNullOrWhiteSpace(runContext.OperatorNote))
+        {
+            summary += $" ({runContext.OperatorNote})";
+        }
+
+        return summary;
     }
 }
