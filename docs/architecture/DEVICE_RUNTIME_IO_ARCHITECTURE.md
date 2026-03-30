@@ -113,6 +113,7 @@ The current branch also already reflects these architectural consequences:
 - panels for those devices are moving to session-client behavior instead of owning hardware loops directly,
 - the application host owns session-registry behavior,
 - session-local validation now exists as a shared runtime unit with structured `SessionValidationResult` output,
+- high-rate stream ports now support buffered consumer subscriptions with explicit delivery policy instead of only raw synchronous event fan-out,
 - controlled-device sessions can define device-level `EmergencyStop`,
 - acquisition-style panels can expose a small operator-facing output-settings surface,
 - and `ApplyAndExit` is treated as a session-lifecycle action rather than only a UI close action.
@@ -268,7 +269,7 @@ The first-generation recommendation is:
 - `IStreamOutputPort<T>`
   - raises a `Produced` event for each new payload item
 
-The first-generation delivery mechanism should be standard .NET events.
+The low-level compatibility mechanism should remain standard .NET events, but high-rate consumers should prefer buffered subscriptions over raw producer-thread fan-out.
 
 Recommended shape:
 
@@ -277,6 +278,17 @@ Recommended shape:
   - `event Action<T> Changed`
 - stream port
   - `event Action<T> Produced`
+  - `Subscribe(StreamDeliveryPolicy policy, Func<T, ValueTask> onItem)`
+
+Buffered delivery policy should make these choices explicit:
+
+- `Ordered`
+  - preserve item order for recorder or computation consumers
+- `LatestOnly`
+  - coalesce bursts for UI-style or latest-value consumers
+- optional bounded buffering
+- explicit overflow policy when a bounded queue fills
+- optional max delivery rate for consumer-local decimation
 
 Threading contract:
 
@@ -284,6 +296,7 @@ Threading contract:
 - ports do not automatically marshal to the UI thread
 - UI-facing consumers must marshal to the dispatcher at the panel-adapter boundary
 - non-UI consumers remain free to process events without WPF coupling
+- buffered subscriptions own their own queue/coalescing policy and should be the preferred high-rate path for panels
 
 Subscription lifecycle:
 

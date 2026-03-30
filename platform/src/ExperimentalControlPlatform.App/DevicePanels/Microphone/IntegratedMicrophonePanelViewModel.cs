@@ -42,6 +42,7 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
     private readonly ValueCardItem _windowCard = new("Window", "--");
     private readonly ValueCardItem _clippingCard = new("Clipping", "No");
     private IntegratedMicrophoneSession? _session;
+    private IStreamDeliverySubscription? _frameSubscription;
     private MicrophoneFrameJournal? _frameJournal;
     private bool _isBusy;
     private bool _isConnected;
@@ -998,7 +999,15 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
         _session.Diagnostics.Changed += OnSessionDiagnosticsChanged;
         _session.AppliedSettings.Changed += OnSessionAppliedSettingsChanged;
         _session.SessionEnd.Changed += OnSessionEndChanged;
-        _session.LatestFrame.Changed += OnSessionFrameChanged;
+        _frameSubscription = _session.Frames.Subscribe(
+            StreamDeliveryPolicy.LatestOnly(),
+            frame => new ValueTask(RunOnUiAsync(() =>
+            {
+                if (ReferenceEquals(_session, session))
+                {
+                    ApplySessionFrame(frame);
+                }
+            })));
         _frameJournal = new MicrophoneFrameJournal(_session.Frames);
 
         ApplySessionState(_session.State.Current!);
@@ -1019,7 +1028,8 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
             _session.Diagnostics.Changed -= OnSessionDiagnosticsChanged;
             _session.AppliedSettings.Changed -= OnSessionAppliedSettingsChanged;
             _session.SessionEnd.Changed -= OnSessionEndChanged;
-            _session.LatestFrame.Changed -= OnSessionFrameChanged;
+            _frameSubscription?.Dispose();
+            _frameSubscription = null;
             _session = null;
         }
 
@@ -1045,16 +1055,6 @@ public sealed class IntegratedMicrophonePanelViewModel : ObservableObject, IAudi
     private void OnSessionEndChanged(DeviceSessionEndSnapshot? snapshot)
     {
         _ = RunOnUiAsync(() => ApplySessionEnd(snapshot));
-    }
-
-    private void OnSessionFrameChanged(MicrophoneFrame? frame)
-    {
-        if (frame is null)
-        {
-            return;
-        }
-
-        _ = RunOnUiAsync(() => ApplySessionFrame(frame));
     }
 
     private void ApplySessionState(IntegratedMicrophoneSessionState state)
