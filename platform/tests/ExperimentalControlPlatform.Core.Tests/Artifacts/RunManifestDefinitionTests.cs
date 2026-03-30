@@ -47,5 +47,41 @@ public sealed class RunManifestDefinitionTests
         Assert.Equal(
             "0.35",
             manifest.RoleBindingParameterValues[new ArtifactId("role.upstream_camera")][new ArtifactId("param.camera_exposure_ms")]);
+        Assert.Empty(manifest.Artifacts);
+    }
+
+    [Fact]
+    public void Constructor_Captures_Artifact_Path_Mapping()
+    {
+        var manifest = new RunManifestDefinition(
+            new ArtifactId("manifest.run_002"),
+            new ArtifactId("exp.turbulence_transition_v1"),
+            "1.0.0",
+            new Dictionary<ArtifactId, ArtifactId>
+            {
+                [new ArtifactId("role.upstream_camera")] = new ArtifactId("device.camera_01")
+            },
+            new Dictionary<ArtifactId, ArtifactId>
+            {
+                [new ArtifactId("role.upstream_camera")] = new ArtifactId("protocol.sdk_camera_v1")
+            },
+            new Dictionary<ArtifactId, IReadOnlyDictionary<ArtifactId, string>>(),
+            new Dictionary<ArtifactId, string>(),
+            DateTimeOffset.Parse("2026-03-19T12:00:00+01:00"),
+            DateTimeOffset.Parse("2026-03-19T12:05:00+01:00"),
+            null,
+            "user stop",
+            [new ArtifactId("artifact.runtime_events.run_002")],
+            ["run started", "run stopped"],
+            [],
+            new Dictionary<ArtifactId, string>
+            {
+                [new ArtifactId("artifact.runtime_events.run_002")] = "runtime-events.yaml",
+                [new ArtifactId("artifact.run_manifest.run_002")] = "manifest.yaml"
+            });
+
+        Assert.Equal(
+            "runtime-events.yaml",
+            manifest.Artifacts[new ArtifactId("artifact.runtime_events.run_002")]);
     }
 }

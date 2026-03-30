@@ -34,7 +34,8 @@ public sealed record class RunManifestDefinition
             stopReason,
             outputIds,
             runtimeEvents,
-            warningsOrFaults)
+            warningsOrFaults,
+            new Dictionary<ArtifactId, string>())
     {
     }
 
@@ -53,6 +54,41 @@ public sealed record class RunManifestDefinition
         IReadOnlyList<ArtifactId> outputIds,
         IReadOnlyList<string> runtimeEvents,
         IReadOnlyList<string> warningsOrFaults)
+        : this(
+            id,
+            experimentId,
+            experimentVersion,
+            roleBindings,
+            protocolBindings,
+            roleBindingParameterValues,
+            parameterValues,
+            startedAt,
+            stoppedAt,
+            activatedStopConditionId,
+            stopReason,
+            outputIds,
+            runtimeEvents,
+            warningsOrFaults,
+            new Dictionary<ArtifactId, string>())
+    {
+    }
+
+    public RunManifestDefinition(
+        ArtifactId id,
+        ArtifactId experimentId,
+        string experimentVersion,
+        IReadOnlyDictionary<ArtifactId, ArtifactId> roleBindings,
+        IReadOnlyDictionary<ArtifactId, ArtifactId> protocolBindings,
+        IReadOnlyDictionary<ArtifactId, IReadOnlyDictionary<ArtifactId, string>> roleBindingParameterValues,
+        IReadOnlyDictionary<ArtifactId, string> parameterValues,
+        DateTimeOffset startedAt,
+        DateTimeOffset? stoppedAt,
+        ArtifactId? activatedStopConditionId,
+        string? stopReason,
+        IReadOnlyList<ArtifactId> outputIds,
+        IReadOnlyList<string> runtimeEvents,
+        IReadOnlyList<string> warningsOrFaults,
+        IReadOnlyDictionary<ArtifactId, string> artifacts)
     {
         Id = ArtifactId.Require(id, nameof(id));
         ExperimentId = ArtifactId.Require(experimentId, nameof(experimentId));
@@ -68,6 +104,7 @@ public sealed record class RunManifestDefinition
         OutputIds = CopyArtifactList(outputIds, nameof(outputIds));
         RuntimeEvents = CopyStrings(runtimeEvents, nameof(runtimeEvents));
         WarningsOrFaults = CopyStrings(warningsOrFaults, nameof(warningsOrFaults));
+        Artifacts = CopyArtifactKeyedStrings(artifacts, nameof(artifacts));
     }
 
     public ArtifactId Id { get; }
@@ -97,6 +134,8 @@ public sealed record class RunManifestDefinition
     public IReadOnlyList<string> RuntimeEvents { get; }
 
     public IReadOnlyList<string> WarningsOrFaults { get; }
+
+    public IReadOnlyDictionary<ArtifactId, string> Artifacts { get; }
 
     private static IReadOnlyDictionary<TKey, TValue> CopyDictionary<TKey, TValue>(
         IReadOnlyDictionary<TKey, TValue> values,

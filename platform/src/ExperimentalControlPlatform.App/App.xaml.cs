@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.Windows;
 using ExperimentalControlPlatform.App.DevicePanels.ControlCenter;
 using ExperimentalControlPlatform.App.DevicePanels.HyperCam;
@@ -25,7 +27,12 @@ public partial class App : Application
         _sessionRegistry = new DeviceSessionRegistry();
         _runtimeCoordinator = new RuntimeCoordinator(_sessionRegistry);
         var controlCenterPanel = new ControlCenterPanelViewModel(new SerialControlCenterService(), _sessionRegistry);
-        _mainViewModel = new MainViewModel(_runtimeCoordinator, new[] { controlCenterPanel });
+        var runArtifactsRoot = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Orchestral",
+            "runs");
+        var runRecorder = new RunRecorder(runArtifactsRoot);
+        _mainViewModel = new MainViewModel(_runtimeCoordinator, new[] { controlCenterPanel }, runRecorder);
         var deviceTestWindow = new DeviceTestWindow(_mainViewModel);
 
         MainWindow = deviceTestWindow;
@@ -36,10 +43,12 @@ public partial class App : Application
     {
         try
         {
-            if (_runtimeCoordinator is not null
+            if (_mainViewModel is not null
+                && _runtimeCoordinator is not null
                 && _runtimeCoordinator.LatestSnapshot.State is RunState.Running or RunState.Stopping)
             {
                 _runtimeCoordinator.EnsureStoppedAsync(StopReason.UserRequested("Application shutdown.")).GetAwaiter().GetResult();
+                _mainViewModel.FinalizeRunRecordingForLatestStoppedRun();
             }
             else
             {
