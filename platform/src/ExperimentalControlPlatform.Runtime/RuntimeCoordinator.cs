@@ -30,16 +30,22 @@ public sealed class RuntimeCoordinator : IRuntimeCoordinator
 
     public RuntimeRunContext Start()
     {
-        return StartCore(null);
+        return StartCore(null, null);
     }
 
     public RuntimeRunContext Start(ResolvedExperimentDefinition experiment)
     {
         ArgumentNullException.ThrowIfNull(experiment);
-        return StartCore(experiment);
+        return StartCore(experiment, null);
     }
 
-    private RuntimeRunContext StartCore(ResolvedExperimentDefinition? experiment)
+    public RuntimeRunContext Start(RunContextDefinition runContext)
+    {
+        ArgumentNullException.ThrowIfNull(runContext);
+        return StartCore(runContext.Experiment, runContext);
+    }
+
+    private RuntimeRunContext StartCore(ResolvedExperimentDefinition? experiment, RunContextDefinition? runContext)
     {
         lock (_syncRoot)
         {
@@ -55,7 +61,8 @@ public sealed class RuntimeCoordinator : IRuntimeCoordinator
                 runId,
                 RunState.Running,
                 startedAtUtc: startedAtUtc,
-                experiment: experiment);
+                experiment: experiment,
+                runContext: runContext);
 
             return _latestSnapshot;
         }
@@ -133,7 +140,8 @@ public sealed class RuntimeCoordinator : IRuntimeCoordinator
                 _latestSnapshot.StartedAtUtc,
                 stoppedAtUtc: null,
                 reason,
-                _latestSnapshot.Experiment);
+                _latestSnapshot.Experiment,
+                _latestSnapshot.RunContext);
             stoppingSnapshot = _latestSnapshot;
             _activeStopTask = StopCoreAsync(stoppingSnapshot, reason, cancellationToken);
             return _activeStopTask;
@@ -161,7 +169,8 @@ public sealed class RuntimeCoordinator : IRuntimeCoordinator
                     stoppingSnapshot.StartedAtUtc,
                     stoppedAtUtc,
                     reason,
-                    stoppingSnapshot.Experiment);
+                    stoppingSnapshot.Experiment,
+                    stoppingSnapshot.RunContext);
                 _activeStopTask = null;
             }
         }

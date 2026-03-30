@@ -34,7 +34,8 @@ Status:
 - runtime coordinator and stop authority exist,
 - experiment definition and role binding now exist as a validated artifact/runtime boundary,
 - high-rate stream buffering and delivery policy now exists for runtime stream ports and the highest-pressure UI consumers,
-- next slice is end-height controller session.
+- run context and metadata now exist as a first-class experiment-plane unit,
+- next universal slice is run recorder and artifact writer.
 
 Required foundations:
 
@@ -48,6 +49,7 @@ Active slice plans:
 - [2026-03-28-runtime-coordinator-and-stop-authority-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-28-runtime-coordinator-and-stop-authority-plan.md)
 - [2026-03-30-experiment-definition-and-role-binding-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-30-experiment-definition-and-role-binding-plan.md)
 - [2026-03-30-high-rate-stream-buffering-and-delivery-policy-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-30-high-rate-stream-buffering-and-delivery-policy-plan.md)
+- [2026-03-30-run-context-and-metadata-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-30-run-context-and-metadata-plan.md)
 
 ### 2. First Reference Experiment
 
@@ -55,8 +57,9 @@ Status:
 
 - partially unblocked,
 - still waiting on:
-  - end-height controller session,
-  - run recorder/artifact writer.
+  - run recorder/artifact writer,
+  - run monitor/alarm surface,
+  - experiment-specific controller sessions as required by the chosen reference experiment.
 
 ### 3. AI Brain Integration
 
