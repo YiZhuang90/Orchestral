@@ -7,6 +7,8 @@ namespace ExperimentalControlPlatform.Core.Artifacts;
 public sealed record class ResolvedExperimentDefinition
 {
     private readonly Dictionary<ArtifactId, RoleBindingDefinition> _bindingsByRoleId;
+    private readonly Dictionary<ArtifactId, ParameterDefinition> _parametersById;
+    private readonly Dictionary<ArtifactId, ControlTargetDefinition> _controlTargetsById;
 
     public ResolvedExperimentDefinition(
         ExperimentDefinition experiment,
@@ -28,6 +30,8 @@ public sealed record class ResolvedExperimentDefinition
         }
 
         _bindingsByRoleId = RoleBindings.ToDictionary(static binding => binding.RoleId, static binding => binding);
+        _parametersById = Experiment.Parameters.ToDictionary(static parameter => parameter.Id, static parameter => parameter);
+        _controlTargetsById = Experiment.ControlTargets.ToDictionary(static controlTarget => controlTarget.Id, static controlTarget => controlTarget);
     }
 
     public ExperimentDefinition Experiment { get; }
@@ -40,8 +44,32 @@ public sealed record class ResolvedExperimentDefinition
 
     public IReadOnlyDictionary<ArtifactId, string> ParameterValues { get; }
 
+    public IReadOnlyList<ControlTargetDefinition> ControlTargets => Experiment.ControlTargets;
+
     public bool TryGetBinding(ArtifactId roleId, out RoleBindingDefinition? binding) =>
         _bindingsByRoleId.TryGetValue(ArtifactId.Require(roleId, nameof(roleId)), out binding);
+
+    public bool TryGetControlTarget(ArtifactId controlTargetId, out ControlTargetDefinition? controlTarget) =>
+        _controlTargetsById.TryGetValue(ArtifactId.Require(controlTargetId, nameof(controlTargetId)), out controlTarget);
+
+    public bool TryGetParameterValue(ArtifactId parameterId, out string? value)
+    {
+        var requiredId = ArtifactId.Require(parameterId, nameof(parameterId));
+        if (ParameterValues.TryGetValue(requiredId, out var explicitValue))
+        {
+            value = explicitValue;
+            return true;
+        }
+
+        if (_parametersById.TryGetValue(requiredId, out var definition) && !string.IsNullOrWhiteSpace(definition.DefaultValue))
+        {
+            value = definition.DefaultValue;
+            return true;
+        }
+
+        value = null;
+        return false;
+    }
 
     public static ExperimentBindingValidationResult Validate(
         ExperimentDefinition experiment,
@@ -152,7 +180,142 @@ public sealed record class ResolvedExperimentDefinition
             }
         }
 
+        ValidateControlTargets(
+            experiment,
+            bindingsByRole,
+            experimentParameterIds,
+            parameterValues,
+            experimentRoles,
+            issues);
+
         return new ExperimentBindingValidationResult(issues);
+    }
+
+    private static void ValidateControlTargets(
+        ExperimentDefinition experiment,
+        IReadOnlyDictionary<ArtifactId, RoleBindingDefinition> bindingsByRole,
+        IReadOnlySet<ArtifactId> experimentParameterIds,
+        IReadOnlyDictionary<ArtifactId, string> parameterValues,
+        IReadOnlyDictionary<ArtifactId, DeviceRoleDefinition> experimentRoles,
+        ICollection<ExperimentBindingValidationIssue> issues)
+    {
+        var measuredSourceIds = experiment.Streams
+            .Select(static stream => stream.Id)
+            .ToHashSet();
+
+        var parameterDefinitionsById = experiment.Parameters.ToDictionary(static parameter => parameter.Id, static parameter => parameter);
+
+        foreach (var controlTarget in experiment.ControlTargets)
+        {
+            if (!experimentRoles.ContainsKey(controlTarget.CommandRoleId))
+            {
+                issues.Add(new ExperimentBindingValidationIssue(
+                    "unknown_control_target_command_role",
+                    $"Control target '{controlTarget.Id}' references unknown command role '{controlTarget.CommandRoleId}'.",
+                    roleId: controlTarget.CommandRoleId));
+            }
+            else if (!bindingsByRole.ContainsKey(controlTarget.CommandRoleId))
+            {
+                issues.Add(new ExperimentBindingValidationIssue(
+                    "unbound_control_target_command_role",
+                    $"Control target '{controlTarget.Id}' references role '{controlTarget.CommandRoleId}', but that role has no concrete binding.",
+                    roleId: controlTarget.CommandRoleId));
+            }
+
+            if (!measuredSourceIds.Contains(controlTarget.MeasuredSourceId))
+            {
+                issues.Add(new ExperimentBindingValidationIssue(
+                    "unknown_control_target_measured_source",
+                    $"Control target '{controlTarget.Id}' references unknown measured source '{controlTarget.MeasuredSourceId}'."));
+            }
+
+            ValidateControlTargetParameter(
+                controlTarget.TargetParameterId,
+                "missing_control_target_parameter_value",
+                "unknown_control_target_parameter",
+                controlTarget,
+                experimentParameterIds,
+                parameterDefinitionsById,
+                parameterValues,
+                issues);
+
+            ValidateControlTargetParameter(
+                controlTarget.ScheduleParameterId,
+                "missing_control_target_schedule_value",
+                "unknown_control_target_schedule_parameter",
+                controlTarget,
+                experimentParameterIds,
+                parameterDefinitionsById,
+                parameterValues,
+                issues);
+        }
+    }
+
+    private static void ValidateControlTargetParameter(
+        ArtifactId? parameterId,
+        string missingValueIssueCode,
+        string unknownParameterIssueCode,
+        ControlTargetDefinition controlTarget,
+        IReadOnlySet<ArtifactId> experimentParameterIds,
+        IReadOnlyDictionary<ArtifactId, ParameterDefinition> parameterDefinitionsById,
+        IReadOnlyDictionary<ArtifactId, string> parameterValues,
+        ICollection<ExperimentBindingValidationIssue> issues)
+    {
+        if (!parameterId.HasValue)
+        {
+            return;
+        }
+
+        var requiredId = parameterId.Value;
+        if (!experimentParameterIds.Contains(requiredId))
+        {
+            issues.Add(new ExperimentBindingValidationIssue(
+                unknownParameterIssueCode,
+                $"Control target '{controlTarget.Id}' references unknown parameter '{requiredId}'.",
+                parameterId: requiredId));
+            return;
+        }
+
+        if (parameterValues.ContainsKey(requiredId))
+        {
+            ValidateControlTargetParameterFormat(controlTarget, requiredId, parameterValues[requiredId], issues);
+            return;
+        }
+
+        if (parameterDefinitionsById.TryGetValue(requiredId, out var definition) && !string.IsNullOrWhiteSpace(definition.DefaultValue))
+        {
+            ValidateControlTargetParameterFormat(controlTarget, requiredId, definition.DefaultValue!, issues);
+            return;
+        }
+
+        issues.Add(new ExperimentBindingValidationIssue(
+            missingValueIssueCode,
+            $"Control target '{controlTarget.Id}' requires a value for parameter '{requiredId}'.",
+            parameterId: requiredId));
+    }
+
+    private static void ValidateControlTargetParameterFormat(
+        ControlTargetDefinition controlTarget,
+        ArtifactId parameterId,
+        string parameterValue,
+        ICollection<ExperimentBindingValidationIssue> issues)
+    {
+        if (controlTarget.SetpointProfile != "scheduled" || controlTarget.ScheduleParameterId != parameterId)
+        {
+            return;
+        }
+
+        try
+        {
+            ControlTargetScheduleParser.Parse(parameterValue, parameterId);
+        }
+        catch (FormatException ex)
+        {
+            issues.Add(new ExperimentBindingValidationIssue(
+                "invalid_control_target_schedule_format",
+                $"Control target '{controlTarget.Id}' has an invalid schedule format: {ex.Message}",
+                parameterId: parameterId));
+        }
     }
 
     private static void ValidateBindingAgainstRoleAndDevice(

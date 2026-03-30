@@ -32,6 +32,7 @@ An experiment defines:
 - the purpose of the run,
 - the device roles required,
 - experiment-level parameters,
+- control targets,
 - stream inputs and derived streams,
 - transforms,
 - monitors,
@@ -167,6 +168,7 @@ Monitors are used to:
 - display live state,
 - summarize system health,
 - show derived metrics,
+- show control-tracking state,
 - support operator judgment,
 - feed stop conditions when needed.
 
@@ -180,7 +182,39 @@ Monitors have three permitted semantic shapes:
 
 If a monitor produces time-varying data, that output must be named as a stream rather than implied by the monitor name alone.
 
-### 3.11 Stop Condition
+For a primary controlled variable, a monitor may present live tracking state in `Target +/- Error` form, such as `Re 1600 +/- 12`.
+
+Display-rate decimation is a UI concern only. A monitor surface may render at a lower display rate without changing the underlying stream, recorder fidelity, or alarm evaluation.
+
+### 3.11 Control Target
+
+A control target is a named experiment-level declaration that says:
+
+- which variable is being controlled,
+- which measured stream provides the observed value,
+- which command-capable role or runtime unit receives control output,
+- how the target evolves over run time,
+- and how regulation should be performed.
+
+Control targets belong to the experiment definition and resolved runtime state.
+They should be chosen during experiment building, not improvised during initialize-time operator interaction.
+
+At minimum, a control target should declare two independent axes:
+
+- `setpoint profile`
+  - `constant`
+  - `scheduled`
+- `regulation mode`
+  - `open_loop`
+  - `closed_loop`
+
+This distinction matters because a constant target may still require closed-loop regulation, and a scheduled target may still be executed either open-loop or closed-loop.
+
+The system language should allow multiple control targets in one experiment, even if the first-generation monitor or panel emphasizes one primary target.
+
+If a derived quantity is used as the measured input for control, it must be surfaced as a named stream before a control target references it. Monitor identities are not valid control-target measured sources.
+
+### 3.12 Stop Condition
 
 A stop condition is a rule that ends or pauses a run when a condition is met.
 
@@ -194,7 +228,7 @@ Stop conditions may be:
 
 Stop conditions are system-level rules. They are checked by the runtime, and when satisfied they produce a stop reason that becomes part of the run manifest.
 
-### 3.12 Output
+### 3.13 Output
 
 An output is a declared artifact or data product produced by a run.
 
@@ -209,7 +243,7 @@ Outputs may include:
 
 Outputs are declared in the experiment so the runtime knows what to persist and the user knows what to expect.
 
-### 3.13 Run Manifest
+### 3.14 Run Manifest
 
 A run manifest is the authoritative record of one execution of an experiment.
 
@@ -237,6 +271,7 @@ The language should be read as a graph of constrained relationships:
 - a device provides capabilities through a protocol,
 - a device binding connects a device to a role,
 - parameters configure experiment behavior and device behavior,
+- control targets define how measured experiment state should drive commands,
 - streams carry data through the runtime,
 - transforms derive new streams from existing streams,
 - monitors report important runtime values,
@@ -313,27 +348,33 @@ Purpose: observe and control a turbulence-transition setup using two cameras, on
 - `temperature_inlet.samples`: scalar temperature stream.
 - `flow_actuator.state`: actuator status stream.
 
-### 6.8 Transforms
+### 6.8 Control Targets
+
+- `re_control` uses the derived Reynolds-number stream as its measured value.
+- its `setpoint_profile` may be `constant` or `scheduled`.
+- its `regulation_mode` is `closed_loop` when the platform actively holds Reynolds number near target.
+
+### 6.9 Transforms
 
 - `upstream_roi_crop` consumes `camera_upstream.frames` and produces `upstream_roi.frames`.
 - `downstream_roi_crop` consumes `camera_downstream.frames` and produces `downstream_roi.frames`.
 - `temperature_smoother` consumes `temperature_inlet.samples` and produces `temperature_inlet.smoothed`.
 - `turbulence_indicator` consumes both ROI streams and produces `puff_indicator`.
 
-### 6.9 Monitors
+### 6.10 Monitors
 
-- `live_reynolds_number` shows the current target and resolved operating condition.
+- `live_reynolds_number` shows the current target and tracking error, for example `Target Re +/- error`.
 - `temperature_monitor` shows the current inlet temperature and trend.
 - `puff_monitor` shows the derived turbulence indicator.
 - `actuator_status_monitor` shows whether the actuator is armed, active, or idle.
 
-### 6.10 Stop condition
+### 6.11 Stop condition
 
 System-level stop condition: stop the run if `temperature_inlet.samples` exceeds `temperature_limit_c` for longer than the configured debounce window.
 
 This is a system-level stop condition because it protects the entire run, not just one device.
 
-### 6.11 Outputs
+### 6.12 Outputs
 
 - `run_manifest`
 - `raw_camera_streams`
@@ -341,7 +382,7 @@ This is a system-level stop condition because it protects the entire run, not ju
 - `derived_turbulence_indicator`
 - `runtime_logs`
 
-### 6.12 Example binding sketch
+### 6.13 Example binding sketch
 
 ```yaml
 experiment:
@@ -386,6 +427,9 @@ parameters:
   re_target:
     type: float
     unit: dimensionless
+  re_schedule:
+    type: time_series
+    unit: dimensionless
   camera_exposure_ms:
     type: float
     unit: ms
@@ -396,11 +440,22 @@ parameters:
     type: float
     unit: C
 
+control_targets:
+  - id: re_control
+    measured_source: reynolds_number
+    command_role: flow_actuator
+    setpoint_profile: constant
+    regulation_mode: closed_loop
+    target_parameter: re_target
+
 monitors:
   - id: temperature_monitor
     source: temperature_inlet.samples
   - id: puff_monitor
     source: puff_indicator
+  - id: live_reynolds_number
+    source: reynolds_number
+    display: target_plus_minus_error
 
 stop_conditions:
   - id: stop_on_high_temperature

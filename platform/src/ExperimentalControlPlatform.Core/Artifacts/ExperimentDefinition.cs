@@ -17,6 +17,33 @@ public sealed record class ExperimentDefinition
         IReadOnlyList<MonitorDefinition> monitors,
         IReadOnlyList<StopConditionDefinition> stopConditions,
         IReadOnlyList<OutputDefinition> outputs)
+        : this(
+            id,
+            name,
+            purpose,
+            roles,
+            parameters,
+            streams,
+            transforms,
+            monitors,
+            stopConditions,
+            outputs,
+            [])
+    {
+    }
+
+    public ExperimentDefinition(
+        ArtifactId id,
+        string name,
+        string purpose,
+        IReadOnlyList<DeviceRoleDefinition> roles,
+        IReadOnlyList<ParameterDefinition> parameters,
+        IReadOnlyList<StreamDefinition> streams,
+        IReadOnlyList<TransformDefinition> transforms,
+        IReadOnlyList<MonitorDefinition> monitors,
+        IReadOnlyList<StopConditionDefinition> stopConditions,
+        IReadOnlyList<OutputDefinition> outputs,
+        IReadOnlyList<ControlTargetDefinition> controlTargets)
     {
         Id = ArtifactId.Require(id, nameof(id));
         Name = RequireText(name, nameof(name));
@@ -28,6 +55,7 @@ public sealed record class ExperimentDefinition
         Monitors = CopyOptional(monitors, nameof(monitors));
         StopConditions = CopyOptional(stopConditions, nameof(stopConditions));
         Outputs = CopyOptional(outputs, nameof(outputs));
+        ControlTargets = CopyOptional(controlTargets, nameof(controlTargets));
     }
 
     public ArtifactId Id { get; }
@@ -49,6 +77,8 @@ public sealed record class ExperimentDefinition
     public IReadOnlyList<StopConditionDefinition> StopConditions { get; }
 
     public IReadOnlyList<OutputDefinition> Outputs { get; }
+
+    public IReadOnlyList<ControlTargetDefinition> ControlTargets { get; }
 
     private static IReadOnlyList<T> CopyRequired<T>(IReadOnlyList<T> values, string paramName)
     {
