@@ -211,6 +211,62 @@ public sealed class ResolvedExperimentDefinitionTests
         Assert.Contains("binding parameter", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void ValidateCrossSession_Returns_Issue_For_Duplicate_Shared_Device_Capability_Claim()
+    {
+        var resolved = CreateResolvedExperimentWithDuplicateSharedDeviceCapabilityClaim();
+
+        var validation = resolved.ValidateCrossSession();
+
+        Assert.False(validation.IsValid);
+        Assert.Contains(validation.Issues, issue => issue.Code == "duplicate_shared_device_capability_claim");
+    }
+
+    [Fact]
+    public void ValidateCrossSession_Returns_Issue_For_Conflicting_Control_Target_Command_Role()
+    {
+        var resolved = CreateResolvedExperimentWithConflictingControlTargets();
+
+        var validation = resolved.ValidateCrossSession();
+
+        Assert.False(validation.IsValid);
+        Assert.Contains(validation.Issues, issue => issue.Code == "conflicting_control_target_command_role");
+    }
+
+    [Fact]
+    public void ValidateCrossSession_Returns_Valid_For_Clean_Resolved_Experiment()
+    {
+        var resolved = new ResolvedExperimentDefinition(
+            CreateExperimentDefinition(),
+            "1.0.0",
+            [CreateCameraDeviceDefinition("device.camera_01"), CreateControllerDeviceDefinition("device.controller_01")],
+            [
+                new RoleBindingDefinition(
+                    new ArtifactId("role.camera_upstream"),
+                    new ArtifactId("device.camera_01"),
+                    new ArtifactId("protocol.vendor_sdk_camera_v1"),
+                    [new ArtifactId("cap.frame_stream"), new ArtifactId("cap.exposure_control")]),
+                new RoleBindingDefinition(
+                    new ArtifactId("role.flow_actuator"),
+                    new ArtifactId("device.controller_01"),
+                    new ArtifactId("protocol.serial_ascii_v1"),
+                    [new ArtifactId("cap.pulse_actuation"), new ArtifactId("cap.status_report")],
+                    new Dictionary<ArtifactId, string>
+                    {
+                        [new ArtifactId("param.actuator_pulse_ms")] = "2.0"
+                    })
+            ],
+            new Dictionary<ArtifactId, string>
+            {
+                [new ArtifactId("param.camera_exposure_ms")] = "0.35"
+            });
+
+        var validation = resolved.ValidateCrossSession();
+
+        Assert.True(validation.IsValid);
+        Assert.Empty(validation.Issues);
+    }
+
     private static ExperimentDefinition CreateExperimentDefinition()
     {
         return new ExperimentDefinition(
@@ -297,4 +353,157 @@ public sealed class ResolvedExperimentDefinitionTests
             "best-effort",
             "fail-fast",
             "manual");
+
+    private static ResolvedExperimentDefinition CreateResolvedExperimentWithDuplicateSharedDeviceCapabilityClaim()
+    {
+        var experiment = new ExperimentDefinition(
+            new ArtifactId("exp.shared_device_capability_conflict"),
+            "Shared Device Capability Conflict",
+            "Exercise cross-session validation for ambiguous capability ownership on one concrete device.",
+            [
+                new DeviceRoleDefinition(
+                    new ArtifactId("role.laser_control"),
+                    "Laser Control",
+                    "Controls the laser output.",
+                    [new ArtifactId("cap.laser_control")],
+                    new ArtifactId("protocol.serial_ascii_v1")),
+                new DeviceRoleDefinition(
+                    new ArtifactId("role.puff_actuation"),
+                    "Puff Actuation",
+                    "Controls puff actuation output.",
+                    [new ArtifactId("cap.pulse_actuation")],
+                    new ArtifactId("protocol.serial_ascii_v1"))
+            ],
+            [],
+            [],
+            [],
+            [],
+            [],
+            []);
+
+        var sharedDevice = new DeviceDefinition(
+            new ArtifactId("device.control_center_01"),
+            "Control Center 01",
+            "control_center_01",
+            new ProtocolDefinition(
+                new ArtifactId("protocol.serial_ascii_v1"),
+                "Serial ASCII",
+                "serial",
+                "request-response",
+                "session",
+                "best-effort",
+                "fail-fast",
+                "manual"),
+            [
+                new CapabilityDefinition(new ArtifactId("cap.laser_control"), "laser_control", "Controls the laser."),
+                new CapabilityDefinition(new ArtifactId("cap.pulse_actuation"), "pulse_actuation", "Issues puff pulses.")
+            ],
+            [],
+            "healthy");
+
+        return new ResolvedExperimentDefinition(
+            experiment,
+            "1.0.0",
+            [sharedDevice],
+            [
+                new RoleBindingDefinition(
+                    new ArtifactId("role.laser_control"),
+                    sharedDevice.Id,
+                    sharedDevice.Protocol.Id,
+                    [new ArtifactId("cap.laser_control"), new ArtifactId("cap.pulse_actuation")]),
+                new RoleBindingDefinition(
+                    new ArtifactId("role.puff_actuation"),
+                    sharedDevice.Id,
+                    sharedDevice.Protocol.Id,
+                    [new ArtifactId("cap.pulse_actuation")])
+            ],
+            new Dictionary<ArtifactId, string>());
+    }
+
+    private static ResolvedExperimentDefinition CreateResolvedExperimentWithConflictingControlTargets()
+    {
+        var commandRoleId = new ArtifactId("role.control_center");
+        var experiment = new ExperimentDefinition(
+            new ArtifactId("exp.control_target_conflict"),
+            "Control Target Conflict",
+            "Exercise cross-session validation for multiple control targets on the same command role.",
+            [
+                new DeviceRoleDefinition(
+                    commandRoleId,
+                    "Control Center",
+                    "Provides actuation and status output.",
+                    [new ArtifactId("cap.pulse_actuation"), new ArtifactId("cap.status_report")],
+                    new ArtifactId("protocol.serial_ascii_v1"))
+            ],
+            [
+                new ParameterDefinition(
+                    new ArtifactId("param.re_target_primary"),
+                    "Primary Re Target",
+                    "float",
+                    "experiment",
+                    defaultValue: "1600"),
+                new ParameterDefinition(
+                    new ArtifactId("param.re_target_secondary"),
+                    "Secondary Re Target",
+                    "float",
+                    "experiment",
+                    defaultValue: "1700")
+            ],
+            [
+                new StreamDefinition(
+                    new ArtifactId("stream.reynolds_number"),
+                    "Reynolds Number",
+                    "transform",
+                    "scalar<double>",
+                    "runtime"),
+                new StreamDefinition(
+                    new ArtifactId("stream.flow_rate"),
+                    "Flow Rate",
+                    "transform",
+                    "scalar<double>",
+                    "runtime")
+            ],
+            [],
+            [],
+            [],
+            [],
+            [
+                new ControlTargetDefinition(
+                    new ArtifactId("control.re_primary"),
+                    "Primary Re",
+                    "Maintains the main Reynolds target.",
+                    new ArtifactId("stream.reynolds_number"),
+                    commandRoleId,
+                    "constant",
+                    "closed_loop",
+                    targetParameterId: new ArtifactId("param.re_target_primary")),
+                new ControlTargetDefinition(
+                    new ArtifactId("control.re_secondary"),
+                    "Secondary Re",
+                    "Competes for the same command role in V1.",
+                    new ArtifactId("stream.flow_rate"),
+                    commandRoleId,
+                    "constant",
+                    "closed_loop",
+                    targetParameterId: new ArtifactId("param.re_target_secondary"))
+            ]);
+
+        var controller = CreateControllerDeviceDefinition("device.controller_01");
+        var binding = new RoleBindingDefinition(
+            commandRoleId,
+            controller.Id,
+            controller.Protocol.Id,
+            [new ArtifactId("cap.pulse_actuation"), new ArtifactId("cap.status_report")],
+            new Dictionary<ArtifactId, string>
+            {
+                [new ArtifactId("param.actuator_pulse_ms")] = "2.0"
+            });
+
+        return new ResolvedExperimentDefinition(
+            experiment,
+            "1.0.0",
+            [controller],
+            [binding],
+            new Dictionary<ArtifactId, string>());
+    }
 }

@@ -66,11 +66,38 @@ public sealed class MainViewModel : IDisposable
         _ = StartRuntimeAsync();
     }
 
-    public Task<string?> InitializeRuntimeAsync(string runIndex, string? primaryTargetDraft, string? operatorNote)
+    public Task<ExperimentMonitorInitializationResult> InitializeRuntimeAsync(string runIndex, string? primaryTargetDraft, string? operatorNote)
     {
-        var runContext = BuildRunContext(runIndex, primaryTargetDraft, operatorNote);
-        _preparedRunContext = runContext;
-        return Task.FromResult<string?>($"Initialized {runContext.DisplayName ?? runContext.Id.Value}.");
+        try
+        {
+            var runContext = BuildRunContext(runIndex, primaryTargetDraft, operatorNote);
+            var validation = _runtimeCoordinator.ValidateStart(runContext.Experiment);
+            if (!validation.IsValid)
+            {
+                _preparedRunContext = null;
+                return Task.FromResult(ExperimentMonitorInitializationResult.Blocked(
+                    "Initialization blocked by cross-session validation.",
+                    BuildInitializationValidationItems(validation)));
+            }
+
+            _preparedRunContext = runContext;
+            return Task.FromResult(ExperimentMonitorInitializationResult.Ready(
+                $"Initialized {runContext.DisplayName ?? runContext.Id.Value}."));
+        }
+        catch (Exception ex)
+        {
+            _preparedRunContext = null;
+            return Task.FromResult(ExperimentMonitorInitializationResult.Blocked(
+                ex.Message,
+                [
+                    new ExperimentMonitorItem(
+                        "alarm.initialize",
+                        ExperimentMonitorSeverity.Alarm,
+                        "initialize",
+                        ex.Message,
+                        DateTimeOffset.UtcNow)
+                ]));
+        }
     }
 
     public void StopRuntime()
@@ -340,6 +367,33 @@ public sealed class MainViewModel : IDisposable
         {
             await controller.DisposeAsync().ConfigureAwait(false);
         }
+    }
+
+    private static IReadOnlyList<ExperimentMonitorItem> BuildInitializationValidationItems(CrossSessionValidationResult validation)
+    {
+        return validation.Issues
+            .Select((issue, index) => new ExperimentMonitorItem(
+                $"alarm.cross_session_validation.{index + 1}",
+                ExperimentMonitorSeverity.Alarm,
+                BuildInitializationValidationSource(issue),
+                issue.Message,
+                DateTimeOffset.UtcNow))
+            .ToArray();
+    }
+
+    private static string BuildInitializationValidationSource(CrossSessionValidationIssue issue)
+    {
+        if (issue.CommandRoleId.HasValue)
+        {
+            return issue.CommandRoleId.Value.Value;
+        }
+
+        if (issue.DeviceId.HasValue)
+        {
+            return issue.DeviceId.Value.Value;
+        }
+
+        return "cross-session validation";
     }
 
     private static bool RequiresFlowReynoldsDerivedState(ResolvedExperimentDefinition experiment)

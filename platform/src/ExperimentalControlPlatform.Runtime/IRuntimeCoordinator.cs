@@ -11,6 +11,8 @@ public interface IRuntimeCoordinator
 
     RuntimeRunContext LatestSnapshot { get; }
 
+    CrossSessionValidationResult ValidateStart(ResolvedExperimentDefinition experiment);
+
     RuntimeRunContext Start();
 
     RuntimeRunContext Start(ResolvedExperimentDefinition experiment);

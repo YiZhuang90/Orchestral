@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using ExperimentalControlPlatform.App.DevicePanels;
 using ExperimentalControlPlatform.App.Widgets;
@@ -11,7 +12,7 @@ public sealed class ExperimentMonitorPanelViewModel : ObservableObject, IDeviceT
 {
     private readonly object _syncRoot = new();
     private readonly ISnapshotOutputPort<ExperimentMonitorSnapshot> _monitorSnapshotPort;
-    private readonly Func<string, string?, string?, Task<string?>> _initializeAsync;
+    private readonly Func<string, string?, string?, Task<ExperimentMonitorInitializationResult>> _initializeAsync;
     private readonly Func<Task> _startAsync;
     private readonly Func<Task> _stopAsync;
     private readonly Func<Task> _closeWithoutApplyAsync;
@@ -32,6 +33,7 @@ public sealed class ExperimentMonitorPanelViewModel : ObservableObject, IDeviceT
     private string _footerRunLabel = "Run not started.";
     private IReadOnlyList<ExperimentMonitorItem> _displayItems = Array.Empty<ExperimentMonitorItem>();
     private IReadOnlyList<ExperimentMonitorDeviceSnapshot> _deviceSnapshots = Array.Empty<ExperimentMonitorDeviceSnapshot>();
+    private IReadOnlyList<ExperimentMonitorItem> _initializationItems = Array.Empty<ExperimentMonitorItem>();
     private readonly ValueCardItem _runStateCard = new("Run state", "Ready");
     private readonly ValueCardItem _controlCard = new("Primary control", "No active control target.");
     private readonly ValueCardItem _derivedStateCard = new("Measured state", "No derived flow state.");
@@ -39,7 +41,7 @@ public sealed class ExperimentMonitorPanelViewModel : ObservableObject, IDeviceT
 
     public ExperimentMonitorPanelViewModel(
         ISnapshotOutputPort<ExperimentMonitorSnapshot> monitorSnapshotPort,
-        Func<string, string?, string?, Task<string?>> initializeAsync,
+        Func<string, string?, string?, Task<ExperimentMonitorInitializationResult>> initializeAsync,
         Func<Task> startAsync,
         Func<Task> stopAsync,
         Func<Task> closeWithoutApplyAsync,
@@ -153,12 +155,13 @@ public sealed class ExperimentMonitorPanelViewModel : ObservableObject, IDeviceT
 
     public async Task InitializeAsync()
     {
-        var summary = await _initializeAsync(
+        var result = await _initializeAsync(
             RunIndexDraft,
             string.IsNullOrWhiteSpace(PrimaryTargetDraft) ? null : PrimaryTargetDraft,
             OperatorNoteDraft).ConfigureAwait(true);
-        _isInitialized = true;
-        _initializationStatus = summary ?? $"Initialized {RunIndexDraft}.";
+        _isInitialized = result.IsReady;
+        _initializationStatus = result.StatusMessage;
+        _initializationItems = result.ValidationItems;
         OnPropertyChanged(nameof(InitializationStatus));
         OnPropertyChanged(nameof(CanStart));
         ApplyPendingSnapshotForDisplay();
@@ -181,6 +184,7 @@ public sealed class ExperimentMonitorPanelViewModel : ObservableObject, IDeviceT
         {
             _isInitialized = false;
             _initializationStatus = "Not initialized.";
+            _initializationItems = Array.Empty<ExperimentMonitorItem>();
             OnPropertyChanged(nameof(InitializationStatus));
             OnPropertyChanged(nameof(CanStart));
             OnPropertyChanged(nameof(CanStop));
@@ -224,26 +228,40 @@ public sealed class ExperimentMonitorPanelViewModel : ObservableObject, IDeviceT
             _displaySnapshot = _pendingSnapshot;
         }
 
+        var displayedItems = _displaySnapshot.RunState == RunState.Idle && _initializationItems.Count > 0
+            ? _initializationItems
+            : _displaySnapshot.Items;
+        var warningCount = displayedItems.Count(static item => item.Severity == ExperimentMonitorSeverity.Warning);
+        var alarmCount = displayedItems.Count(static item => item.Severity == ExperimentMonitorSeverity.Alarm);
+        var highestSeverity = alarmCount > 0
+            ? ExperimentMonitorSeverity.Alarm
+            : warningCount > 0
+                ? ExperimentMonitorSeverity.Warning
+                : _displaySnapshot.HighestSeverity;
+
         CurrentRunStateLabel = _displaySnapshot.RunState switch
         {
             RunState.Running => "Running",
             RunState.Stopping => "Stopping",
+            _ when !_isInitialized && _initializationItems.Count > 0 => "Blocked",
             _ when _isInitialized => "Initialized",
             _ => "Ready"
         };
-        LiveSummary = _displaySnapshot.RunState == RunState.Idle && _isInitialized && _displaySnapshot.StateSummary == "Ready to initialize."
+        LiveSummary = _displaySnapshot.RunState == RunState.Idle && (_isInitialized || _initializationItems.Count > 0) && _displaySnapshot.StateSummary == "Ready to initialize."
             ? _initializationStatus
             : $"{_displaySnapshot.RunDisplayName}: {_displaySnapshot.StateSummary}";
         PrimaryControlSummary = _displaySnapshot.PrimaryControlSummary;
         DerivedStateSummary = _displaySnapshot.DerivedStateSummary;
-        FooterHealthLabel = _displaySnapshot.HighestSeverity switch
+        FooterHealthLabel = highestSeverity switch
         {
-            ExperimentMonitorSeverity.Alarm => $"Alarms: {_displaySnapshot.AlarmCount}",
-            ExperimentMonitorSeverity.Warning => $"Warnings: {_displaySnapshot.WarningCount}",
+            ExperimentMonitorSeverity.Alarm => $"Alarms: {Math.Max(alarmCount, _displaySnapshot.AlarmCount)}",
+            ExperimentMonitorSeverity.Warning => $"Warnings: {Math.Max(warningCount, _displaySnapshot.WarningCount)}",
             _ => "Healthy"
         };
-        FooterRunLabel = _displaySnapshot.StateSummary;
-        DisplayItems = _displaySnapshot.Items;
+        FooterRunLabel = _displaySnapshot.RunState == RunState.Idle && _initializationItems.Count > 0
+            ? _initializationStatus
+            : _displaySnapshot.StateSummary;
+        DisplayItems = displayedItems;
         DeviceSnapshots = _displaySnapshot.Devices;
         _runStateCard.Value = CurrentRunStateLabel;
         _controlCard.Value = PrimaryControlSummary;

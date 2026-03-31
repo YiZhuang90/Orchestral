@@ -14,7 +14,7 @@ public sealed class ExperimentMonitorPanelViewModelTests
         var ticker = new FakeDisplayTicker();
         using var viewModel = new ExperimentMonitorPanelViewModel(
             snapshotPort,
-            initializeAsync: (_, _, _) => Task.FromResult<string?>(null),
+            initializeAsync: (_, _, _) => Task.FromResult(ExperimentMonitorInitializationResult.Ready("Ready.")),
             startAsync: () => Task.CompletedTask,
             stopAsync: () => Task.CompletedTask,
             closeWithoutApplyAsync: () => Task.CompletedTask,
@@ -32,7 +32,7 @@ public sealed class ExperimentMonitorPanelViewModelTests
         var ticker = new FakeDisplayTicker();
         using var viewModel = new ExperimentMonitorPanelViewModel(
             snapshotPort,
-            initializeAsync: (_, _, _) => Task.FromResult<string?>(null),
+            initializeAsync: (_, _, _) => Task.FromResult(ExperimentMonitorInitializationResult.Ready("Ready.")),
             startAsync: () => Task.CompletedTask,
             stopAsync: () => Task.CompletedTask,
             closeWithoutApplyAsync: () => Task.CompletedTask,
@@ -80,7 +80,7 @@ public sealed class ExperimentMonitorPanelViewModelTests
             initializeAsync: (runIndex, target, note) =>
             {
                 initializeCalls++;
-                return Task.FromResult<string?>($"Initialized {runIndex} with {target}.");
+                return Task.FromResult(ExperimentMonitorInitializationResult.Ready($"Initialized {runIndex} with {target}."));
             },
             startAsync: () =>
             {
@@ -123,6 +123,38 @@ public sealed class ExperimentMonitorPanelViewModelTests
         Assert.False(viewModel.CanStop);
         Assert.Equal("Not initialized.", viewModel.InitializationStatus);
         Assert.Equal(1, stopCalls);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_With_Invalid_Result_Keeps_Start_Disabled_And_Shows_Blocking_Items()
+    {
+        var snapshotPort = new SnapshotOutputPort<ExperimentMonitorSnapshot>(new ExperimentMonitorSnapshot());
+        var ticker = new FakeDisplayTicker();
+        using var viewModel = new ExperimentMonitorPanelViewModel(
+            snapshotPort,
+            initializeAsync: (_, _, _) => Task.FromResult(
+                ExperimentMonitorInitializationResult.Blocked(
+                    "Initialization blocked by cross-session validation.",
+                    [
+                        new ExperimentMonitorItem(
+                            "alarm.cross_session_validation",
+                            ExperimentMonitorSeverity.Alarm,
+                            "cross-session validation",
+                            "Control targets 'control.re_primary' and 'control.re_secondary' both command role 'role.control_center'.",
+                            DateTimeOffset.Parse("2026-03-31T10:00:05+00:00"))
+                    ])),
+            startAsync: () => Task.CompletedTask,
+            stopAsync: () => Task.CompletedTask,
+            closeWithoutApplyAsync: () => Task.CompletedTask,
+            displayTicker: ticker);
+
+        await viewModel.InitializeAsync();
+        ticker.RaiseTick();
+
+        Assert.False(viewModel.CanStart);
+        Assert.Equal("Initialization blocked by cross-session validation.", viewModel.InitializationStatus);
+        Assert.Single(viewModel.DisplayItems);
+        Assert.Equal(ExperimentMonitorSeverity.Alarm, viewModel.DisplayItems[0].Severity);
     }
 
     private sealed class FakeDisplayTicker : IDisplayTicker
