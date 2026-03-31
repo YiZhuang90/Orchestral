@@ -118,6 +118,7 @@ The current branch also already reflects these architectural consequences:
 - coordinator snapshots can now carry stable run-intent metadata and artifact references separately from the ephemeral runtime `RunId`,
 - experiment definitions now carry first-generation `ControlTargetDefinition` artifacts with constant or scheduled setpoint profiles and open-loop or closed-loop regulation modes,
 - `ControllerUnitSession` now exists as the first experiment-plane runtime unit above controlled-device sessions,
+- `FlowReynoldsDerivedStateSession` now exists as the first measured-state runtime unit that derives experiment-plane flow/Reynolds/temperature truth from device-session telemetry,
 - controlled-device sessions can define device-level `EmergencyStop`,
 - acquisition-style panels can expose a small operator-facing output-settings surface,
 - and `ApplyAndExit` is treated as a session-lifecycle action rather than only a UI close action.
@@ -133,16 +134,25 @@ The current coordinator status is still only foundational:
   - runtime events
   - warnings/faults
   - panel snapshot artifacts
-  - monitor snapshot artifacts,
+  - monitor snapshot artifacts
+  - flow/Reynolds derived-state snapshot and record artifacts,
 - the first-generation `ControllerUnitSession` can now:
   - resolve one control target from the experiment package,
   - evaluate constant and scheduled target values,
   - publish `Target +/- Error` state,
   - and emit normalized control decisions above device sessions,
+- the first-generation `FlowReynoldsDerivedStateSession` can now:
+  - poll control-center pulse telemetry during a run,
+  - consume PT-104 temperature samples when available,
+  - derive flow rate, mean temperature, temperature delta, bulk velocity, and Reynolds number,
+  - publish a runtime snapshot plus a recorded sample stream,
+  - and feed those measured values into both controller and monitor units,
 - the first-generation `ExperimentMonitorSession` can now:
   - consume coordinator state and runtime-session snapshots through the runtime layer,
+  - consume derived experiment-plane measured state from `FlowReynoldsDerivedStateSession`,
   - normalize device health into monitor snapshots,
   - surface first warning/alarm items,
+  - present measured-state summary alongside `Target +/- Error`,
   - and feed those outputs to both the experiment monitor panel and run artifacts,
 - but it is not yet the full experiment-level orchestration layer for multiple active sessions.
 
@@ -348,9 +358,9 @@ The data model already allows multiple control targets, but the first-generation
 
 What remains ahead:
 
-- measured-stream wiring from real derived experiment values such as Reynolds number,
 - broader multi-target controller orchestration,
 - richer alarm rules and automatic stop-condition linkage,
+- dedicated stream projection for additional derived quantities where needed,
 - and experiment-specific controller-session projection where required.
 
 ## What

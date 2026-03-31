@@ -11,5 +11,7 @@ public interface IRunRecorder
     RunRecordingResult? CompleteRun(
         RuntimeRunContext snapshot,
         IReadOnlyList<IDeviceTestPanelViewModel> panels,
+        FlowReynoldsDerivedStateSnapshot? derivedStateSnapshot = null,
+        IReadOnlyList<FlowReynoldsDerivedStateSample>? derivedStateSamples = null,
         ExperimentMonitorSnapshot? monitorSnapshot = null);
 }

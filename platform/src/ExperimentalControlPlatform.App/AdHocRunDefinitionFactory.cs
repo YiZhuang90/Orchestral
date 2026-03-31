@@ -43,32 +43,99 @@ public sealed class AdHocRunDefinitionFactory
         var controlCenterRole = panelEntries
             .Select(static entry => entry.Role)
             .FirstOrDefault(static role => role.Id == new ArtifactId("role.control_center"));
-        if (primaryControlTargetValue.HasValue && controlCenterRole is not null)
+        if (controlCenterRole is not null)
         {
-            var targetParameterId = new ArtifactId("param.re_target");
-            var measuredSourceId = new ArtifactId("stream.reynolds_number");
             parameters.Add(new ParameterDefinition(
-                targetParameterId,
-                "Re Target",
+                FlowReynoldsArtifactIds.PulsesPerLiterParameterId,
+                "Pulses Per Liter",
+                "integer",
+                "experiment",
+                defaultValue: "80"));
+            parameters.Add(new ParameterDefinition(
+                FlowReynoldsArtifactIds.PipeInnerDiameterParameterId,
+                "Pipe Inner Diameter",
                 "float",
                 "experiment",
-                unit: "dimensionless"));
+                unit: "m",
+                defaultValue: "0.00403"));
+            parameters.Add(new ParameterDefinition(
+                FlowReynoldsArtifactIds.PipeLengthParameterId,
+                "Pipe Length",
+                "float",
+                "experiment",
+                unit: "m",
+                defaultValue: "1.0"));
+            parameters.Add(new ParameterDefinition(
+                FlowReynoldsArtifactIds.PipeRoughnessParameterId,
+                "Pipe Roughness",
+                "float",
+                "experiment",
+                unit: "m",
+                defaultValue: "0.0"));
+            parameters.Add(new ParameterDefinition(
+                FlowReynoldsArtifactIds.ReferenceTemperatureParameterId,
+                "Reference Temperature",
+                "float",
+                "experiment",
+                unit: "C",
+                defaultValue: "20.95"));
+            parameters.Add(new ParameterDefinition(
+                FlowReynoldsArtifactIds.FlowrateAverageCountParameterId,
+                "Flowrate Average Count",
+                "integer",
+                "experiment",
+                defaultValue: "100"));
+            parameters.Add(new ParameterDefinition(
+                FlowReynoldsArtifactIds.PulsePollIntervalMillisecondsParameterId,
+                "Pulse Poll Interval",
+                "integer",
+                "experiment",
+                unit: "ms",
+                defaultValue: "500"));
             streams.Add(new StreamDefinition(
-                measuredSourceId,
+                FlowReynoldsArtifactIds.FlowRateStreamId,
+                "Flow Rate",
+                "transform",
+                "scalar<double>",
+                "runtime"));
+            streams.Add(new StreamDefinition(
+                FlowReynoldsArtifactIds.ReynoldsNumberStreamId,
                 "Reynolds Number",
                 "transform",
                 "scalar<double>",
                 "runtime"));
+            streams.Add(new StreamDefinition(
+                FlowReynoldsArtifactIds.MeanTemperatureStreamId,
+                "Mean Temperature",
+                "transform",
+                "scalar<double>",
+                "runtime"));
+            streams.Add(new StreamDefinition(
+                FlowReynoldsArtifactIds.TemperatureDeltaStreamId,
+                "Temperature Delta",
+                "transform",
+                "scalar<double>",
+                "runtime"));
+        }
+
+        if (primaryControlTargetValue.HasValue && controlCenterRole is not null)
+        {
+            parameters.Add(new ParameterDefinition(
+                FlowReynoldsArtifactIds.PrimaryControlTargetParameterId,
+                "Re Target",
+                "float",
+                "experiment",
+                unit: "dimensionless"));
             controlTargets.Add(new ControlTargetDefinition(
-                new ArtifactId("control.re_primary"),
+                FlowReynoldsArtifactIds.PrimaryControlTargetId,
                 "Primary Re Control",
                 "Maintains a primary Reynolds-number target for ad hoc runtime experiments.",
-                measuredSourceId,
+                FlowReynoldsArtifactIds.ReynoldsNumberStreamId,
                 controlCenterRole.Id,
                 "constant",
                 "closed_loop",
-                targetParameterId: targetParameterId));
-            parameterValues[targetParameterId] = primaryControlTargetValue.Value.ToString("0.###", CultureInfo.InvariantCulture);
+                targetParameterId: FlowReynoldsArtifactIds.PrimaryControlTargetParameterId));
+            parameterValues[FlowReynoldsArtifactIds.PrimaryControlTargetParameterId] = primaryControlTargetValue.Value.ToString("0.###", CultureInfo.InvariantCulture);
         }
 
         var experiment = new ExperimentDefinition(

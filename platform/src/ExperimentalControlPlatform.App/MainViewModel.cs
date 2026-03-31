@@ -20,6 +20,8 @@ public sealed class MainViewModel : IDisposable
     private readonly ExperimentMonitorSession _monitorSession;
     private readonly ExperimentMonitorPanelViewModel _experimentMonitorPanel;
     private ControllerUnitSession? _controllerUnitSession;
+    private FlowReynoldsDerivedStateSession? _derivedStateSession;
+    private IStreamDeliverySubscription? _derivedStateControllerSubscription;
     private RunContextDefinition? _preparedRunContext;
 
     public MainViewModel(
@@ -113,7 +115,7 @@ public sealed class MainViewModel : IDisposable
             var started = _runtimeCoordinator.Start(runContext);
             _runRecorder.BeginRun(started);
             RuntimeStatus.Update(started);
-            await AttachControllerForRunAsync(started).ConfigureAwait(false);
+            await AttachExperimentPlaneSessionsForRunAsync(started).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -130,7 +132,7 @@ public sealed class MainViewModel : IDisposable
                 : _runtimeCoordinator.RequestStopAsync(reason);
             RuntimeStatus.Update(_runtimeCoordinator.LatestSnapshot);
             var stopped = await stopTask;
-            await StopControllerAsync(reason, stopped.StoppedAtUtc).ConfigureAwait(false);
+            await StopExperimentPlaneSessionsAsync(reason, stopped.StoppedAtUtc).ConfigureAwait(false);
             RuntimeStatus.Update(stopped);
             _preparedRunContext = null;
             FinalizeRunRecording(stopped);
@@ -150,17 +152,19 @@ public sealed class MainViewModel : IDisposable
             return;
         }
 
-        LastRunRecording = _runRecorder.CompleteRun(stopped, DevicePanels, _monitorSession.Snapshot.Current);
+        LastRunRecording = _runRecorder.CompleteRun(
+            stopped,
+            DevicePanels,
+            _derivedStateSession?.State.Current,
+            _derivedStateSession?.RecordedSamples,
+            _monitorSession.Snapshot.Current);
     }
 
     public void Dispose()
     {
         _experimentMonitorPanel.Dispose();
         RunAsyncCleanup(() => _monitorSession.DisposeAsync().AsTask());
-        if (_controllerUnitSession is not null)
-        {
-            RunAsyncCleanup(() => _controllerUnitSession.DisposeAsync().AsTask());
-        }
+        RunAsyncCleanup(DisposeExperimentPlaneSessionsAsync);
 
         foreach (var panel in DevicePanels)
         {
@@ -208,42 +212,139 @@ public sealed class MainViewModel : IDisposable
             []);
     }
 
-    private async Task AttachControllerForRunAsync(RuntimeRunContext started)
+    private async Task AttachExperimentPlaneSessionsForRunAsync(RuntimeRunContext started)
     {
-        if (!started.StartedAtUtc.HasValue || started.Experiment?.ControlTargets.Count is not > 0)
+        if (!started.StartedAtUtc.HasValue || started.Experiment is null)
         {
-            await ReplaceControllerAsync(null).ConfigureAwait(false);
+            await ReplaceExperimentPlaneSessionsAsync(null, null, null).ConfigureAwait(false);
             return;
         }
 
-        var controlTarget = started.Experiment.ControlTargets[0];
-        var controller = new ControllerUnitSession(
-            started.Experiment,
-            controlTarget.Id,
-            started.StartedAtUtc.Value);
-        await ReplaceControllerAsync(controller).ConfigureAwait(false);
-        await controller.SampleAsync(started.StartedAtUtc.Value).ConfigureAwait(false);
+        var experiment = started.Experiment;
+        ControllerUnitSession? controller = null;
+        FlowReynoldsDerivedStateSession? derivedState = null;
+        IStreamDeliverySubscription? derivedStateControllerSubscription = null;
+        try
+        {
+            if (experiment.ControlTargets.Count > 0)
+            {
+                var controlTarget = experiment.ControlTargets[0];
+                controller = new ControllerUnitSession(
+                    experiment,
+                    controlTarget.Id,
+                    started.StartedAtUtc.Value);
+                await controller.SampleAsync(started.StartedAtUtc.Value).ConfigureAwait(false);
+            }
+
+            if (RequiresFlowReynoldsDerivedState(experiment))
+            {
+                var controlCenterSession = _sessionRegistry.Sessions.OfType<ControlCenterSession>().FirstOrDefault();
+                if (controlCenterSession is not null)
+                {
+                    var pt104Session = _sessionRegistry.Sessions.OfType<Pt104Session>().FirstOrDefault();
+                    derivedState = new FlowReynoldsDerivedStateSession(experiment);
+                    if (controller is not null)
+                    {
+                        derivedStateControllerSubscription = derivedState.Samples.Subscribe(
+                            StreamDeliveryPolicy.LatestOnly(),
+                            sample => new ValueTask(controller.SampleAsync(sample.ObservedAtUtc, sample.ReynoldsNumber)));
+                    }
+
+                    await derivedState.AttachRuntimeSourcesAsync(controlCenterSession, pt104Session).ConfigureAwait(false);
+                }
+            }
+
+            await ReplaceExperimentPlaneSessionsAsync(controller, derivedState, derivedStateControllerSubscription).ConfigureAwait(false);
+        }
+        catch
+        {
+            derivedStateControllerSubscription?.Dispose();
+            if (derivedState is not null)
+            {
+                await derivedState.DisposeAsync().ConfigureAwait(false);
+            }
+
+            if (controller is not null)
+            {
+                await controller.DisposeAsync().ConfigureAwait(false);
+            }
+
+            throw;
+        }
     }
 
-    private async Task ReplaceControllerAsync(ControllerUnitSession? controller)
+    private async Task ReplaceExperimentPlaneSessionsAsync(
+        ControllerUnitSession? controller,
+        FlowReynoldsDerivedStateSession? derivedState,
+        IStreamDeliverySubscription? derivedStateControllerSubscription)
     {
-        var previous = _controllerUnitSession;
+        var previousController = _controllerUnitSession;
+        var previousDerivedState = _derivedStateSession;
+        var previousDerivedStateControllerSubscription = _derivedStateControllerSubscription;
+
         _controllerUnitSession = controller;
+        _derivedStateSession = derivedState;
+        _derivedStateControllerSubscription = derivedStateControllerSubscription;
+
         _monitorSession.AttachController(controller);
-        if (previous is not null)
+        _monitorSession.AttachDerivedState(derivedState);
+
+        previousDerivedStateControllerSubscription?.Dispose();
+        if (previousDerivedState is not null)
         {
-            await previous.DisposeAsync().ConfigureAwait(false);
+            await previousDerivedState.DisposeAsync().ConfigureAwait(false);
+        }
+
+        if (previousController is not null)
+        {
+            await previousController.DisposeAsync().ConfigureAwait(false);
         }
     }
 
-    private async Task StopControllerAsync(StopReason reason, DateTimeOffset? stoppedAtUtc)
+    private async Task StopExperimentPlaneSessionsAsync(StopReason reason, DateTimeOffset? stoppedAtUtc)
     {
-        if (_controllerUnitSession is null)
+        if (_derivedStateSession is not null)
         {
-            return;
+            await _derivedStateSession.StopAsync(reason).ConfigureAwait(false);
         }
 
-        await _controllerUnitSession.StopAsync(reason, stoppedAtUtc).ConfigureAwait(false);
+        _derivedStateControllerSubscription?.Dispose();
+        _derivedStateControllerSubscription = null;
+
+        if (_controllerUnitSession is not null)
+        {
+            await _controllerUnitSession.StopAsync(reason, stoppedAtUtc).ConfigureAwait(false);
+        }
+    }
+
+    private async Task DisposeExperimentPlaneSessionsAsync()
+    {
+        var controller = _controllerUnitSession;
+        var derivedState = _derivedStateSession;
+        var subscription = _derivedStateControllerSubscription;
+
+        _controllerUnitSession = null;
+        _derivedStateSession = null;
+        _derivedStateControllerSubscription = null;
+
+        _monitorSession.AttachController(null);
+        _monitorSession.AttachDerivedState(null);
+
+        subscription?.Dispose();
+        if (derivedState is not null)
+        {
+            await derivedState.DisposeAsync().ConfigureAwait(false);
+        }
+
+        if (controller is not null)
+        {
+            await controller.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    private static bool RequiresFlowReynoldsDerivedState(ResolvedExperimentDefinition experiment)
+    {
+        return experiment.Experiment.Streams.Any(static stream => stream.Id == FlowReynoldsArtifactIds.ReynoldsNumberStreamId);
     }
 
     private static string Slugify(string value, string fallback)
@@ -282,6 +383,8 @@ public sealed class MainViewModel : IDisposable
         public RunRecordingResult? CompleteRun(
             RuntimeRunContext snapshot,
             IReadOnlyList<IDeviceTestPanelViewModel> panels,
+            FlowReynoldsDerivedStateSnapshot? derivedStateSnapshot = null,
+            IReadOnlyList<FlowReynoldsDerivedStateSample>? derivedStateSamples = null,
             ExperimentMonitorSnapshot? monitorSnapshot = null) => null;
     }
 }

@@ -15,6 +15,7 @@ public sealed class ExperimentMonitorSession : IAsyncDisposable
     private readonly SnapshotOutputPort<ExperimentMonitorSnapshot> _snapshot = new(new ExperimentMonitorSnapshot());
     private IReadOnlyList<IExperimentMonitorSource> _sources;
     private ControllerUnitSession? _controller;
+    private FlowReynoldsDerivedStateSession? _derivedState;
     private bool _disposed;
 
     public ExperimentMonitorSession(
@@ -73,6 +74,30 @@ public sealed class ExperimentMonitorSession : IAsyncDisposable
         RecomputeSnapshot();
     }
 
+    public void AttachDerivedState(FlowReynoldsDerivedStateSession? derivedState)
+    {
+        lock (_syncRoot)
+        {
+            if (ReferenceEquals(_derivedState, derivedState))
+            {
+                return;
+            }
+
+            if (_derivedState is not null)
+            {
+                _derivedState.State.Changed -= HandleDerivedStateChanged;
+            }
+
+            _derivedState = derivedState;
+            if (_derivedState is not null)
+            {
+                _derivedState.State.Changed += HandleDerivedStateChanged;
+            }
+        }
+
+        RecomputeSnapshot();
+    }
+
     public ValueTask DisposeAsync()
     {
         if (_disposed)
@@ -92,6 +117,11 @@ public sealed class ExperimentMonitorSession : IAsyncDisposable
             if (_controller is not null)
             {
                 _controller.State.Changed -= HandleControllerStateChanged;
+            }
+
+            if (_derivedState is not null)
+            {
+                _derivedState.State.Changed -= HandleDerivedStateChanged;
             }
         }
 
@@ -116,6 +146,11 @@ public sealed class ExperimentMonitorSession : IAsyncDisposable
     }
 
     private void HandleControllerStateChanged(ControllerUnitState _)
+    {
+        RecomputeSnapshot();
+    }
+
+    private void HandleDerivedStateChanged(FlowReynoldsDerivedStateSnapshot _)
     {
         RecomputeSnapshot();
     }
@@ -157,10 +192,12 @@ public sealed class ExperimentMonitorSession : IAsyncDisposable
         }
 
         ControllerUnitState? controllerState;
+        FlowReynoldsDerivedStateSnapshot? derivedStateSnapshot;
         IReadOnlyList<IExperimentMonitorSource> sources;
         lock (_syncRoot)
         {
             controllerState = _controller?.State.Current;
+            derivedStateSnapshot = _derivedState?.State.Current;
             sources = _sources;
         }
 
@@ -170,7 +207,7 @@ public sealed class ExperimentMonitorSession : IAsyncDisposable
             .Select(static source => source.CreateSnapshot())
             .OrderBy(static snapshot => snapshot.DisplayName, StringComparer.Ordinal)
             .ToArray();
-        var items = BuildItems(runtimeSnapshot, controllerState, deviceSnapshots, observedAtUtc);
+        var items = BuildItems(runtimeSnapshot, controllerState, derivedStateSnapshot, deviceSnapshots, observedAtUtc);
         var warningCount = items.Count(static item => item.Severity == ExperimentMonitorSeverity.Warning);
         var alarmCount = items.Count(static item => item.Severity == ExperimentMonitorSeverity.Alarm);
         var highestSeverity = items.Count == 0
@@ -194,13 +231,19 @@ public sealed class ExperimentMonitorSession : IAsyncDisposable
             PrimaryControlMeasuredValue = controllerState?.MeasuredValue,
             PrimaryControlErrorValue = controllerState?.ErrorValue,
             PrimaryControlMeasuredValueIsStale = controllerState?.MeasuredValueIsStale ?? false,
-            PrimaryControlSummary = BuildPrimaryControlSummary(controllerState)
+            PrimaryControlSummary = BuildPrimaryControlSummary(controllerState),
+            DerivedFlowRateLitersPerMinute = derivedStateSnapshot?.FilteredFlowRateLitersPerMinute,
+            DerivedReynoldsNumber = derivedStateSnapshot?.ReynoldsNumber,
+            DerivedMeanTemperatureC = derivedStateSnapshot?.MeanTemperatureC,
+            DerivedStateIsStale = IsDerivedStateStale(derivedStateSnapshot, observedAtUtc),
+            DerivedStateSummary = BuildDerivedStateSummary(derivedStateSnapshot, observedAtUtc)
         });
     }
 
     private IReadOnlyList<ExperimentMonitorItem> BuildItems(
         RuntimeRunContext runtimeSnapshot,
         ControllerUnitState? controllerState,
+        FlowReynoldsDerivedStateSnapshot? derivedStateSnapshot,
         IReadOnlyList<ExperimentMonitorDeviceSnapshot> deviceSnapshots,
         DateTimeOffset observedAtUtc)
     {
@@ -266,6 +309,17 @@ public sealed class ExperimentMonitorSession : IAsyncDisposable
                 observedAtUtc));
         }
 
+        if (runtimeSnapshot.State == RunState.Running
+            && IsDerivedStateStale(derivedStateSnapshot, observedAtUtc))
+        {
+            items.Add(new ExperimentMonitorItem(
+                "warn.derived.reynolds_number.stale",
+                ExperimentMonitorSeverity.Warning,
+                "derived.reynolds_number",
+                "Derived Reynolds state is stale.",
+                observedAtUtc));
+        }
+
         return items
             .OrderByDescending(static item => item.Severity)
             .ThenBy(static item => item.Source, StringComparer.Ordinal)
@@ -319,6 +373,28 @@ public sealed class ExperimentMonitorSession : IAsyncDisposable
         return controllerState.MeasuredValueIsStale
             ? $"{controllerState.ControlTargetName} {controllerState.TargetValue.Value:0.###} +/- {controllerState.ErrorValue:0.###} (stale)"
             : $"{controllerState.ControlTargetName} {controllerState.TargetValue.Value:0.###} +/- {controllerState.ErrorValue:0.###}";
+    }
+
+    private string BuildDerivedStateSummary(FlowReynoldsDerivedStateSnapshot? derivedStateSnapshot, DateTimeOffset observedAtUtc)
+    {
+        if (derivedStateSnapshot is null || !derivedStateSnapshot.ReynoldsNumber.HasValue)
+        {
+            return "No derived flow state.";
+        }
+
+        var staleSuffix = IsDerivedStateStale(derivedStateSnapshot, observedAtUtc) ? " (stale)" : string.Empty;
+        var temperatureSuffix = derivedStateSnapshot.UsesFallbackTemperature ? " (fallback temperature)" : string.Empty;
+        return $"Re {derivedStateSnapshot.ReynoldsNumber.Value:0.###}, {derivedStateSnapshot.FilteredFlowRateLitersPerMinute!.Value:0.###} L/min, {derivedStateSnapshot.MeanTemperatureC!.Value:0.###} C{temperatureSuffix}{staleSuffix}";
+    }
+
+    private bool IsDerivedStateStale(FlowReynoldsDerivedStateSnapshot? derivedStateSnapshot, DateTimeOffset observedAtUtc)
+    {
+        if (derivedStateSnapshot?.ObservedAtUtc is null)
+        {
+            return false;
+        }
+
+        return observedAtUtc - derivedStateSnapshot.ObservedAtUtc.Value > _sourceStaleThreshold;
     }
 
     private static string GetSeverityToken(bool criticalControl) => criticalControl ? "alarm" : "warn";
