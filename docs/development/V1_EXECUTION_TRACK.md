@@ -49,7 +49,7 @@ Status:
   - measured-value wiring into `ControllerUnitSession`,
   - monitor-side derived-state presentation and stale-state warnings,
   - and run-artifact persistence for derived-state snapshot/record outputs,
-- universal runtime is now strong enough that the next missing work should not be framed as "one more universal runtime unit",
+- universal runtime is now strong enough that the next missing work should not be framed as new first-generation runtime creation,
 - next shared guidance slice is formalizing the `Experiment Logic` layer that sits above runtime and below later AI orchestration.
 
 Required foundations:
@@ -91,7 +91,28 @@ Required foundations:
 - [SYSTEM_LANGUAGE_SPEC.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/architecture/SYSTEM_LANGUAGE_SPEC.md)
 - [EXPERIMENT_LOGIC_LAYER.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/architecture/EXPERIMENT_LOGIC_LAYER.md)
 
-### 3. First Reference Experiment
+### 3. Universal Hardening Before Experiment Logic Proof
+
+Status:
+
+- the first-generation universal runtime foundation is built enough to stop adding new generic core slices by reflex,
+- the remaining universal work is now:
+  - `Control-center capability decomposition`
+  - `Cross-session validation`
+  - `Experiment-definition linting`
+  - `Replay / simulator harness`,
+- after those are complete, the next step should be a minimum code-level proof of the experiment-logic layer rather than another broad runtime rewrite.
+
+Guiding plan:
+
+- [2026-03-31-universal-completion-and-experiment-logic-proof-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-31-universal-completion-and-experiment-logic-proof-plan.md)
+
+As each hardening unit lands, update both:
+
+- this section's sequencing note,
+- and section `1. Runtime And Safety Foundation` if the shared runtime status bullets changed.
+
+### 4. First Reference Experiment
 
 Status:
 
@@ -100,7 +121,7 @@ Status:
   - experiment-logic units such as camera-pair semantics and experiment-specific processing,
   - experiment-specific controller sessions as required by the chosen reference experiment.
 
-### 4. AI Brain Integration
+### 5. AI Brain Integration
 
 Status:
 
