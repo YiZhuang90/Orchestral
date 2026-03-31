@@ -51,7 +51,7 @@ public sealed class ControlCenterPanelViewModelTests
         Assert.Equal(new ControlCenterCommand(false, false, 0), service.SentCommands.Last());
         var appliedSettings = Assert.IsType<IntegrationPanelAppliedSettingsOutput>(viewModel.AppliedSettingsOutput);
         var appliedEndpointSettings = Assert.IsAssignableFrom<IReadOnlyDictionary<string, string?>>(appliedSettings.EndpointSettings);
-        Assert.Equal("0", appliedEndpointSettings["StepCount"]);
+        Assert.Equal("0", appliedEndpointSettings["puff.step_count"]);
         var appliedNotes = Assert.IsAssignableFrom<IReadOnlyList<string>>(appliedSettings.NormalizationNotes);
         Assert.Contains(
             appliedNotes,
@@ -60,7 +60,7 @@ public sealed class ControlCenterPanelViewModelTests
         Assert.Equal("Applied settings were staged and the control center returned to idle wait state.", sessionEnd.ExitReason);
         var sessionEndSnapshot = Assert.IsType<IntegrationPanelAppliedSettingsOutput>(sessionEnd.AppliedSettingsSnapshot);
         var sessionEndEndpointSettings = Assert.IsAssignableFrom<IReadOnlyDictionary<string, string?>>(sessionEndSnapshot.EndpointSettings);
-        Assert.Equal("0", sessionEndEndpointSettings["StepCount"]);
+        Assert.Equal("0", sessionEndEndpointSettings["puff.step_count"]);
         Assert.True(service.ConnectionDisposed);
         Assert.True(closeRequested);
     }
@@ -77,6 +77,28 @@ public sealed class ControlCenterPanelViewModelTests
         viewModel.StepCountInputDraft = "-1";
 
         Assert.False(viewModel.CanApplyCommand);
+    }
+
+    [Fact]
+    public async Task ApplyCommandAsync_UsesCapabilityScopedEndpointSettings()
+    {
+        var service = new FakeControlCenterService();
+        var registry = new DeviceSessionRegistry();
+        var viewModel = new ControlCenterPanelViewModel(service, registry);
+
+        await viewModel.RefreshDevicesAsync();
+        await viewModel.ConnectAsync();
+        viewModel.SelectedLaserStateItem = new ControlStateOption("On", true);
+        viewModel.SelectedPuffStateItem = new ControlStateOption("On", true);
+        viewModel.StepCountInputDraft = "12";
+
+        await viewModel.ApplyCommandAsync();
+
+        var appliedSettings = Assert.IsType<IntegrationPanelAppliedSettingsOutput>(viewModel.AppliedSettingsOutput);
+        var endpointSettings = Assert.IsAssignableFrom<IReadOnlyDictionary<string, string?>>(appliedSettings.EndpointSettings);
+        Assert.Equal("true", endpointSettings["laser.enabled"]);
+        Assert.Equal("true", endpointSettings["puff.enabled"]);
+        Assert.Equal("12", endpointSettings["puff.step_count"]);
     }
 
     private sealed class FakeControlCenterService : IControlCenterService

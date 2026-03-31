@@ -120,6 +120,11 @@ The current branch also already reflects these architectural consequences:
 - experiment definitions now carry first-generation `ControlTargetDefinition` artifacts with constant or scheduled setpoint profiles and open-loop or closed-loop regulation modes,
 - `ControllerUnitSession` now exists as the first experiment-plane runtime unit above controlled-device sessions,
 - `FlowReynoldsDerivedStateSession` now exists as the first measured-state runtime unit that derives experiment-plane flow/Reynolds/temperature truth from device-session telemetry,
+- `ControlCenterSession` now exposes explicit capability surfaces for:
+  - `LaserControl`
+  - `PuffActuation`
+  - `FlowTelemetry`
+  while still preserving one truthful combined serial transport command beneath those runtime surfaces,
 - controlled-device sessions can define device-level `EmergencyStop`,
 - acquisition-style panels can expose a small operator-facing output-settings surface,
 - and `ApplyAndExit` is treated as a session-lifecycle action rather than only a UI close action.
@@ -149,7 +154,7 @@ The current coordinator status is still only foundational:
   - publish `Target +/- Error` state,
   - and emit normalized control decisions above device sessions,
 - the first-generation `FlowReynoldsDerivedStateSession` can now:
-  - poll control-center pulse telemetry during a run,
+  - poll explicit control-center flow telemetry during a run,
   - consume PT-104 temperature samples when available,
   - derive flow rate, mean temperature, temperature delta, bulk velocity, and Reynolds number,
   - publish a runtime snapshot plus a recorded sample stream,

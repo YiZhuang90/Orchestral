@@ -101,7 +101,7 @@ Protocol answers "how do we talk to this device?" Capability answers "what can w
 
 A capability is an operation or data service that a device can provide.
 
-Capability identifiers are canonical machine names used in experiment definitions, bindings, and validation. They should use stable lowercase `snake_case` names such as `frame_stream`, `scalar_sample_stream`, and `pulse_actuation`.
+Capability identifiers are canonical machine names used in experiment definitions, bindings, and validation. They should use stable lowercase `snake_case` names such as `frame_stream`, `scalar_sample_stream`, `pulse_actuation`, `laser_control`, and `flow_telemetry`.
 
 Human-facing prose names may be longer or more descriptive, but they should map directly to a canonical capability identifier.
 
@@ -357,6 +357,9 @@ Purpose: observe and control a turbulence-transition setup using two cameras, on
 - `camera_downstream` requires `frame_stream`, `exposure_control`, `roi_control`.
 - `flow_actuator` requires `pulse_actuation` and `status_report`.
 - `temperature_inlet` requires `scalar_sample_stream` and `health_check`.
+
+Combined devices may expose multiple runtime capability surfaces even when the transport protocol is shared.
+For example, the control-center serial device should be modeled in runtime as separate `laser_control`, `pulse_actuation`, and `flow_telemetry` capability surfaces above one mixed serial command/readback protocol.
 
 ### 6.4 Devices and protocols
 

@@ -302,7 +302,7 @@ public sealed class ControlCenterPanelViewModel : ObservableObject, IControlCent
             return;
         }
 
-        await _session.ReadPulseCountAsync().ConfigureAwait(false);
+        await _session.ReadFlowTelemetryAsync().ConfigureAwait(false);
     }
 
     public async Task ApplyCommandAsync()
@@ -460,10 +460,13 @@ public sealed class ControlCenterPanelViewModel : ObservableObject, IControlCent
         UnbindSession();
         _session = session;
         session.State.Changed += HandleStateChanged;
+        session.LaserControl.Changed += HandleLaserControlChanged;
+        session.PuffActuation.Changed += HandlePuffActuationChanged;
+        session.FlowTelemetry.Changed += HandleFlowTelemetryChanged;
         session.Diagnostics.Changed += HandleDiagnosticsChanged;
         session.AppliedState.Changed += HandleAppliedStateChanged;
         session.LatestPulse.Changed += HandleLatestPulseChanged;
-        session.PulseReads.Produced += HandlePulseProduced;
+        session.FlowTelemetryReads.Produced += HandleFlowTelemetryProduced;
         session.SessionEnd.Changed += HandleSessionEndChanged;
 
         if (session.State.Current is not null)
@@ -475,6 +478,21 @@ public sealed class ControlCenterPanelViewModel : ObservableObject, IControlCent
         {
             HandleDiagnosticsChanged(session.Diagnostics.Current);
         }
+
+        if (session.LaserControl.Current is not null)
+        {
+            HandleLaserControlChanged(session.LaserControl.Current);
+        }
+
+        if (session.PuffActuation.Current is not null)
+        {
+            HandlePuffActuationChanged(session.PuffActuation.Current);
+        }
+
+        if (session.FlowTelemetry.Current is not null)
+        {
+            HandleFlowTelemetryChanged(session.FlowTelemetry.Current);
+        }
     }
 
     private void UnbindSession()
@@ -485,10 +503,13 @@ public sealed class ControlCenterPanelViewModel : ObservableObject, IControlCent
         }
 
         _session.State.Changed -= HandleStateChanged;
+        _session.LaserControl.Changed -= HandleLaserControlChanged;
+        _session.PuffActuation.Changed -= HandlePuffActuationChanged;
+        _session.FlowTelemetry.Changed -= HandleFlowTelemetryChanged;
         _session.Diagnostics.Changed -= HandleDiagnosticsChanged;
         _session.AppliedState.Changed -= HandleAppliedStateChanged;
         _session.LatestPulse.Changed -= HandleLatestPulseChanged;
-        _session.PulseReads.Produced -= HandlePulseProduced;
+        _session.FlowTelemetryReads.Produced -= HandleFlowTelemetryProduced;
         _session.SessionEnd.Changed -= HandleSessionEndChanged;
         _session = null;
     }
@@ -499,14 +520,35 @@ public sealed class ControlCenterPanelViewModel : ObservableObject, IControlCent
         {
             IsConnected = state.Connected;
             _statusMessage = state.StatusMessage;
-            _laserCard.Value = FormatState(state.LastCommandedLaserEnabled);
-            _puffCard.Value = FormatState(state.LastCommandedPuffEnabled);
-            _stepCard.Value = state.LastStepCount?.ToString(CultureInfo.InvariantCulture) ?? "--";
-            _pulseCard.Value = state.LastPulseCount?.ToString(CultureInfo.InvariantCulture) ?? "--";
-            FooterLaserLabel = $"Laser cmd: {FormatState(state.LastCommandedLaserEnabled)}";
-            FooterPuffLabel = $"Puff cmd: {FormatState(state.LastCommandedPuffEnabled)}";
             FooterSystemStateLabel = state.Busy ? "Busy" : (state.Connected ? "Ready" : "System Ready");
             RefreshStatusOutput();
+        });
+    }
+
+    private void HandleLaserControlChanged(ControlCenterLaserCapabilityState state)
+    {
+        RunOnUi(() =>
+        {
+            _laserCard.Value = FormatState(state.LastCommandedEnabled);
+            FooterLaserLabel = $"Laser cmd: {FormatState(state.LastCommandedEnabled)}";
+        });
+    }
+
+    private void HandlePuffActuationChanged(ControlCenterPuffActuationCapabilityState state)
+    {
+        RunOnUi(() =>
+        {
+            _puffCard.Value = FormatState(state.LastCommandedEnabled);
+            _stepCard.Value = state.LastStepCount?.ToString(CultureInfo.InvariantCulture) ?? "--";
+            FooterPuffLabel = $"Puff cmd: {FormatState(state.LastCommandedEnabled)}";
+        });
+    }
+
+    private void HandleFlowTelemetryChanged(ControlCenterFlowTelemetryState state)
+    {
+        RunOnUi(() =>
+        {
+            _pulseCard.Value = state.LastPulseCount?.ToString(CultureInfo.InvariantCulture) ?? "--";
         });
     }
 
@@ -563,8 +605,8 @@ public sealed class ControlCenterPanelViewModel : ObservableObject, IControlCent
             {
                 Timestamp = pulse.ReceivedAt,
                 DeviceId = pulse.DeviceId,
-                EndpointId = "pulse-counter",
-                PayloadType = "ControlCenterPulseCount",
+                EndpointId = "flow_telemetry.pulse_count",
+                PayloadType = "ControlCenterFlowTelemetryPulseCount",
                 PayloadValue = pulse.PulseCount.ToString(CultureInfo.InvariantCulture),
                 Units = "pulses",
                 SequenceNumber = _session?.State.Current?.PulseSequence ?? 0,
@@ -574,7 +616,7 @@ public sealed class ControlCenterPanelViewModel : ObservableObject, IControlCent
         });
     }
 
-    private void HandlePulseProduced(ControlCenterPulseReadback pulse)
+    private void HandleFlowTelemetryProduced(ControlCenterPulseReadback pulse)
     {
         RunOnUi(() =>
         {
@@ -715,9 +757,9 @@ public sealed class ControlCenterPanelViewModel : ObservableObject, IControlCent
             },
             EndpointSettings = new Dictionary<string, string?>
             {
-                ["LaserEnabled"] = command.LaserEnabled ? "true" : "false",
-                ["PuffEnabled"] = command.PuffEnabled ? "true" : "false",
-                ["StepCount"] = command.StepCount.ToString(CultureInfo.InvariantCulture)
+                ["laser.enabled"] = command.LaserEnabled ? "true" : "false",
+                ["puff.enabled"] = command.PuffEnabled ? "true" : "false",
+                ["puff.step_count"] = command.StepCount.ToString(CultureInfo.InvariantCulture)
             },
             SessionSettings = new Dictionary<string, string?>
             {

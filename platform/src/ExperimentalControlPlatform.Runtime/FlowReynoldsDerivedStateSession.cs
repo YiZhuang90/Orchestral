@@ -219,7 +219,7 @@ public sealed class FlowReynoldsDerivedStateSession : IAsyncDisposable
         if (controlCenterSession is not null)
         {
             _controlCenterSession = controlCenterSession;
-            _controlCenterSession.PulseReads.Produced += HandlePulseReadProduced;
+            _controlCenterSession.FlowTelemetryReads.Produced += HandleFlowTelemetryProduced;
             _pulsePollingCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             _pulsePollingTask = Task.Run(() => RunPulsePollingLoopAsync(controlCenterSession, _pulsePollingCancellation.Token), CancellationToken.None);
         }
@@ -272,7 +272,7 @@ public sealed class FlowReynoldsDerivedStateSession : IAsyncDisposable
 
         if (controlCenterSession is not null)
         {
-            controlCenterSession.PulseReads.Produced -= HandlePulseReadProduced;
+            controlCenterSession.FlowTelemetryReads.Produced -= HandleFlowTelemetryProduced;
         }
 
         if (pt104Session is not null)
@@ -299,7 +299,7 @@ public sealed class FlowReynoldsDerivedStateSession : IAsyncDisposable
         pulsePollingCancellation?.Dispose();
     }
 
-    private void HandlePulseReadProduced(ControlCenterPulseReadback readback)
+    private void HandleFlowTelemetryProduced(ControlCenterPulseReadback readback)
     {
         RecordPulseReadback(readback);
     }
@@ -317,10 +317,10 @@ public sealed class FlowReynoldsDerivedStateSession : IAsyncDisposable
             {
                 try
                 {
-                    await controlCenterSession.ReadPulseCountAsync(cancellationToken).ConfigureAwait(false);
+                    await controlCenterSession.ReadFlowTelemetryAsync(cancellationToken).ConfigureAwait(false);
                     PublishDiagnostics(Diagnostics.Current! with
                     {
-                        LastCommand = "Poll control-center pulse telemetry",
+                        LastCommand = "Poll control-center flow telemetry",
                         LastValidationResult = $"Polling every {_pulsePollInterval.TotalMilliseconds:0} ms.",
                         LastError = null
                     });
@@ -333,7 +333,7 @@ public sealed class FlowReynoldsDerivedStateSession : IAsyncDisposable
                 {
                     PublishDiagnostics(Diagnostics.Current! with
                     {
-                        LastCommand = "Poll control-center pulse telemetry",
+                        LastCommand = "Poll control-center flow telemetry",
                         LastError = ex.Message
                     });
                 }
