@@ -18,7 +18,9 @@ Read this together with:
 - [INTEGRATION_PANEL_IO_CONTRACT.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/INTEGRATION_PANEL_IO_CONTRACT.md)
 - [DEVICE_ARCHETYPE_MAPPING.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/DEVICE_ARCHETYPE_MAPPING.md)
 - [TIMING_AND_SYNCHRONIZATION_STRATEGY.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/TIMING_AND_SYNCHRONIZATION_STRATEGY.md)
-- [EXPERIMENT_LOGIC_LAYER.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/architecture/EXPERIMENT_LOGIC_LAYER.md)
+- [EXPERIMENT_LOGIC_LAYER.md](./EXPERIMENT_LOGIC_LAYER.md)
+- [EXPERIMENT_CANVAS_ARCHITECTURE.md](./EXPERIMENT_CANVAS_ARCHITECTURE.md)
+- [VIRTUAL_TWIN_AND_SIMULATION_STRATEGY.md](./VIRTUAL_TWIN_AND_SIMULATION_STRATEGY.md)
 
 ## Why
 
@@ -137,6 +139,15 @@ This branch now also makes one architectural boundary explicit:
 - but it is better classified as `experiment logic` than as universal runtime infrastructure,
 - so future comparable units should be planned through the experiment-logic layer instead of expanding the universal runtime bucket indefinitely.
 
+This branch should also now be read with one implementation rule in mind:
+
+- runtime sessions must sit above a stable Orchestral service/session contract,
+- so the same runtime session can later run against:
+  - real services,
+  - virtual twins,
+  - replay sources,
+  - or synthetic sources.
+
 The current coordinator status is still only foundational:
 
 - `RuntimeCoordinator` now owns truthful run-level `Idle -> Running -> Stopping -> Idle` stop transitions,
@@ -203,6 +214,15 @@ flowchart LR
     D --> J["Data Display / Compare"]
     D --> K["Computation / Recording"]
     C <-- L["Operator / Automation / Runtime Logic"]
+```
+
+The same layering rule should hold for virtualized execution:
+
+```mermaid
+flowchart LR
+    A["Real Service Or Adapter"] --> B["Device Session"]
+    C["Virtual Service / Replay / Synthetic"] --> B
+    B --> D["Runtime Consumers"]
 ```
 
 ### How state ownership maps into runtime IO
@@ -288,6 +308,31 @@ Default first-generation rules:
 - connect and disconnect within one panel lifetime normally reuse the same session object
 - a new session is created only when the host intentionally starts a new device-session lifetime
 - controlled-device sessions should define an explicit device-level safe-stop path when the hardware can cause unsafe real-world state
+
+### How real and virtual implementations should relate
+
+Concrete implementations should be able to run in different source modes:
+
+- `Real`
+- `Virtual`
+- `Replay`
+- `Synthetic`
+
+The important rule is:
+
+- the runtime session should stay the same,
+- the Orchestral contract should stay the same,
+- only the implementation behind that contract should change.
+
+The preferred architecture is:
+
+- real device service for live hardware,
+- virtual device service for an offline twin,
+- replay source for recorded data,
+- synthetic source for generated signals.
+
+The choice between those source modes should belong to experiment building or canvas-level system design rather than to panel-local lifecycle buttons.
+Once that choice is made, it becomes part of the resolved concrete implementation for the run.
 
 ### How experiment monitor and controller units should work
 

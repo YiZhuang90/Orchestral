@@ -27,6 +27,43 @@ This workflow exists to reduce the burden of:
 
 It does not assume that AI will always succeed. It assumes that AI should do as much as it can before asking the user for more.
 
+### 2.1 Relationship To Development Workflow
+
+When this spec is used to implement a real device integration slice, it should be composed with:
+
+- [MODULE_DEVELOPMENT_WORKFLOW.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/development/MODULE_DEVELOPMENT_WORKFLOW.md)
+- [SUBAGENT_DEVELOPMENT_CONTRACT.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/collaboration/SUBAGENT_DEVELOPMENT_CONTRACT.md)
+
+The intended relationship is:
+
+- this document defines the domain-specific device-integration rules,
+- `MODULE_DEVELOPMENT_WORKFLOW.md` defines the generic execution skeleton,
+- `SUBAGENT_DEVELOPMENT_CONTRACT.md` defines how bounded delegation is used inside that workflow.
+
+For device-integration development, this spec should be treated as:
+
+- a `required foundation` document,
+- not as the execution plan itself.
+
+That means a real device slice should still:
+
+1. clarify the slice and list required foundation docs,
+2. inspect current code and hardware reality,
+3. write a slice-specific execution plan,
+4. implement with verification,
+5. review against both code truth and this integration spec,
+6. land the slice and update execution tracking.
+
+Sub-agents, when used, should be applied inside that workflow for bounded work such as:
+
+- protocol/manual/SDK discovery,
+- current-code inspection,
+- driver or service implementation,
+- session or panel wiring,
+- and review or retest.
+
+They should not treat this spec as permission to do vague end-to-end work without a bounded task package.
+
 ## 3. Inputs
 
 The workflow should begin from minimal user input, such as:
@@ -61,6 +98,7 @@ If successful, the workflow should produce:
 - a runtime-session mapping,
 - a verification plan,
 - a handover verification record,
+- a virtual-twin or simulation closure path when feasible,
 - and device integration documentation.
 
 If unsuccessful after bounded retries, it should produce:
@@ -368,7 +406,35 @@ At the workflow level, the key requirement is:
 - verify the corresponding internal data flow,
 - and record what was truly confirmed before handover.
 
-## 7.9 Stage I: guided escalation
+## 7.9 Stage I: virtual twin and simulation closure
+
+After the real device path is working and truthfully wired into the runtime/session/panel model, Orchestral should also try to leave the integration in a shape that supports a virtual execution path.
+
+The preferred outputs are:
+
+- a virtual device service that implements the same Orchestral service/session contract as the real device path,
+- or a replay path that can drive the same runtime-facing consumer boundary,
+- or a synthetic source for scalar or event-oriented devices,
+- or, when necessary, a narrower transport mock for serial or protocol-level testing.
+
+The key rule is:
+
+- do not make the virtual path depend first on faking the raw vendor SDK,
+- make it depend first on the same Orchestral-facing contract used by the real runtime session.
+
+This virtual closure path is the preferred final stage of device integration because it lets Orchestral continue testing controller, monitor, recorder, and experiment-logic paths even when hardware is absent.
+
+For the current V1 hardening sequence, this stage should be read as a preferred closure target rather than as a first-pass blocker.
+The first universal harness should stay limited to single-session replay and scalar synthetic sources rather than expanding immediately to broad full-fidelity virtual services for every device family.
+
+At the workflow level, this stage distinguishes:
+
+- `functionally usable integration`: the real device path works and is verified,
+- `fully closed integration`: the real device path works and a virtual or simulated execution path also exists.
+
+For simple scalar or serial devices, this stage may be relatively small. For imaging or multi-capability devices, it may remain partial on the first pass, but the integration should still be left in a shape that can accept that virtual closure without re-architecting the runtime session.
+
+## 7.10 Stage J: guided escalation
 
 If Orchestral still cannot produce a working initialization/read path after three rounds, it should stop the automatic attempt and guide the user.
 
@@ -469,6 +535,7 @@ The workflow should ultimately be able to generate or update:
 - a test harness,
 - a troubleshooting log,
 - a handover verification report,
+- a virtual-twin or simulation closure note,
 - an implementation-window mapping,
 - and a widget/archetype selection record.
 
@@ -574,4 +641,5 @@ This workflow is successful when Orchestral can:
 - reuse or adapt the existing widget stack instead of defaulting to one-off UI,
 - verify the actual panel through both user-facing interaction and internal data-flow checks before handover,
 - repeat that verification after troubleshooting rather than only after the first implementation,
+- leave the integration in a shape that can support a virtual twin or simulation closure path without re-architecting the runtime session,
 - and, when it still fails, guide the user toward exactly the missing information instead of stalling vaguely.

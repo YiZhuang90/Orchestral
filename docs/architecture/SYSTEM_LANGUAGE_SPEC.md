@@ -6,11 +6,13 @@ This document defines the core language of Orchestral V1. It is the semantic lay
 
 The goal is not to define a visual editor format or a generic plugin framework. The goal is to define stable nouns and their relationships so the platform can validate, generate, and execute experiments consistently.
 
+The experiment canvas may later present these nouns visually, but this document remains the semantic source of truth rather than a UI-layout specification.
+
 ## 2. Design Rules
 
 - The language is artifact-first and schema-backed.
 - Experiment definitions describe intent and structure, not driver internals.
-- Device roles describe needs; devices satisfy those needs.
+- Experiment roles describe needs; concrete implementations satisfy those needs.
 - Protocols describe communication semantics.
 - Capabilities describe what a device can provide or accept.
 - Capability names are canonical identifiers, not prose labels.
@@ -30,7 +32,7 @@ An experiment is the top-level scientific workflow definition.
 An experiment defines:
 
 - the purpose of the run,
-- the device roles required,
+- the experiment roles required,
 - experiment-level parameters,
 - control targets,
 - stream inputs and derived streams,
@@ -41,9 +43,26 @@ An experiment defines:
 
 An experiment does not bind to specific hardware directly. It names what the system needs and what should happen when the experiment runs.
 
-### 3.2 Device Role
+### 3.2 Experiment Function
 
-A device role is a functional requirement inside an experiment.
+An experiment function is a high-level scientific or system job inside an experiment.
+
+Examples:
+
+- downstream puff detection,
+- upstream verification,
+- Reynolds regulation,
+- temperature monitoring,
+- run recording.
+
+An experiment function is broader than one experiment role.
+It may include acquisition, processing, detection, control, and output responsibilities together.
+
+In the future experiment canvas, top-level blocks should map to experiment functions rather than to vendor devices.
+
+### 3.3 Experiment Role
+
+An experiment role is a functional requirement inside an experiment.
 
 A role says what kind of device is needed, such as:
 
@@ -54,9 +73,26 @@ A role says what kind of device is needed, such as:
 
 A role is abstract. It does not identify a vendor, model, or serial number. A role can require one or more capabilities and may constrain protocol family or output shape.
 
-### 3.3 Device
+### 3.4 Concrete Implementation
 
-A device is a concrete hardware or simulated instance that can be bound to a role.
+A concrete implementation is the real or virtual implementation bound to an experiment role.
+
+Examples:
+
+- a real `HuaTengCamera`,
+- a real `PT104`,
+- a virtual control-center service,
+- a replay-backed stream source,
+- a synthetic scalar source.
+
+Concrete implementation sits below experiment-role meaning and above the transport or runtime-service details that make execution possible.
+
+A concrete implementation is the run-bound realization of a role.
+It may wrap a device, but replay and synthetic implementations are not themselves devices.
+
+### 3.5 Device
+
+A device is the identifiable hardware endpoint or device-shaped twin that exposes protocol and capability semantics to Orchestral.
 
 A device contains:
 
@@ -66,22 +102,41 @@ A device contains:
 - configurable parameters,
 - health status.
 
-A device may satisfy one role in one experiment run and a different role in another run, provided its capabilities and protocol semantics are compatible.
+A device may back one concrete implementation in one run and a different one in another run, provided its capabilities and protocol semantics are compatible.
 
-### 3.4 Role Binding
+Replay and synthetic sources are concrete implementations, but they are not devices.
 
-Role binding is the explicit association of a device role with a concrete device for a specific run.
+### 3.6 Source Mode
 
-Role binding is the bridge between the abstract experiment and the concrete hardware. A binding resolves:
+Source mode describes how a concrete implementation is currently realized.
 
-- which device instance fills the role,
-- which protocol instance or protocol configuration is used,
-- which role-required capabilities are satisfied by the device,
-- which device and role parameters are active for the run.
+The first canonical modes should be:
+
+- `Real`
+- `Virtual`
+- `Replay`
+- `Synthetic`
+
+These modes are important because one experiment function or role may stay stable while the bound concrete implementation changes source mode.
+
+Source mode is selected by experiment-building or binding surfaces and then becomes a property of the resolved concrete implementation for that run.
+
+### 3.7 Role Binding
+
+Role binding is the explicit association of an experiment role with a concrete implementation for a specific run.
+
+Role binding is the bridge between the abstract experiment and the concrete execution path. A binding resolves:
+
+- which concrete implementation fills the role,
+- which device, replay source, or synthetic source stands behind that implementation,
+- which protocol instance or protocol configuration is used when relevant,
+- which role-required capabilities are satisfied,
+- which source mode is active,
+- and which implementation and role parameters are active for the run.
 
 A binding is specific to one run context. It is part of the resolved runtime state and part of the run manifest.
 
-### 3.5 Protocol
+### 3.8 Protocol
 
 A protocol is the communication contract used to interact with a device.
 
@@ -97,7 +152,7 @@ A protocol describes:
 
 Protocol answers "how do we talk to this device?" Capability answers "what can we ask it to do?"
 
-### 3.6 Capability
+### 3.9 Capability
 
 A capability is an operation or data service that a device can provide.
 
@@ -116,7 +171,7 @@ Examples:
 
 Capabilities are the main compatibility boundary between an experiment role and a concrete device. The experiment asks for capabilities; the device advertises capabilities.
 
-### 3.7 Parameter
+### 3.10 Parameter
 
 A parameter is a named value that configures an experiment, a device binding, a transform, a monitor, or a stop condition.
 
@@ -131,7 +186,7 @@ Parameters have explicit metadata such as:
 
 Parameters are not free-form runtime variables. They are declared in the experiment language so they can be validated, surfaced in UI, and recorded in the run manifest.
 
-### 3.8 Stream
+### 3.11 Stream
 
 A stream is a time-varying sequence of values or events produced by a device, transform, or monitor.
 
@@ -145,7 +200,7 @@ Streams may represent:
 
 A stream has a producer, a schema, and a time basis. It may be consumed by transforms, monitors, logging, or UI components.
 
-### 3.9 Transform
+### 3.12 Transform
 
 A transform converts one or more input streams into one or more output streams.
 
@@ -159,7 +214,7 @@ Transforms are used for:
 
 Transforms are part of the experiment runtime model. They are not the same as device capabilities because they operate on data already inside the experiment graph.
 
-### 3.10 Monitor
+### 3.13 Monitor
 
 A monitor is a named runtime observation or summary of an experiment condition or derived value.
 
@@ -186,7 +241,7 @@ For a primary controlled variable, a monitor may present live tracking state in 
 
 Display-rate decimation is a UI concern only. A monitor surface may render at a lower display rate without changing the underlying stream, recorder fidelity, or alarm evaluation.
 
-### 3.11 Control Target
+### 3.14 Control Target
 
 A control target is a named experiment-level declaration that says:
 
@@ -214,7 +269,7 @@ The system language should allow multiple control targets in one experiment, eve
 
 If a derived quantity is used as the measured input for control, it must be surfaced as a named stream before a control target references it. Monitor identities are not valid control-target measured sources.
 
-### 3.12 Stop Condition
+### 3.15 Stop Condition
 
 A stop condition is a rule that ends or pauses a run when a condition is met.
 
@@ -228,7 +283,7 @@ Stop conditions may be:
 
 Stop conditions are system-level rules. They are checked by the runtime, and when satisfied they produce a stop reason that becomes part of the run manifest.
 
-### 3.13 Output
+### 3.16 Output
 
 An output is a declared artifact or data product produced by a run.
 
@@ -243,7 +298,7 @@ Outputs may include:
 
 Outputs are declared in the experiment so the runtime knows what to persist and the user knows what to expect.
 
-### 3.14 Run Manifest
+### 3.17 Run Manifest
 
 A run manifest is the authoritative record of one execution of an experiment.
 
@@ -262,7 +317,7 @@ It records:
 
 The run manifest is not a full data lake. It is the compact, structured summary that ties the experiment definition to the actual execution.
 
-### 3.15 Experiment Logic
+### 3.18 Experiment Logic
 
 Experiment logic is the experiment-specific runtime meaning layered on top of the universal runtime foundation.
 
@@ -303,10 +358,13 @@ If a unit depends on one experiment's scientific meaning rather than remaining r
 
 The language should be read as a graph of constrained relationships:
 
-- an experiment requires one or more device roles,
+- an experiment may be described in terms of one or more experiment functions,
+- an experiment function expands into one or more experiment roles and logic responsibilities,
+- an experiment requires one or more experiment roles,
 - a role requires one or more capabilities,
+- a concrete implementation may run in real, virtual, replay, or synthetic source mode,
 - a device provides capabilities through a protocol,
-- a device binding connects a device to a role,
+- a role binding connects an experiment role to a concrete implementation,
 - parameters configure experiment behavior and device behavior,
 - control targets define how measured experiment state should drive commands,
 - streams carry data through the runtime,
@@ -344,6 +402,14 @@ At minimum, a binding should verify:
 The language should not require the experiment definition to know vendor names, driver classes, or low-level implementation details.
 
 A binding should be represented explicitly in the resolved run state and in the run manifest, so a run can be replayed or audited without reconstructing the mapping from logs.
+
+When a canvas is present, it should use these nouns in this order:
+
+1. experiment function
+2. experiment role
+3. concrete implementation
+
+That preserves high-level user intent while still allowing the runtime to bind down to concrete devices or virtual sources.
 
 ## 6. Turbulence Example
 

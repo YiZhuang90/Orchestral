@@ -37,6 +37,16 @@ So the project needs a formal boundary:
 - universal runtime below
 - experiment logic above
 
+The experiment canvas should sit on the same side of this boundary as experiment logic.
+
+That means:
+
+- top-level canvas blocks represent `Experiment Functions`,
+- those functions expand into `Experiment Roles`,
+- and those roles later bind to `Concrete Implementations`.
+
+Experiment logic is the code and runtime meaning that make those high-level function blocks real.
+
 ## Layer Boundaries
 
 ### Universal Runtime Foundation
@@ -83,6 +93,7 @@ This layer answers questions like:
 - how do several devices work together in this experiment?
 - what derived state is important for this experiment?
 - what detection/control logic belongs to this experiment?
+- how does one high-level experiment function decompose into roles, transforms, detectors, controllers, and outputs?
 
 ### AI Orchestration
 
@@ -115,6 +126,18 @@ flowchart LR
     A["Hardware / Adapters"] --> B["Universal Runtime"]
     B --> C["Experiment Logic"]
     C --> D["Operator Surface / Reports / Future AI"]
+```
+
+For canvas-oriented design and binding, the conceptual mapping is:
+
+```mermaid
+flowchart TD
+    A["Experiment Function"] --> B["Experiment Roles"]
+    A --> C["Experiment Logic Units"]
+    B --> D["Concrete Implementations"]
+    D --> E["Universal Runtime"]
+    E --> C
+    C --> F["Operator Surface / Reports"]
 ```
 
 Examples:
@@ -230,7 +253,7 @@ Before broad experiment-logic expansion, Orchestral should still finish the smal
 - control-center capability decomposition
 - cross-session validation
 - experiment-definition linting
-- replay / simulator harness
+- virtual device and replay/simulation harness
 
 After those are done, the minimum code-level proof of this layer should use the already-built Reynolds logic as the first experiment-logic boundary test.
 
