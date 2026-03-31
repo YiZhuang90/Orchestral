@@ -223,7 +223,22 @@ When planning future work:
 2. move experiment-specific meaning into experiment logic
 3. only then build the specific reference experiment units on that layer
 
-So the next units after this document should come from the experiment-logic layer, not from a fictional "one more universal runtime unit" bucket.
+So the next units after this document should come from the experiment-logic layer, not from another round of first-generation runtime creation by reflex.
+
+Before broad experiment-logic expansion, Orchestral should still finish the small remaining set of universal hardening units:
+
+- control-center capability decomposition
+- cross-session validation
+- experiment-definition linting
+- replay / simulator harness
+
+After those are done, the minimum code-level proof of this layer should use the already-built Reynolds logic as the first experiment-logic boundary test.
+
+That minimum proof should:
+
+- give experiment logic an explicit code-level home,
+- keep runtime infrastructure reusable,
+- and prove that one experiment-logic unit can consume runtime outputs and still feed controller, monitor, and recorder correctly.
 
 ## Success Criterion
 
