@@ -16,7 +16,7 @@ public sealed class MainViewModel : IDisposable
     private readonly IDeviceSessionRegistry _sessionRegistry;
     private readonly IRuntimeCoordinator _runtimeCoordinator;
     private readonly IRunRecorder _runRecorder;
-    private readonly AdHocRunDefinitionFactory _adHocRunDefinitionFactory;
+    private readonly IRunDefinitionFactory _runDefinitionFactory;
     private readonly ExperimentMonitorSession _monitorSession;
     private readonly ExperimentMonitorPanelViewModel _experimentMonitorPanel;
     private ControllerUnitSession? _controllerUnitSession;
@@ -29,13 +29,13 @@ public sealed class MainViewModel : IDisposable
         IDeviceSessionRegistry sessionRegistry,
         IEnumerable<IDeviceTestPanelViewModel> devicePanels,
         IRunRecorder? runRecorder = null,
-        AdHocRunDefinitionFactory? adHocRunDefinitionFactory = null)
+        IRunDefinitionFactory? adHocRunDefinitionFactory = null)
     {
         _sessionRegistry = sessionRegistry ?? throw new ArgumentNullException(nameof(sessionRegistry));
         _runtimeCoordinator = runtimeCoordinator ?? throw new ArgumentNullException(nameof(runtimeCoordinator));
         ArgumentNullException.ThrowIfNull(devicePanels);
         _runRecorder = runRecorder ?? new NullRunRecorder();
-        _adHocRunDefinitionFactory = adHocRunDefinitionFactory ?? new AdHocRunDefinitionFactory();
+        _runDefinitionFactory = adHocRunDefinitionFactory ?? new AdHocRunDefinitionFactory();
         RuntimeStatus = new RuntimeStatusViewModel(_runtimeCoordinator.LatestSnapshot);
         DevicePanels = new ReadOnlyCollection<IDeviceTestPanelViewModel>(new List<IDeviceTestPanelViewModel>(devicePanels));
         _monitorSession = new ExperimentMonitorSession(_runtimeCoordinator, _sessionRegistry);
@@ -71,13 +71,11 @@ public sealed class MainViewModel : IDisposable
         try
         {
             var runContext = BuildRunContext(runIndex, primaryTargetDraft, operatorNote);
-            var validation = _runtimeCoordinator.ValidateStart(runContext.Experiment);
-            if (!validation.IsValid)
+            var initializationValidation = ValidateRunContextForInitialization(runContext);
+            if (!initializationValidation.IsReady)
             {
                 _preparedRunContext = null;
-                return Task.FromResult(ExperimentMonitorInitializationResult.Blocked(
-                    "Initialization blocked by cross-session validation.",
-                    BuildInitializationValidationItems(validation)));
+                return Task.FromResult(initializationValidation);
             }
 
             _preparedRunContext = runContext;
@@ -138,6 +136,12 @@ public sealed class MainViewModel : IDisposable
                 $"run-{DateTimeOffset.Now:yyyyMMdd-HHmmss}",
                 null,
                 null);
+            var initializationValidation = ValidateRunContextForInitialization(runContext);
+            if (!initializationValidation.IsReady)
+            {
+                throw new InvalidOperationException(initializationValidation.StatusMessage);
+            }
+
             _preparedRunContext = null;
             var started = _runtimeCoordinator.Start(runContext);
             _runRecorder.BeginRun(started);
@@ -217,7 +221,7 @@ public sealed class MainViewModel : IDisposable
             primaryTargetValue = parsed;
         }
 
-        var experiment = _adHocRunDefinitionFactory.Create(DevicePanels, primaryTargetValue);
+        var experiment = _runDefinitionFactory.Create(DevicePanels, primaryTargetValue);
         var runContextId = new ArtifactId($"runctx.{Slugify(normalizedRunIndex, "ad_hoc_runtime")}");
         var metadata = new Dictionary<ArtifactId, string>
         {
@@ -237,6 +241,28 @@ public sealed class MainViewModel : IDisposable
             new Dictionary<ArtifactId, ArtifactId>(),
             [],
             []);
+    }
+
+    private ExperimentMonitorInitializationResult ValidateRunContextForInitialization(RunContextDefinition runContext)
+    {
+        var lint = runContext.Experiment.Experiment.Lint();
+        if (!lint.IsValid)
+        {
+            return ExperimentMonitorInitializationResult.Blocked(
+                "Initialization blocked by experiment-definition linting.",
+                BuildInitializationLintItems(lint));
+        }
+
+        var validation = _runtimeCoordinator.ValidateStart(runContext.Experiment);
+        if (!validation.IsValid)
+        {
+            return ExperimentMonitorInitializationResult.Blocked(
+                "Initialization blocked by cross-session validation.",
+                BuildInitializationValidationItems(validation));
+        }
+
+        return ExperimentMonitorInitializationResult.Ready(
+            $"Initialized {runContext.DisplayName ?? runContext.Id.Value}.");
     }
 
     private async Task AttachExperimentPlaneSessionsForRunAsync(RuntimeRunContext started)
@@ -376,6 +402,19 @@ public sealed class MainViewModel : IDisposable
                 $"alarm.cross_session_validation.{index + 1}",
                 ExperimentMonitorSeverity.Alarm,
                 BuildInitializationValidationSource(issue),
+                issue.Message,
+                DateTimeOffset.UtcNow))
+            .ToArray();
+    }
+
+    private static IReadOnlyList<ExperimentMonitorItem> BuildInitializationLintItems(ExperimentDefinitionLintResult lint)
+    {
+        return lint.Issues
+            .Where(static issue => issue.Severity == ExperimentDefinitionLintSeverity.Error)
+            .Select((issue, index) => new ExperimentMonitorItem(
+                $"alarm.experiment_definition_linting.{index + 1}",
+                ExperimentMonitorSeverity.Alarm,
+                "experiment-definition linting",
                 issue.Message,
                 DateTimeOffset.UtcNow))
             .ToArray();

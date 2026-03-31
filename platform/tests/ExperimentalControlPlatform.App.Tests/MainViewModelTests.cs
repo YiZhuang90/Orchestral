@@ -8,6 +8,7 @@ using System.Windows.Input;
 using ExperimentalControlPlatform.App.DevicePanels;
 using ExperimentalControlPlatform.App.DevicePanels.Contracts;
 using ExperimentalControlPlatform.App.ExperimentMonitor;
+using ExperimentalControlPlatform.Core.Artifacts;
 using ExperimentalControlPlatform.Devices.ControlCenter;
 using ExperimentalControlPlatform.Runtime;
 
@@ -157,6 +158,24 @@ public sealed class MainViewModelTests
         }
     }
 
+    [Fact]
+    public async Task InitializeRuntimeAsync_With_Lint_Errors_Blocks_Before_CrossSession_Validation()
+    {
+        var coordinator = new RuntimeCoordinator(new FakeRegistry());
+        using var viewModel = new MainViewModel(
+            coordinator,
+            new FakeRegistry(),
+            new[] { new FakeIntegrationPanel("Camera", null) },
+            runRecorder: null,
+            adHocRunDefinitionFactory: new InvalidLintRunDefinitionFactory());
+
+        var result = await viewModel.InitializeRuntimeAsync("run-001", null, null);
+
+        Assert.False(result.IsReady);
+        Assert.Equal("Initialization blocked by experiment-definition linting.", result.StatusMessage);
+        Assert.Contains(result.ValidationItems, item => item.Source == "experiment-definition linting");
+    }
+
     private sealed class FakeRegistry : IDeviceSessionRegistry
     {
         private readonly IReadOnlyCollection<IDeviceSession> _sessions;
@@ -185,6 +204,84 @@ public sealed class MainViewModelTests
         public bool Remove(DeviceSessionId sessionId) => false;
 
         public Task StopAllAsync(StopReason reason, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class InvalidLintRunDefinitionFactory : IRunDefinitionFactory
+    {
+        public ResolvedExperimentDefinition Create(IEnumerable<IDeviceTestPanelViewModel> panels)
+        {
+            return Create(panels, primaryControlTargetValue: null);
+        }
+
+        public ResolvedExperimentDefinition Create(IEnumerable<IDeviceTestPanelViewModel> panels, double? primaryControlTargetValue)
+        {
+            var experiment = new ExperimentDefinition(
+                new ArtifactId("exp.invalid_lint_block"),
+                "Invalid Lint Block",
+                "Returns an authored package with a broken monitor reference.",
+                [
+                    new DeviceRoleDefinition(
+                        new ArtifactId("role.camera_upstream"),
+                        "Upstream Camera",
+                        "Captures the upstream view.",
+                        [new ArtifactId("cap.frame_stream")],
+                        new ArtifactId("protocol.vendor_sdk_camera_v1"))
+                ],
+                [],
+                [
+                    new StreamDefinition(
+                        new ArtifactId("stream.frame"),
+                        "Frame",
+                        "device",
+                        "image",
+                        "sample")
+                ],
+                [],
+                [
+                    new MonitorDefinition(
+                        new ArtifactId("monitor.signal"),
+                        "Signal Monitor",
+                        "Watches a missing stream.",
+                        "display-only",
+                        [new ArtifactId("stream.missing_signal")])
+                ],
+                [],
+                []);
+
+            var device = new DeviceDefinition(
+                new ArtifactId("device.camera_01"),
+                "Camera 01",
+                "camera_01",
+                new ProtocolDefinition(
+                    new ArtifactId("protocol.vendor_sdk_camera_v1"),
+                    "Vendor Camera",
+                    "sdk",
+                    "request-response",
+                    "session",
+                    "best-effort",
+                    "fail-fast",
+                    "manual"),
+                [
+                    new CapabilityDefinition(
+                        new ArtifactId("cap.frame_stream"),
+                        "frame_stream",
+                        "Produces image frames.")
+                ],
+                [],
+                "healthy");
+            var binding = new RoleBindingDefinition(
+                new ArtifactId("role.camera_upstream"),
+                device.Id,
+                device.Protocol.Id,
+                [new ArtifactId("cap.frame_stream")]);
+
+            return new ResolvedExperimentDefinition(
+                experiment,
+                "test.v1",
+                [device],
+                [binding],
+                new Dictionary<ArtifactId, string>());
+        }
     }
 
     private sealed class FakeControlCenterService : IControlCenterService
