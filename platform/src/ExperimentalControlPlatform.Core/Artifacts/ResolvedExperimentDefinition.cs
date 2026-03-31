@@ -71,6 +71,16 @@ public sealed record class ResolvedExperimentDefinition
         return false;
     }
 
+    public CrossSessionValidationResult ValidateCrossSession()
+    {
+        var issues = new List<CrossSessionValidationIssue>();
+
+        ValidateSharedDeviceCapabilityClaims(RoleBindings, issues);
+        ValidateControlTargetCommandRoleConflicts(ControlTargets, issues);
+
+        return new CrossSessionValidationResult(issues);
+    }
+
     public static ExperimentBindingValidationResult Validate(
         ExperimentDefinition experiment,
         IReadOnlyList<DeviceDefinition> devices,
@@ -407,6 +417,69 @@ public sealed record class ResolvedExperimentDefinition
                     deviceId: device.Id,
                     parameterId: parameterEntry.Key));
             }
+        }
+    }
+
+    private static void ValidateSharedDeviceCapabilityClaims(
+        IReadOnlyList<RoleBindingDefinition> roleBindings,
+        ICollection<CrossSessionValidationIssue> issues)
+    {
+        foreach (var deviceGroup in roleBindings.GroupBy(static binding => binding.DeviceId))
+        {
+            if (deviceGroup.Count() < 2)
+            {
+                continue;
+            }
+
+            var capabilityClaims = deviceGroup
+                .SelectMany(
+                    static binding => binding.SatisfiedCapabilityIds.Select(capabilityId => new
+                    {
+                        binding.RoleId,
+                        CapabilityId = capabilityId
+                    }))
+                .GroupBy(static claim => claim.CapabilityId);
+
+            foreach (var claimGroup in capabilityClaims)
+            {
+                var claimedByRoles = claimGroup
+                    .Select(static claim => claim.RoleId)
+                    .Distinct()
+                    .ToArray();
+                if (claimedByRoles.Length < 2)
+                {
+                    continue;
+                }
+
+                issues.Add(new CrossSessionValidationIssue(
+                    "duplicate_shared_device_capability_claim",
+                    $"Concrete device '{deviceGroup.Key}' assigns capability '{claimGroup.Key}' to more than one bound role: {string.Join(", ", claimedByRoles)}.",
+                    deviceId: deviceGroup.Key,
+                    capabilityId: claimGroup.Key,
+                    roleIds: claimedByRoles));
+            }
+        }
+    }
+
+    private static void ValidateControlTargetCommandRoleConflicts(
+        IReadOnlyList<ControlTargetDefinition> controlTargets,
+        ICollection<CrossSessionValidationIssue> issues)
+    {
+        foreach (var commandRoleGroup in controlTargets.GroupBy(static controlTarget => controlTarget.CommandRoleId))
+        {
+            if (commandRoleGroup.Count() < 2)
+            {
+                continue;
+            }
+
+            var conflictingTargets = commandRoleGroup
+                .Select(static controlTarget => controlTarget.Id)
+                .ToArray();
+            issues.Add(new CrossSessionValidationIssue(
+                "conflicting_control_target_command_role",
+                $"Control targets {string.Join(", ", conflictingTargets)} all command role '{commandRoleGroup.Key}'. V1 allows only one control target per command role.",
+                commandRoleId: commandRoleGroup.Key,
+                controlTargetIds: conflictingTargets));
         }
     }
 

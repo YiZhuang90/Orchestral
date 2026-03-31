@@ -59,6 +59,40 @@ public sealed class RuntimeCoordinatorTests
     }
 
     [Fact]
+    public void ValidateStart_Returns_CrossSession_Issues_For_Invalid_Resolved_Experiment()
+    {
+        var coordinator = new RuntimeCoordinator(new FakeRegistry());
+        var experiment = CreateCrossSessionInvalidResolvedExperimentDefinition();
+
+        var validation = coordinator.ValidateStart(experiment);
+
+        Assert.False(validation.IsValid);
+        Assert.Contains(validation.Issues, issue => issue.Code == "conflicting_control_target_command_role");
+    }
+
+    [Fact]
+    public void Start_WithRunContext_Rejects_CrossSession_Invalid_Experiment()
+    {
+        var coordinator = new RuntimeCoordinator(new FakeRegistry());
+        var runContext = CreateRunContextDefinition(CreateCrossSessionInvalidResolvedExperimentDefinition());
+
+        var exception = Assert.Throws<InvalidOperationException>(() => coordinator.Start(runContext));
+
+        Assert.Contains("cross-session validation", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Start_WithResolvedExperiment_Rejects_CrossSession_Invalid_Experiment()
+    {
+        var coordinator = new RuntimeCoordinator(new FakeRegistry());
+        var experiment = CreateCrossSessionInvalidResolvedExperimentDefinition();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => coordinator.Start(experiment));
+
+        Assert.Contains("cross-session validation", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task RequestStopAsync_TransitionsThroughStoppingAndThenReturnsCompletedStopSnapshot()
     {
         var registry = new FakeRegistry(blockStopUntilReleased: true);
@@ -396,9 +430,12 @@ public sealed class RuntimeCoordinatorTests
     }
 
     private static RunContextDefinition CreateRunContextDefinition() =>
+        CreateRunContextDefinition(CreateResolvedExperimentDefinition());
+
+    private static RunContextDefinition CreateRunContextDefinition(ResolvedExperimentDefinition experiment) =>
         new(
             new ArtifactId("runctx.transition_demo_001"),
-            CreateResolvedExperimentDefinition(),
+            experiment,
             "transition-demo-001",
             "looping mode, RR=0.36",
             new Dictionary<ArtifactId, string>
@@ -411,4 +448,104 @@ public sealed class RuntimeCoordinatorTests
             },
             [new ArtifactId("decision.run_001")],
             [new ArtifactId("artifact.run_manifest_001")]);
+
+    private static ResolvedExperimentDefinition CreateCrossSessionInvalidResolvedExperimentDefinition()
+    {
+        var commandRoleId = new ArtifactId("role.control_center");
+        var experiment = new ExperimentDefinition(
+            new ArtifactId("exp.control_target_conflict"),
+            "Control Target Conflict",
+            "Exercise cross-session validation for conflicting command-role ownership.",
+            [
+                new DeviceRoleDefinition(
+                    commandRoleId,
+                    "Control Center",
+                    "Provides actuation and status output.",
+                    [new ArtifactId("cap.pulse_actuation"), new ArtifactId("cap.status_report")],
+                    new ArtifactId("protocol.serial_ascii_v1"))
+            ],
+            [
+                new ParameterDefinition(
+                    new ArtifactId("param.re_target_primary"),
+                    "Primary Re Target",
+                    "float",
+                    "experiment",
+                    defaultValue: "1600"),
+                new ParameterDefinition(
+                    new ArtifactId("param.re_target_secondary"),
+                    "Secondary Re Target",
+                    "float",
+                    "experiment",
+                    defaultValue: "1700")
+            ],
+            [
+                new StreamDefinition(
+                    new ArtifactId("stream.reynolds_number"),
+                    "Reynolds Number",
+                    "transform",
+                    "scalar<double>",
+                    "runtime"),
+                new StreamDefinition(
+                    new ArtifactId("stream.flow_rate"),
+                    "Flow Rate",
+                    "transform",
+                    "scalar<double>",
+                    "runtime")
+            ],
+            [],
+            [],
+            [],
+            [],
+            [
+                new ControlTargetDefinition(
+                    new ArtifactId("control.re_primary"),
+                    "Primary Re",
+                    "Maintains the main Reynolds target.",
+                    new ArtifactId("stream.reynolds_number"),
+                    commandRoleId,
+                    "constant",
+                    "closed_loop",
+                    targetParameterId: new ArtifactId("param.re_target_primary")),
+                new ControlTargetDefinition(
+                    new ArtifactId("control.re_secondary"),
+                    "Secondary Re",
+                    "Competes for the same command role in V1.",
+                    new ArtifactId("stream.flow_rate"),
+                    commandRoleId,
+                    "constant",
+                    "closed_loop",
+                    targetParameterId: new ArtifactId("param.re_target_secondary"))
+            ]);
+        var controllerDevice = new DeviceDefinition(
+            new ArtifactId("device.controller_01"),
+            "Controller 01",
+            "controller_01",
+            new ProtocolDefinition(
+                new ArtifactId("protocol.serial_ascii_v1"),
+                "Serial ASCII",
+                "serial",
+                "request-response",
+                "session",
+                "best-effort",
+                "fail-fast",
+                "manual"),
+            [
+                new CapabilityDefinition(new ArtifactId("cap.pulse_actuation"), "pulse_actuation", "Issues trigger pulses."),
+                new CapabilityDefinition(new ArtifactId("cap.status_report"), "status_report", "Reports actuator state.")
+            ],
+            [],
+            "healthy");
+        var binding = new RoleBindingDefinition(
+            commandRoleId,
+            controllerDevice.Id,
+            controllerDevice.Protocol.Id,
+            [new ArtifactId("cap.pulse_actuation"), new ArtifactId("cap.status_report")]);
+
+        return new ResolvedExperimentDefinition(
+            experiment,
+            "1.0.0",
+            [controllerDevice],
+            [binding],
+            new Dictionary<ArtifactId, string>());
+    }
 }

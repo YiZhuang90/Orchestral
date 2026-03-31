@@ -30,6 +30,12 @@ public sealed class RuntimeCoordinator : IRuntimeCoordinator
         }
     }
 
+    public CrossSessionValidationResult ValidateStart(ResolvedExperimentDefinition experiment)
+    {
+        ArgumentNullException.ThrowIfNull(experiment);
+        return experiment.ValidateCrossSession();
+    }
+
     public RuntimeRunContext Start()
     {
         return StartCore(null, null);
@@ -55,6 +61,15 @@ public sealed class RuntimeCoordinator : IRuntimeCoordinator
             if (IsActive(_latestSnapshot.State))
             {
                 throw new InvalidOperationException("Runtime is already active and cannot be started again.");
+            }
+
+            if (experiment is not null)
+            {
+                var validation = ValidateStart(experiment);
+                if (!validation.IsValid)
+                {
+                    throw new InvalidOperationException($"Cross-session validation failed: {validation.Summary}");
+                }
             }
 
             var startedAtUtc = DateTimeOffset.UtcNow;

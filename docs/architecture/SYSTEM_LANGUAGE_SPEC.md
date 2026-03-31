@@ -319,6 +319,11 @@ The language should be read as a graph of constrained relationships:
 
 The platform should validate these relationships before a run starts.
 
+In V1, reusable cross-session validation should at least catch:
+
+- ambiguous capability ownership when one concrete device is bound to multiple roles and the same capability is claimed by more than one role binding,
+- conflicting control-target ownership when more than one control target tries to command the same role.
+
 ## 5. Minimal Role Binding Semantics
 
 Role binding should be strict enough to be safe, but not so strict that the language becomes brittle.

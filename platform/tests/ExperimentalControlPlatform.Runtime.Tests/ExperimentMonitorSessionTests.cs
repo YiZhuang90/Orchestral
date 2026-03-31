@@ -19,6 +19,7 @@ public sealed class ExperimentMonitorSessionTests
         var coordinator = new RuntimeCoordinator(new FakeRegistry());
         var experiment = CreateResolvedExperimentDefinition();
         var started = coordinator.Start(experiment);
+        var sampleObservedAtUtc = started.StartedAtUtc!.Value.AddSeconds(5);
         await using var controller = new ControllerUnitSession(
             experiment,
             FlowReynoldsArtifactIds.PrimaryControlTargetId,
@@ -26,10 +27,10 @@ public sealed class ExperimentMonitorSessionTests
         await using var monitor = new ExperimentMonitorSession(
             coordinator,
             [],
-            clock: () => RunStartedAt.AddSeconds(5));
+            clock: () => sampleObservedAtUtc);
 
         monitor.AttachController(controller);
-        await controller.SampleAsync(RunStartedAt.AddSeconds(5), 1588);
+        await controller.SampleAsync(sampleObservedAtUtc, 1588);
 
         var snapshot = Assert.IsType<ExperimentMonitorSnapshot>(monitor.Snapshot.Current);
         Assert.Equal(RunState.Running, snapshot.RunState);
@@ -48,6 +49,8 @@ public sealed class ExperimentMonitorSessionTests
         var coordinator = new RuntimeCoordinator(new FakeRegistry());
         var experiment = CreateResolvedExperimentDefinition();
         var started = coordinator.Start(experiment);
+        var firstObservedAtUtc = started.StartedAtUtc!.Value.AddSeconds(5);
+        var secondObservedAtUtc = started.StartedAtUtc!.Value.AddSeconds(6);
         await using var controller = new ControllerUnitSession(
             experiment,
             FlowReynoldsArtifactIds.PrimaryControlTargetId,
@@ -55,11 +58,11 @@ public sealed class ExperimentMonitorSessionTests
         await using var monitor = new ExperimentMonitorSession(
             coordinator,
             [],
-            clock: () => RunStartedAt.AddSeconds(6));
+            clock: () => secondObservedAtUtc);
 
         monitor.AttachController(controller);
-        await controller.SampleAsync(RunStartedAt.AddSeconds(5), 1588);
-        await controller.SampleAsync(RunStartedAt.AddSeconds(6));
+        await controller.SampleAsync(firstObservedAtUtc, 1588);
+        await controller.SampleAsync(secondObservedAtUtc);
 
         var snapshot = Assert.IsType<ExperimentMonitorSnapshot>(monitor.Snapshot.Current);
         Assert.Equal(ExperimentMonitorSeverity.Warning, snapshot.HighestSeverity);
