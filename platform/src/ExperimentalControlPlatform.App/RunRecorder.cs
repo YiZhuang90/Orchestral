@@ -39,6 +39,8 @@ public sealed class RunRecorder : IRunRecorder
     public RunRecordingResult? CompleteRun(
         RuntimeRunContext snapshot,
         IReadOnlyList<IDeviceTestPanelViewModel> panels,
+        FlowReynoldsDerivedStateSnapshot? derivedStateSnapshot = null,
+        IReadOnlyList<FlowReynoldsDerivedStateSample>? derivedStateSamples = null,
         ExperimentMonitorSnapshot? monitorSnapshot = null)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
@@ -56,7 +58,13 @@ public sealed class RunRecorder : IRunRecorder
             _runtimeEvents = [];
         }
 
-        return _writer.Write(snapshot, panels, runtimeEvents, monitorSnapshot);
+        return _writer.Write(
+            snapshot,
+            panels,
+            runtimeEvents,
+            monitorSnapshot,
+            derivedStateSnapshot,
+            derivedStateSamples);
     }
 
     private static string BuildStartedEvent(RuntimeRunContext snapshot)

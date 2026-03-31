@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ExperimentalControlPlatform.Core.Artifacts;
+using ExperimentalControlPlatform.Devices.ControlCenter;
 using Xunit;
 
 namespace ExperimentalControlPlatform.Runtime.Tests;
@@ -18,11 +19,11 @@ public sealed class ExperimentMonitorSessionTests
         var coordinator = new RuntimeCoordinator(new FakeRegistry());
         var experiment = CreateResolvedExperimentDefinition();
         var started = coordinator.Start(experiment);
-        var controller = new ControllerUnitSession(
+        await using var controller = new ControllerUnitSession(
             experiment,
-            new ArtifactId("control.re_primary"),
+            FlowReynoldsArtifactIds.PrimaryControlTargetId,
             started.StartedAtUtc!.Value);
-        var monitor = new ExperimentMonitorSession(
+        await using var monitor = new ExperimentMonitorSession(
             coordinator,
             [],
             clock: () => RunStartedAt.AddSeconds(5));
@@ -47,11 +48,11 @@ public sealed class ExperimentMonitorSessionTests
         var coordinator = new RuntimeCoordinator(new FakeRegistry());
         var experiment = CreateResolvedExperimentDefinition();
         var started = coordinator.Start(experiment);
-        var controller = new ControllerUnitSession(
+        await using var controller = new ControllerUnitSession(
             experiment,
-            new ArtifactId("control.re_primary"),
+            FlowReynoldsArtifactIds.PrimaryControlTargetId,
             started.StartedAtUtc!.Value);
-        var monitor = new ExperimentMonitorSession(
+        await using var monitor = new ExperimentMonitorSession(
             coordinator,
             [],
             clock: () => RunStartedAt.AddSeconds(6));
@@ -99,6 +100,53 @@ public sealed class ExperimentMonitorSessionTests
             item.Severity == ExperimentMonitorSeverity.Alarm
             && item.Source == "session.control_center_01"
             && item.Message.Contains("disconnected", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task Snapshot_Includes_Derived_State_Summary_When_Attached()
+    {
+        var coordinator = new RuntimeCoordinator(new FakeRegistry());
+        coordinator.Start(CreateResolvedExperimentDefinition());
+        await using var derivedState = new FlowReynoldsDerivedStateSession(CreateResolvedExperimentDefinition());
+        derivedState.RecordTemperatureSample(new Pt104Reading("pt104_01", 2, 20.9, RunStartedAt.AddSeconds(1), "LiveRead"));
+        derivedState.RecordTemperatureSample(new Pt104Reading("pt104_01", 4, 21.1, RunStartedAt.AddSeconds(1), "LiveRead"));
+        derivedState.RecordPulseReadback(new ControlCenterPulseReadback("control_center_01", "Control Center", 1.0, 10, RunStartedAt.AddSeconds(1)));
+        derivedState.RecordPulseReadback(new ControlCenterPulseReadback("control_center_01", "Control Center", 2.0, 14, RunStartedAt.AddSeconds(2)));
+        await using var monitor = new ExperimentMonitorSession(
+            coordinator,
+            [],
+            clock: () => RunStartedAt.AddSeconds(3));
+
+        monitor.AttachDerivedState(derivedState);
+
+        var snapshot = Assert.IsType<ExperimentMonitorSnapshot>(monitor.Snapshot.Current);
+        Assert.NotNull(snapshot.DerivedReynoldsNumber);
+        Assert.NotNull(snapshot.DerivedFlowRateLitersPerMinute);
+        Assert.Equal(21.0, snapshot.DerivedMeanTemperatureC!.Value, 6);
+        Assert.Contains("Re", snapshot.DerivedStateSummary);
+        Assert.Contains("L/min", snapshot.DerivedStateSummary);
+    }
+
+    [Fact]
+    public async Task Snapshot_Raises_Warning_When_Derived_State_Is_Stale()
+    {
+        var coordinator = new RuntimeCoordinator(new FakeRegistry());
+        coordinator.Start(CreateResolvedExperimentDefinition());
+        await using var derivedState = new FlowReynoldsDerivedStateSession(CreateResolvedExperimentDefinition());
+        derivedState.RecordPulseReadback(new ControlCenterPulseReadback("control_center_01", "Control Center", 1.0, 10, RunStartedAt.AddSeconds(1)));
+        derivedState.RecordPulseReadback(new ControlCenterPulseReadback("control_center_01", "Control Center", 2.0, 11, RunStartedAt.AddSeconds(2)));
+        await using var monitor = new ExperimentMonitorSession(
+            coordinator,
+            [],
+            clock: () => RunStartedAt.AddSeconds(10));
+
+        monitor.AttachDerivedState(derivedState);
+
+        var snapshot = Assert.IsType<ExperimentMonitorSnapshot>(monitor.Snapshot.Current);
+        Assert.Equal(ExperimentMonitorSeverity.Warning, snapshot.HighestSeverity);
+        Assert.Contains(snapshot.Items, item =>
+            item.Source == "derived.reynolds_number"
+            && item.Message.Contains("stale", StringComparison.OrdinalIgnoreCase));
     }
 
     private sealed class FakeRegistry : IDeviceSessionRegistry
@@ -162,16 +210,75 @@ public sealed class ExperimentMonitorSessionTests
             ],
             [
                 new ParameterDefinition(
-                    new ArtifactId("param.re_target"),
+                    FlowReynoldsArtifactIds.PrimaryControlTargetParameterId,
                     "Re Target",
                     "float",
                     "experiment",
-                    unit: "dimensionless")
+                    unit: "dimensionless"),
+                new ParameterDefinition(
+                    FlowReynoldsArtifactIds.PulsesPerLiterParameterId,
+                    "Pulses Per Liter",
+                    "integer",
+                    "experiment",
+                    defaultValue: "80"),
+                new ParameterDefinition(
+                    FlowReynoldsArtifactIds.PipeInnerDiameterParameterId,
+                    "Pipe Inner Diameter",
+                    "float",
+                    "experiment",
+                    unit: "m",
+                    defaultValue: "0.00403"),
+                new ParameterDefinition(
+                    FlowReynoldsArtifactIds.PipeLengthParameterId,
+                    "Pipe Length",
+                    "float",
+                    "experiment",
+                    unit: "m",
+                    defaultValue: "1.0"),
+                new ParameterDefinition(
+                    FlowReynoldsArtifactIds.PipeRoughnessParameterId,
+                    "Pipe Roughness",
+                    "float",
+                    "experiment",
+                    unit: "m",
+                    defaultValue: "0.0"),
+                new ParameterDefinition(
+                    FlowReynoldsArtifactIds.ReferenceTemperatureParameterId,
+                    "Reference Temperature",
+                    "float",
+                    "experiment",
+                    unit: "C",
+                    defaultValue: "20.95"),
+                new ParameterDefinition(
+                    FlowReynoldsArtifactIds.FlowrateAverageCountParameterId,
+                    "Flowrate Average Count",
+                    "integer",
+                    "experiment",
+                    defaultValue: "100"),
+                new ParameterDefinition(
+                    FlowReynoldsArtifactIds.PulsePollIntervalMillisecondsParameterId,
+                    "Pulse Poll Interval",
+                    "integer",
+                    "experiment",
+                    unit: "ms",
+                    defaultValue: "500")
             ],
             [
                 new StreamDefinition(
-                    new ArtifactId("stream.reynolds_number"),
+                    FlowReynoldsArtifactIds.ReynoldsNumberStreamId,
                     "Reynolds Number",
+                    "transform",
+                    "scalar<double>",
+                    "runtime"),
+                new StreamDefinition(
+                    FlowReynoldsArtifactIds.FlowRateStreamId,
+                    "Flow Rate",
+                    "transform",
+                    "scalar<double>",
+                    "runtime"),
+                new StreamDefinition(
+                    FlowReynoldsArtifactIds.MeanTemperatureStreamId,
+                    "Mean Temperature",
                     "transform",
                     "scalar<double>",
                     "runtime")
@@ -182,14 +289,14 @@ public sealed class ExperimentMonitorSessionTests
             [],
             [
                 new ControlTargetDefinition(
-                    new ArtifactId("control.re_primary"),
+                    FlowReynoldsArtifactIds.PrimaryControlTargetId,
                     "Primary Re Control",
                     "Keeps Reynolds number near the requested target.",
-                    new ArtifactId("stream.reynolds_number"),
+                    FlowReynoldsArtifactIds.ReynoldsNumberStreamId,
                     new ArtifactId("role.flow_actuator"),
                     "constant",
                     "closed_loop",
-                    targetParameterId: new ArtifactId("param.re_target"))
+                    targetParameterId: FlowReynoldsArtifactIds.PrimaryControlTargetParameterId)
             ]);
         var device = new DeviceDefinition(
             new ArtifactId("device.controller_01"),
@@ -223,7 +330,7 @@ public sealed class ExperimentMonitorSessionTests
             [binding],
             new Dictionary<ArtifactId, string>
             {
-                [new ArtifactId("param.re_target")] = "1600"
+                [FlowReynoldsArtifactIds.PrimaryControlTargetParameterId] = "1600"
             });
     }
 }

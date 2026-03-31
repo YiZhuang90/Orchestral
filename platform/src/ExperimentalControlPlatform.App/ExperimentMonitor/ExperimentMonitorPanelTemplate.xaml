@@ -132,7 +132,7 @@
 
         <widgets:StatisticsPanel Grid.Row="0"
                                  Margin="0,0,0,12"
-                                 Columns="3"
+                                 Columns="4"
                                  ItemsSource="{Binding SummaryCards}" />
 
         <widgets:DataPanel Grid.Row="1"

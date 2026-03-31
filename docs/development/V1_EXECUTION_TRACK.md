@@ -43,7 +43,13 @@ Status:
   - first warning/alarm aggregation,
   - runtime-backed `Target +/- Error` presentation,
   - and a display-only live-view path with explicit decimation choices,
-- next universal slice is flow/Reynolds derived-state and measured-stream wiring into the controller/monitor plane.
+- flow/Reynolds derived-state and measured-stream wiring now exists as:
+  - a runtime-owned `FlowReynoldsDerivedStateSession`,
+  - derived Reynolds/flow/temperature state from control-center pulse telemetry and PT-104 samples,
+  - measured-value wiring into `ControllerUnitSession`,
+  - monitor-side derived-state presentation and stale-state warnings,
+  - and run-artifact persistence for derived-state snapshot/record outputs,
+- next universal slice is the camera-pair role unit.
 
 Required foundations:
 
@@ -61,6 +67,7 @@ Active slice plans:
 - [2026-03-30-run-recorder-and-artifact-writer-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-30-run-recorder-and-artifact-writer-plan.md)
 - [2026-03-30-controller-unit-session-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-30-controller-unit-session-plan.md)
 - [2026-03-31-run-monitor-and-alarm-surface-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-31-run-monitor-and-alarm-surface-plan.md)
+- [2026-03-31-flow-reynolds-derived-state-and-measured-stream-wiring-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-31-flow-reynolds-derived-state-and-measured-stream-wiring-plan.md)
 
 ### 2. First Reference Experiment
 
@@ -68,7 +75,6 @@ Status:
 
 - partially unblocked,
 - still waiting on:
-  - measured-state wiring such as flow/Reynolds derived-state for real control feedback,
   - camera-pair role semantics and experiment-specific processing units,
   - experiment-specific controller sessions as required by the chosen reference experiment.
 

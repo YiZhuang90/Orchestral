@@ -347,6 +347,10 @@ Purpose: observe and control a turbulence-transition setup using two cameras, on
 - `camera_downstream.frames`: raw image stream from the downstream camera.
 - `temperature_inlet.samples`: scalar temperature stream.
 - `flow_actuator.state`: actuator status stream.
+- `flowrate_lpm`: derived flow-rate stream from pulse telemetry.
+- `reynolds_number`: derived experiment-control stream used by the primary Reynolds target.
+- `temperature_mean_c`: derived mean-temperature stream for flow-property correction.
+- `temperature_delta_c`: derived temperature-spread stream for monitor and artifact context.
 
 ### 6.8 Control Targets
 
@@ -359,11 +363,17 @@ Purpose: observe and control a turbulence-transition setup using two cameras, on
 - `upstream_roi_crop` consumes `camera_upstream.frames` and produces `upstream_roi.frames`.
 - `downstream_roi_crop` consumes `camera_downstream.frames` and produces `downstream_roi.frames`.
 - `temperature_smoother` consumes `temperature_inlet.samples` and produces `temperature_inlet.smoothed`.
+- `flow_reynolds_derivation` consumes pulse telemetry plus available PT-104 temperature samples and produces:
+  - `flowrate_lpm`
+  - `reynolds_number`
+  - `temperature_mean_c`
+  - `temperature_delta_c`
 - `turbulence_indicator` consumes both ROI streams and produces `puff_indicator`.
 
 ### 6.10 Monitors
 
 - `live_reynolds_number` shows the current target and tracking error, for example `Target Re +/- error`.
+- `derived_flow_state` shows the latest derived Reynolds/flow/temperature summary and stale-state status.
 - `temperature_monitor` shows the current inlet temperature and trend.
 - `puff_monitor` shows the derived turbulence indicator.
 - `actuator_status_monitor` shows whether the actuator is armed, active, or idle.

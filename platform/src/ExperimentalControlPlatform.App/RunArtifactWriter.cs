@@ -37,7 +37,9 @@ public sealed class RunArtifactWriter
         RuntimeRunContext snapshot,
         IReadOnlyList<IDeviceTestPanelViewModel> panels,
         IReadOnlyList<string> runtimeEvents,
-        ExperimentMonitorSnapshot? monitorSnapshot = null)
+        ExperimentMonitorSnapshot? monitorSnapshot = null,
+        FlowReynoldsDerivedStateSnapshot? derivedStateSnapshot = null,
+        IReadOnlyList<FlowReynoldsDerivedStateSample>? derivedStateSamples = null)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(panels);
@@ -112,6 +114,11 @@ public sealed class RunArtifactWriter
                     ["warningCount"] = monitorSnapshot.WarningCount,
                     ["alarmCount"] = monitorSnapshot.AlarmCount,
                     ["primaryControlSummary"] = monitorSnapshot.PrimaryControlSummary,
+                    ["derivedStateSummary"] = monitorSnapshot.DerivedStateSummary,
+                    ["derivedReynoldsNumber"] = monitorSnapshot.DerivedReynoldsNumber,
+                    ["derivedFlowRateLitersPerMinute"] = monitorSnapshot.DerivedFlowRateLitersPerMinute,
+                    ["derivedMeanTemperatureC"] = monitorSnapshot.DerivedMeanTemperatureC,
+                    ["derivedStateIsStale"] = monitorSnapshot.DerivedStateIsStale,
                     ["items"] = monitorSnapshot.Items.Select(
                         static item => new Dictionary<string, object?>
                         {
@@ -139,6 +146,66 @@ public sealed class RunArtifactWriter
                 });
             artifactPaths[monitorSnapshotId] = monitorSnapshotPath;
             outputArtifactIds.Add(monitorSnapshotId);
+        }
+
+        if (derivedStateSnapshot is not null)
+        {
+            var derivedSnapshotId = new ArtifactId($"artifact.flow_reynolds_snapshot.{runKey}");
+            var derivedSnapshotPath = Path.Combine(runDirectoryPath, "flow-reynolds-snapshot.yaml");
+            WriteYaml(
+                derivedSnapshotPath,
+                new Dictionary<string, object?>
+                {
+                    ["kind"] = "flow_reynolds_snapshot",
+                    ["runId"] = snapshot.RunId.ToString(),
+                    ["observedAt"] = FormatTimestamp(derivedStateSnapshot.ObservedAtUtc),
+                    ["pulseObservedAt"] = FormatTimestamp(derivedStateSnapshot.PulseObservedAtUtc),
+                    ["pulseTimestampSeconds"] = derivedStateSnapshot.PulseTimestampSeconds,
+                    ["latestPulseCount"] = derivedStateSnapshot.LatestPulseCount,
+                    ["temperatureObservedAt"] = FormatTimestamp(derivedStateSnapshot.TemperatureObservedAtUtc),
+                    ["rawFlowRateLitersPerMinute"] = derivedStateSnapshot.RawFlowRateLitersPerMinute,
+                    ["filteredFlowRateLitersPerMinute"] = derivedStateSnapshot.FilteredFlowRateLitersPerMinute,
+                    ["meanTemperatureC"] = derivedStateSnapshot.MeanTemperatureC,
+                    ["temperatureDeltaC"] = derivedStateSnapshot.TemperatureDeltaC,
+                    ["bulkVelocityMetersPerSecond"] = derivedStateSnapshot.BulkVelocityMetersPerSecond,
+                    ["reynoldsNumber"] = derivedStateSnapshot.ReynoldsNumber,
+                    ["usesFallbackTemperature"] = derivedStateSnapshot.UsesFallbackTemperature,
+                    ["pulseTelemetryIsStale"] = derivedStateSnapshot.PulseTelemetryIsStale,
+                    ["temperatureIsStale"] = derivedStateSnapshot.TemperatureIsStale,
+                    ["sampleSequence"] = derivedStateSnapshot.SampleSequence,
+                    ["statusMessage"] = derivedStateSnapshot.StatusMessage
+                });
+            artifactPaths[derivedSnapshotId] = derivedSnapshotPath;
+            outputArtifactIds.Add(derivedSnapshotId);
+        }
+
+        if (derivedStateSamples is not null && derivedStateSamples.Count > 0)
+        {
+            var derivedRecordId = new ArtifactId($"artifact.flow_reynolds_record.{runKey}");
+            var derivedRecordPath = Path.Combine(runDirectoryPath, "flow-reynolds-record.yaml");
+            WriteYaml(
+                derivedRecordPath,
+                new Dictionary<string, object?>
+                {
+                    ["kind"] = "flow_reynolds_record",
+                    ["runId"] = snapshot.RunId.ToString(),
+                    ["samples"] = derivedStateSamples.Select(
+                        static sample => new Dictionary<string, object?>
+                        {
+                            ["observedAt"] = sample.ObservedAtUtc.ToString("O"),
+                            ["rawFlowRateLitersPerMinute"] = sample.RawFlowRateLitersPerMinute,
+                            ["filteredFlowRateLitersPerMinute"] = sample.FilteredFlowRateLitersPerMinute,
+                            ["meanTemperatureC"] = sample.MeanTemperatureC,
+                            ["temperatureDeltaC"] = sample.TemperatureDeltaC,
+                            ["bulkVelocityMetersPerSecond"] = sample.BulkVelocityMetersPerSecond,
+                            ["reynoldsNumber"] = sample.ReynoldsNumber,
+                            ["usesFallbackTemperature"] = sample.UsesFallbackTemperature,
+                            ["pulseTelemetryIsStale"] = sample.PulseTelemetryIsStale,
+                            ["temperatureIsStale"] = sample.TemperatureIsStale
+                        }).ToArray()
+                });
+            artifactPaths[derivedRecordId] = derivedRecordPath;
+            outputArtifactIds.Add(derivedRecordId);
         }
 
         var usedPanelSlugs = new HashSet<string>(StringComparer.Ordinal);

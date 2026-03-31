@@ -76,6 +76,43 @@ public sealed class RunRecorderTests
     }
 
     [Fact]
+    public void AdHocRunDefinitionFactory_Adds_FlowReynolds_Streams_And_Default_Parameters_When_ControlCenter_Is_Present()
+    {
+        var factory = new AdHocRunDefinitionFactory();
+        var panels = new IDeviceTestPanelViewModel[]
+        {
+            new FakeIntegrationPanel(
+                "Control Center",
+                new IntegrationPanelDataOutput
+                {
+                    DeviceId = "control_center_01",
+                    PayloadType = IntegrationPanelOutputPayloadType.CommandResult.ToString(),
+                    PayloadValue = "PulseCount=42"
+                }),
+            new FakeIntegrationPanel(
+                "PT-104",
+                new IntegrationPanelDataOutput
+                {
+                    DeviceId = "pt104_01",
+                    PayloadType = IntegrationPanelOutputPayloadType.Scalar.ToString(),
+                    PayloadValue = "20.4"
+                })
+        };
+
+        var resolved = factory.Create(panels);
+
+        Assert.Contains(resolved.Experiment.Streams, stream => stream.Id == FlowReynoldsArtifactIds.FlowRateStreamId);
+        Assert.Contains(resolved.Experiment.Streams, stream => stream.Id == FlowReynoldsArtifactIds.ReynoldsNumberStreamId);
+        Assert.Contains(resolved.Experiment.Streams, stream => stream.Id == FlowReynoldsArtifactIds.MeanTemperatureStreamId);
+        Assert.Contains(resolved.Experiment.Parameters, parameter => parameter.Id == FlowReynoldsArtifactIds.PulsesPerLiterParameterId);
+        Assert.Contains(resolved.Experiment.Parameters, parameter => parameter.Id == FlowReynoldsArtifactIds.PipeInnerDiameterParameterId);
+        Assert.True(resolved.TryGetParameterValue(FlowReynoldsArtifactIds.ReferenceTemperatureParameterId, out var fallbackTemperature));
+        Assert.Equal("20.95", fallbackTemperature);
+        Assert.True(resolved.TryGetParameterValue(FlowReynoldsArtifactIds.PulsesPerLiterParameterId, out var pulsesPerLiter));
+        Assert.Equal("80", pulsesPerLiter);
+    }
+
+    [Fact]
     public void RunArtifactWriter_Writes_Manifest_And_Panel_Snapshot_Artifacts()
     {
         var rootDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
@@ -203,6 +240,88 @@ public sealed class RunRecorderTests
             var warningsYaml = File.ReadAllText(warningsPath);
             Assert.Contains("controller.re_primary", warningsYaml);
             Assert.Contains("Measured value is stale.", warningsYaml);
+        }
+        finally
+        {
+            if (Directory.Exists(rootDirectory))
+            {
+                Directory.Delete(rootDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void RunArtifactWriter_Writes_FlowReynolds_Derived_State_Artifacts()
+    {
+        var rootDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(rootDirectory);
+
+        try
+        {
+            var writer = new RunArtifactWriter(rootDirectory);
+            var runSnapshot = new RuntimeRunContext(
+                Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                RunState.Idle,
+                startedAtUtc: DateTimeOffset.Parse("2026-03-31T14:00:00+02:00"),
+                stoppedAtUtc: DateTimeOffset.Parse("2026-03-31T14:05:00+02:00"),
+                stopReason: StopReason.UserRequested("Operator stopped the run."));
+            var derivedSnapshot = new FlowReynoldsDerivedStateSnapshot
+            {
+                ObservedAtUtc = DateTimeOffset.Parse("2026-03-31T14:04:59+02:00"),
+                RawFlowRateLitersPerMinute = 1.24,
+                FilteredFlowRateLitersPerMinute = 1.22,
+                MeanTemperatureC = 20.95,
+                TemperatureDeltaC = 0.12,
+                BulkVelocityMetersPerSecond = 1.59,
+                ReynoldsNumber = 2310.5,
+                StatusMessage = "Derived Reynolds state ready."
+            };
+            var derivedSamples = new[]
+            {
+                new FlowReynoldsDerivedStateSample(
+                    DateTimeOffset.Parse("2026-03-31T14:04:58+02:00"),
+                    RawFlowRateLitersPerMinute: 1.23,
+                    FilteredFlowRateLitersPerMinute: 1.21,
+                    MeanTemperatureC: 20.94,
+                    TemperatureDeltaC: 0.10,
+                    BulkVelocityMetersPerSecond: 1.58,
+                    ReynoldsNumber: 2308.4,
+                    UsesFallbackTemperature: false,
+                    PulseTelemetryIsStale: false,
+                    TemperatureIsStale: false),
+                new FlowReynoldsDerivedStateSample(
+                    DateTimeOffset.Parse("2026-03-31T14:04:59+02:00"),
+                    RawFlowRateLitersPerMinute: 1.24,
+                    FilteredFlowRateLitersPerMinute: 1.22,
+                    MeanTemperatureC: 20.95,
+                    TemperatureDeltaC: 0.12,
+                    BulkVelocityMetersPerSecond: 1.59,
+                    ReynoldsNumber: 2310.5,
+                    UsesFallbackTemperature: false,
+                    PulseTelemetryIsStale: false,
+                    TemperatureIsStale: false)
+            };
+
+            var result = writer.Write(
+                runSnapshot,
+                [],
+                ["Run started.", "Run stopped."],
+                derivedStateSnapshot: derivedSnapshot,
+                derivedStateSamples: derivedSamples,
+                monitorSnapshot: null);
+
+            Assert.Contains(result.ArtifactPaths.Values, path => path.EndsWith("flow-reynolds-snapshot.yaml", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(result.ArtifactPaths.Values, path => path.EndsWith("flow-reynolds-record.yaml", StringComparison.OrdinalIgnoreCase));
+
+            var snapshotPath = result.ArtifactPaths.Single(entry => entry.Value.EndsWith("flow-reynolds-snapshot.yaml", StringComparison.OrdinalIgnoreCase)).Value;
+            var snapshotYaml = File.ReadAllText(snapshotPath);
+            Assert.Contains("reynoldsNumber: 2310.5", snapshotYaml);
+            Assert.Contains("meanTemperatureC: 20.95", snapshotYaml);
+
+            var recordPath = result.ArtifactPaths.Single(entry => entry.Value.EndsWith("flow-reynolds-record.yaml", StringComparison.OrdinalIgnoreCase)).Value;
+            var recordYaml = File.ReadAllText(recordPath);
+            Assert.Contains("filteredFlowRateLitersPerMinute: 1.21", recordYaml);
+            Assert.Contains("reynoldsNumber: 2310.5", recordYaml);
         }
         finally
         {

@@ -27,12 +27,14 @@ public sealed class ExperimentMonitorPanelViewModel : ObservableObject, IDeviceT
     private string _currentRunStateLabel = "Ready";
     private string _liveSummary = "Ready to initialize.";
     private string _primaryControlSummary = "No active control target.";
+    private string _derivedStateSummary = "No derived flow state.";
     private string _footerHealthLabel = "Healthy";
     private string _footerRunLabel = "Run not started.";
     private IReadOnlyList<ExperimentMonitorItem> _displayItems = Array.Empty<ExperimentMonitorItem>();
     private IReadOnlyList<ExperimentMonitorDeviceSnapshot> _deviceSnapshots = Array.Empty<ExperimentMonitorDeviceSnapshot>();
     private readonly ValueCardItem _runStateCard = new("Run state", "Ready");
     private readonly ValueCardItem _controlCard = new("Primary control", "No active control target.");
+    private readonly ValueCardItem _derivedStateCard = new("Measured state", "No derived flow state.");
     private readonly ValueCardItem _healthCard = new("Health", "Healthy");
 
     public ExperimentMonitorPanelViewModel(
@@ -63,7 +65,7 @@ public sealed class ExperimentMonitorPanelViewModel : ObservableObject, IDeviceT
 
     public IReadOnlyList<int> DisplayRateOptions { get; } = [5, 10, 15, 20, 25, 30];
 
-    public IReadOnlyList<ValueCardItem> SummaryCards => [_runStateCard, _controlCard, _healthCard];
+    public IReadOnlyList<ValueCardItem> SummaryCards => [_runStateCard, _controlCard, _derivedStateCard, _healthCard];
 
     public string RunIndexDraft
     {
@@ -117,6 +119,12 @@ public sealed class ExperimentMonitorPanelViewModel : ObservableObject, IDeviceT
     {
         get => _primaryControlSummary;
         private set => SetProperty(ref _primaryControlSummary, value);
+    }
+
+    public string DerivedStateSummary
+    {
+        get => _derivedStateSummary;
+        private set => SetProperty(ref _derivedStateSummary, value);
     }
 
     public string FooterHealthLabel
@@ -227,6 +235,7 @@ public sealed class ExperimentMonitorPanelViewModel : ObservableObject, IDeviceT
             ? _initializationStatus
             : $"{_displaySnapshot.RunDisplayName}: {_displaySnapshot.StateSummary}";
         PrimaryControlSummary = _displaySnapshot.PrimaryControlSummary;
+        DerivedStateSummary = _displaySnapshot.DerivedStateSummary;
         FooterHealthLabel = _displaySnapshot.HighestSeverity switch
         {
             ExperimentMonitorSeverity.Alarm => $"Alarms: {_displaySnapshot.AlarmCount}",
@@ -238,6 +247,7 @@ public sealed class ExperimentMonitorPanelViewModel : ObservableObject, IDeviceT
         DeviceSnapshots = _displaySnapshot.Devices;
         _runStateCard.Value = CurrentRunStateLabel;
         _controlCard.Value = PrimaryControlSummary;
+        _derivedStateCard.Value = DerivedStateSummary;
         _healthCard.Value = FooterHealthLabel;
         OnPropertyChanged(nameof(CanStart));
         OnPropertyChanged(nameof(CanStop));

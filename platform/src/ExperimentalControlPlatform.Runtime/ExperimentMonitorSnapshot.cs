@@ -38,6 +38,16 @@ public sealed record ExperimentMonitorSnapshot
 
     public string PrimaryControlSummary { get; init; } = "No active control target.";
 
+    public double? DerivedFlowRateLitersPerMinute { get; init; }
+
+    public double? DerivedReynoldsNumber { get; init; }
+
+    public double? DerivedMeanTemperatureC { get; init; }
+
+    public bool DerivedStateIsStale { get; init; }
+
+    public string DerivedStateSummary { get; init; } = "No derived flow state.";
+
     public IReadOnlyList<string> ActiveDeviceNames =>
         Devices.Select(static device => device.DisplayName).ToArray();
 }

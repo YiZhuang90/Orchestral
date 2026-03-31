@@ -8,6 +8,7 @@ using System.Windows.Input;
 using ExperimentalControlPlatform.App.DevicePanels;
 using ExperimentalControlPlatform.App.DevicePanels.Contracts;
 using ExperimentalControlPlatform.App.ExperimentMonitor;
+using ExperimentalControlPlatform.Devices.ControlCenter;
 using ExperimentalControlPlatform.Runtime;
 
 namespace ExperimentalControlPlatform.App.Tests;
@@ -100,13 +101,76 @@ public sealed class MainViewModelTests
         }
     }
 
+    [Fact]
+    public async Task StartRuntime_With_ControlCenterSession_Writes_FlowReynolds_Artifacts_On_Stop()
+    {
+        var rootDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(rootDirectory);
+
+        try
+        {
+            var panel = new FakeIntegrationPanel(
+                "Control Center",
+                new IntegrationPanelDataOutput
+                {
+                    DeviceId = "control_center_01",
+                    PayloadType = IntegrationPanelOutputPayloadType.CommandResult.ToString(),
+                    PayloadValue = "PulseCount=42"
+                });
+            var service = new FakeControlCenterService(
+                new[]
+                {
+                    new ControlCenterPulseReadback("control_center_01", "Control Center", 1.0, 10, DateTimeOffset.Parse("2026-03-31T14:00:01+02:00")),
+                    new ControlCenterPulseReadback("control_center_01", "Control Center", 2.0, 14, DateTimeOffset.Parse("2026-03-31T14:00:02+02:00")),
+                    new ControlCenterPulseReadback("control_center_01", "Control Center", 3.0, 18, DateTimeOffset.Parse("2026-03-31T14:00:03+02:00"))
+                });
+            var controlCenterSession = new ControlCenterSession(
+                service,
+                new ControlCenterDeviceInfo("COM9", "Control Center", "control_center_01"));
+            await controlCenterSession.ConnectAsync();
+
+            var registry = new FakeRegistry(controlCenterSession);
+            var coordinator = new RuntimeCoordinator(registry);
+            var recorder = new RunRecorder(rootDirectory);
+            using var viewModel = new MainViewModel(coordinator, registry, new[] { panel }, recorder);
+
+            await viewModel.StartRuntimeAsync();
+            await service.WaitForReadCountAsync(2, TimeSpan.FromSeconds(3));
+            await viewModel.StopRuntimeAsync();
+
+            Assert.NotNull(viewModel.LastRunRecording);
+            Assert.Contains(
+                viewModel.LastRunRecording!.ArtifactPaths.Values,
+                path => path.EndsWith("flow-reynolds-snapshot.yaml", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(
+                viewModel.LastRunRecording.ArtifactPaths.Values,
+                path => path.EndsWith("flow-reynolds-record.yaml", StringComparison.OrdinalIgnoreCase));
+
+            await controlCenterSession.DisposeAsync();
+        }
+        finally
+        {
+            if (Directory.Exists(rootDirectory))
+            {
+                Directory.Delete(rootDirectory, recursive: true);
+            }
+        }
+    }
+
     private sealed class FakeRegistry : IDeviceSessionRegistry
     {
+        private readonly IReadOnlyCollection<IDeviceSession> _sessions;
+
+        public FakeRegistry(params IDeviceSession[] sessions)
+        {
+            _sessions = sessions;
+        }
+
 #pragma warning disable CS0067
         public event Action? SessionsChanged;
 #pragma warning restore CS0067
 
-        public IReadOnlyCollection<IDeviceSession> Sessions => Array.Empty<IDeviceSession>();
+        public IReadOnlyCollection<IDeviceSession> Sessions => _sessions;
 
         public TSession GetOrAdd<TSession>(DeviceSessionId sessionId, Func<TSession> factory)
             where TSession : class, IDeviceSession => throw new NotSupportedException();
@@ -121,6 +185,77 @@ public sealed class MainViewModelTests
         public bool Remove(DeviceSessionId sessionId) => false;
 
         public Task StopAllAsync(StopReason reason, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class FakeControlCenterService : IControlCenterService
+    {
+        private readonly object _syncRoot = new();
+        private readonly Queue<ControlCenterPulseReadback> _readbacks;
+        private ControlCenterPulseReadback? _lastReadback;
+        private int _readCount;
+
+        public FakeControlCenterService(IEnumerable<ControlCenterPulseReadback> readbacks)
+        {
+            _readbacks = new Queue<ControlCenterPulseReadback>(readbacks);
+        }
+
+        public IReadOnlyList<ControlCenterDeviceInfo> ListDevices() => [];
+
+        public IControlCenterConnection Open(ControlCenterDeviceInfo device) => new FakeControlCenterConnection(device);
+
+        public void SendCommand(IControlCenterConnection connection, ControlCenterCommand command)
+        {
+        }
+
+        public ControlCenterPulseReadback ReadPulseCount(IControlCenterConnection connection)
+        {
+            lock (_syncRoot)
+            {
+                if (_readbacks.Count > 0)
+                {
+                    _lastReadback = _readbacks.Dequeue();
+                }
+
+                _readCount++;
+                return _lastReadback ?? throw new InvalidOperationException("No pulse readbacks configured.");
+            }
+        }
+
+        public async Task WaitForReadCountAsync(int expectedReadCount, TimeSpan timeout)
+        {
+            var startedAt = DateTimeOffset.UtcNow;
+            while (true)
+            {
+                lock (_syncRoot)
+                {
+                    if (_readCount >= expectedReadCount)
+                    {
+                        return;
+                    }
+                }
+
+                if (DateTimeOffset.UtcNow - startedAt > timeout)
+                {
+                    throw new TimeoutException($"Timed out waiting for {expectedReadCount} pulse reads.");
+                }
+
+                await Task.Delay(25);
+            }
+        }
+    }
+
+    private sealed class FakeControlCenterConnection : IControlCenterConnection
+    {
+        public FakeControlCenterConnection(ControlCenterDeviceInfo device)
+        {
+            Device = device;
+        }
+
+        public ControlCenterDeviceInfo Device { get; }
+
+        public void Dispose()
+        {
+        }
     }
 
     private sealed class FakeIntegrationPanel : IDeviceTestPanelViewModel, IIntegrationPanelViewModel
