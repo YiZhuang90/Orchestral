@@ -319,6 +319,12 @@ The language should be read as a graph of constrained relationships:
 
 The platform should validate these relationships before a run starts.
 
+In V1, this validation now has at least three distinct layers:
+
+- experiment-definition linting on the authored package for static structural mistakes,
+- binding validation on the resolved package for concrete role, protocol, capability, and parameter mismatches,
+- cross-session validation for reusable contradictions across bound roles and control targets.
+
 In V1, reusable cross-session validation should at least catch:
 
 - ambiguous capability ownership when one concrete device is bound to multiple roles and the same capability is claimed by more than one role binding,

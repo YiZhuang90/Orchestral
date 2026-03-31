@@ -8,7 +8,7 @@ using ExperimentalControlPlatform.Core.Artifacts;
 
 namespace ExperimentalControlPlatform.App;
 
-public sealed class AdHocRunDefinitionFactory
+public sealed class AdHocRunDefinitionFactory : IRunDefinitionFactory
 {
     public ResolvedExperimentDefinition Create(IEnumerable<IDeviceTestPanelViewModel> panels)
     {

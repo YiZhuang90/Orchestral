@@ -115,6 +115,7 @@ The current branch also already reflects these architectural consequences:
 - the application host owns session-registry behavior,
 - session-local validation now exists as a shared runtime unit with structured `SessionValidationResult` output,
 - cross-session validation now exists as a shared run-start validation unit with structured `CrossSessionValidationResult` output,
+- experiment-definition linting now exists as a shared authored-package pre-flight unit with structured `ExperimentDefinitionLintResult` output,
 - high-rate stream ports now support buffered consumer subscriptions with explicit delivery policy instead of only raw synchronous event fan-out,
 - run-context metadata now exists as a first-class experiment-plane artifact through `RunContextDefinition`,
 - coordinator snapshots can now carry stable run-intent metadata and artifact references separately from the ephemeral runtime `RunId`,
@@ -140,6 +141,7 @@ The current coordinator status is still only foundational:
 
 - `RuntimeCoordinator` now owns truthful run-level `Idle -> Running -> Stopping -> Idle` stop transitions,
 - it now validates resolved experiment packages for reusable cross-session contradictions before start,
+- authored experiment packages are now linted before initialize completes, so broken static references are blocked before cross-session validation or hardware start,
 - it delegates run-level stop to `IDeviceSessionRegistry.StopAllAsync(...)`,
 - and the application host can join an in-flight stop through `EnsureStoppedAsync(...)`,
 - and initialize-time operator flow can surface cross-session validation blockers before run start through the experiment monitor panel client,
