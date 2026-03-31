@@ -25,7 +25,7 @@
 - experiment-specific scientific logic
 - session-registry live-hardware availability checks
 - experiment-definition linting beyond the first cross-session rules
-- replay/simulator infrastructure
+- virtual device and replay/simulation infrastructure
 
 **Required foundation**
 
@@ -115,4 +115,4 @@
   - `2026-03-31-cross-session-validation-rereview-claude-opus-4-6.md`
 - remaining universal sequence after this slice:
   - `Experiment-definition linting`
-  - `Replay / simulator harness`
+  - `Virtual device and replay/simulation harness`

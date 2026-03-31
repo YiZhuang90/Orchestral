@@ -6,7 +6,7 @@ This document is the operational index for V1 execution inside the current Orche
 
 Use:
 
-- [ROADMAP_V1.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/ROADMAP_V1.md) for strategic stage order,
+- [ROADMAP_V1.md](./ROADMAP_V1.md) for strategic stage order,
 - this file for active execution sequencing,
 - and slice-specific execution plans for concrete implementation work.
 
@@ -68,44 +68,57 @@ Status:
 
 Required foundations:
 
-- [DEVICE_RUNTIME_IO_ARCHITECTURE.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/architecture/DEVICE_RUNTIME_IO_ARCHITECTURE.md)
-- [TIMING_AND_SYNCHRONIZATION_STRATEGY.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/architecture/TIMING_AND_SYNCHRONIZATION_STRATEGY.md)
-- [SYSTEM_LANGUAGE_SPEC.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/architecture/SYSTEM_LANGUAGE_SPEC.md)
-- [EXPERIMENT_LOGIC_LAYER.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/architecture/EXPERIMENT_LOGIC_LAYER.md)
+- [DEVICE_RUNTIME_IO_ARCHITECTURE.md](../architecture/DEVICE_RUNTIME_IO_ARCHITECTURE.md)
+- [TIMING_AND_SYNCHRONIZATION_STRATEGY.md](../architecture/TIMING_AND_SYNCHRONIZATION_STRATEGY.md)
+- [SYSTEM_LANGUAGE_SPEC.md](../architecture/SYSTEM_LANGUAGE_SPEC.md)
+- [EXPERIMENT_LOGIC_LAYER.md](../architecture/EXPERIMENT_LOGIC_LAYER.md)
+- [EXPERIMENT_CANVAS_ARCHITECTURE.md](../architecture/EXPERIMENT_CANVAS_ARCHITECTURE.md)
+- [VIRTUAL_TWIN_AND_SIMULATION_STRATEGY.md](../architecture/VIRTUAL_TWIN_AND_SIMULATION_STRATEGY.md)
 
 Active slice plans:
 
-- [2026-03-28-session-local-validation-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-28-session-local-validation-plan.md)
-- [2026-03-28-runtime-coordinator-and-stop-authority-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-28-runtime-coordinator-and-stop-authority-plan.md)
-- [2026-03-30-experiment-definition-and-role-binding-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-30-experiment-definition-and-role-binding-plan.md)
-- [2026-03-30-high-rate-stream-buffering-and-delivery-policy-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-30-high-rate-stream-buffering-and-delivery-policy-plan.md)
-- [2026-03-30-run-context-and-metadata-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-30-run-context-and-metadata-plan.md)
-- [2026-03-30-run-recorder-and-artifact-writer-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-30-run-recorder-and-artifact-writer-plan.md)
-- [2026-03-30-controller-unit-session-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-30-controller-unit-session-plan.md)
-- [2026-03-31-run-monitor-and-alarm-surface-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-31-run-monitor-and-alarm-surface-plan.md)
-- [2026-03-31-flow-reynolds-derived-state-and-measured-stream-wiring-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-31-flow-reynolds-derived-state-and-measured-stream-wiring-plan.md)
-- [2026-03-31-experiment-logic-layer-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-31-experiment-logic-layer-plan.md)
-- [2026-03-31-cross-session-validation-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-31-cross-session-validation-plan.md)
-- [2026-03-31-experiment-definition-linting-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-31-experiment-definition-linting-plan.md)
+- [2026-03-28-session-local-validation-plan.md](./2026-03-28-session-local-validation-plan.md)
+- [2026-03-28-runtime-coordinator-and-stop-authority-plan.md](./2026-03-28-runtime-coordinator-and-stop-authority-plan.md)
+- [2026-03-30-experiment-definition-and-role-binding-plan.md](./2026-03-30-experiment-definition-and-role-binding-plan.md)
+- [2026-03-30-high-rate-stream-buffering-and-delivery-policy-plan.md](./2026-03-30-high-rate-stream-buffering-and-delivery-policy-plan.md)
+- [2026-03-30-run-context-and-metadata-plan.md](./2026-03-30-run-context-and-metadata-plan.md)
+- [2026-03-30-run-recorder-and-artifact-writer-plan.md](./2026-03-30-run-recorder-and-artifact-writer-plan.md)
+- [2026-03-30-controller-unit-session-plan.md](./2026-03-30-controller-unit-session-plan.md)
+- [2026-03-31-run-monitor-and-alarm-surface-plan.md](./2026-03-31-run-monitor-and-alarm-surface-plan.md)
+- [2026-03-31-flow-reynolds-derived-state-and-measured-stream-wiring-plan.md](./2026-03-31-flow-reynolds-derived-state-and-measured-stream-wiring-plan.md)
+- [2026-03-31-experiment-logic-layer-plan.md](./2026-03-31-experiment-logic-layer-plan.md)
+- [2026-03-31-cross-session-validation-plan.md](./2026-03-31-cross-session-validation-plan.md)
+- [2026-03-31-experiment-definition-linting-plan.md](./2026-03-31-experiment-definition-linting-plan.md)
 
 ### 2. Experiment Logic Layer
 
 Status:
 
 - now formalized as the layer above universal runtime and below later AI orchestration,
+- experiment-canvas architecture now defines the high-level authoring model as:
+  - `Experiment Function`
+  - `Experiment Role`
+  - `Concrete Implementation`,
 - intended for experiment-specific units such as:
   - camera-pair semantics,
   - Reynolds derivation,
   - image-to-signal transforms,
   - detection/classification,
   - experiment-specific control and monitor logic,
+- virtual-twin strategy now defines concrete implementation source modes as:
+  - `Real`
+  - `Virtual`
+  - `Replay`
+  - `Synthetic`,
 - next implementation slices for the first reference experiment should route through this layer instead of being misclassified as universal runtime work.
 
 Required foundations:
 
-- [DEVICE_RUNTIME_IO_ARCHITECTURE.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/architecture/DEVICE_RUNTIME_IO_ARCHITECTURE.md)
-- [SYSTEM_LANGUAGE_SPEC.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/architecture/SYSTEM_LANGUAGE_SPEC.md)
-- [EXPERIMENT_LOGIC_LAYER.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/architecture/EXPERIMENT_LOGIC_LAYER.md)
+- [DEVICE_RUNTIME_IO_ARCHITECTURE.md](../architecture/DEVICE_RUNTIME_IO_ARCHITECTURE.md)
+- [SYSTEM_LANGUAGE_SPEC.md](../architecture/SYSTEM_LANGUAGE_SPEC.md)
+- [EXPERIMENT_LOGIC_LAYER.md](../architecture/EXPERIMENT_LOGIC_LAYER.md)
+- [EXPERIMENT_CANVAS_ARCHITECTURE.md](../architecture/EXPERIMENT_CANVAS_ARCHITECTURE.md)
+- [VIRTUAL_TWIN_AND_SIMULATION_STRATEGY.md](../architecture/VIRTUAL_TWIN_AND_SIMULATION_STRATEGY.md)
 
 ### 3. Universal Hardening Before Experiment Logic Proof
 
@@ -113,14 +126,14 @@ Status:
 
 - the first-generation universal runtime foundation is built enough to stop adding new generic core slices by reflex,
 - the remaining universal work is now:
-  - `Replay / simulator harness`,
+  - `Virtual device and replay/simulation harness`,
 - `Control-center capability decomposition`, `Cross-session validation`, and `Experiment-definition linting` are now complete,
 - after those are complete, the next step should be a minimum code-level proof of the experiment-logic layer rather than another broad runtime rewrite.
 
 Guiding plan:
 
-- [2026-03-31-universal-completion-and-experiment-logic-proof-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-31-universal-completion-and-experiment-logic-proof-plan.md)
-- [2026-03-31-control-center-capability-decomposition-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-31-control-center-capability-decomposition-plan.md)
+- [2026-03-31-universal-completion-and-experiment-logic-proof-plan.md](./2026-03-31-universal-completion-and-experiment-logic-proof-plan.md)
+- [2026-03-31-control-center-capability-decomposition-plan.md](./2026-03-31-control-center-capability-decomposition-plan.md)
 
 As each hardening unit lands, update both:
 

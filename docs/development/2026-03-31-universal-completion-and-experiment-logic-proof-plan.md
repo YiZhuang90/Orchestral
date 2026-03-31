@@ -65,7 +65,7 @@ The remaining universal units should be treated as:
 2. `Experiment-definition linting`
    - reusable static checking before a run starts
 
-3. `Replay / simulator harness`
+3. `Virtual device and replay/simulation harness`
    - reusable hardening and offline-test infrastructure
    - V1 scope should stay narrow:
      - single-session recorded-stream playback first
@@ -99,7 +99,7 @@ These universal units are not perfect, but they are complete enough that they sh
 
 1. `Cross-session validation`
 2. `Experiment-definition linting`
-3. `Replay / simulator harness`
+3. `Virtual device and replay/simulation harness`
 
 ## Done Criteria For The Remaining Universal Units
 
@@ -130,13 +130,15 @@ Done when:
 - missing roles, invalid bindings, and broken parameter references are surfaced without starting hardware
 - lint results are available as a reusable artifact or validation object
 
-### 4. Replay / simulator harness
+### 4. Virtual device and replay/simulation harness
 
 Done when:
 
 - one recorded stream can be replayed through the runtime-facing consumer path without real hardware
 - the harness is usable in automated tests
-- V1 stays limited to single-session recorded-stream playback
+- V1 stays limited to:
+  - single-session recorded-stream playback
+  - scalar synthetic streams such as mean-plus-noise sources
 - broader multi-device simulation remains out of scope for this pass
 
 ## Minimum Experiment-Logic Proof
