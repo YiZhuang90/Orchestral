@@ -93,6 +93,29 @@ public sealed class FlowReynoldsDerivedStateSessionTests
         Assert.Equal(RunStartedAt.AddSeconds(2), controllerState.MeasuredValueObservedAtUtc);
     }
 
+    [Fact]
+    public async Task AttachRuntimeSourcesAsync_ConsumesExplicitFlowTelemetrySurface()
+    {
+        var service = new FakeControlCenterService(
+            [
+                new ControlCenterPulseReadback("control_center_01", "Control Center", 1.0, 10, RunStartedAt.AddSeconds(1)),
+                new ControlCenterPulseReadback("control_center_01", "Control Center", 2.0, 14, RunStartedAt.AddSeconds(2))
+            ]);
+        await using var controlCenterSession = new ControlCenterSession(service, ControlCenterDeviceInfo.FromPortName("COM5"));
+        await using var derivedState = new FlowReynoldsDerivedStateSession(CreateResolvedExperimentDefinition());
+
+        await controlCenterSession.ConnectAsync();
+        await derivedState.AttachRuntimeSourcesAsync(controlCenterSession, pt104Session: null);
+        await controlCenterSession.ReadFlowTelemetryAsync();
+        await controlCenterSession.ReadFlowTelemetryAsync();
+
+        var flowTelemetry = Assert.IsType<ControlCenterFlowTelemetryState>(controlCenterSession.FlowTelemetry.Current);
+        Assert.Equal(14, flowTelemetry.LastPulseCount);
+        var state = Assert.IsType<FlowReynoldsDerivedStateSnapshot>(derivedState.State.Current);
+        Assert.Equal(14, state.LatestPulseCount);
+        Assert.NotNull(state.ReynoldsNumber);
+    }
+
     private static ResolvedExperimentDefinition CreateResolvedExperimentDefinition()
     {
         var experiment = new ExperimentDefinition(
@@ -248,5 +271,35 @@ public sealed class FlowReynoldsDerivedStateSessionTests
         var bulkVelocity = flowRateLitersPerMinute / 60 / 1000 / Math.PI / Math.Pow(pipeDiameterMeters, 2) * 4;
         var reynolds = bulkVelocity * pipeDiameterMeters / kinematicViscosity;
         return (bulkVelocity, reynolds);
+    }
+
+    private sealed class FakeControlCenterService(IReadOnlyList<ControlCenterPulseReadback> pulseReadbacks) : IControlCenterService
+    {
+        private readonly FakeControlCenterConnection _connection = new(ControlCenterDeviceInfo.FromPortName("COM5"));
+        private int _pulseIndex;
+
+        public IReadOnlyList<ControlCenterDeviceInfo> ListDevices() => [_connection.Device];
+
+        public IControlCenterConnection Open(ControlCenterDeviceInfo device) => _connection;
+
+        public void SendCommand(IControlCenterConnection connection, ControlCenterCommand command)
+        {
+        }
+
+        public ControlCenterPulseReadback ReadPulseCount(IControlCenterConnection connection)
+        {
+            var index = Math.Min(_pulseIndex, pulseReadbacks.Count - 1);
+            _pulseIndex++;
+            return pulseReadbacks[index];
+        }
+
+        private sealed class FakeControlCenterConnection(ControlCenterDeviceInfo device) : IControlCenterConnection
+        {
+            public ControlCenterDeviceInfo Device { get; } = device;
+
+            public void Dispose()
+            {
+            }
+        }
     }
 }

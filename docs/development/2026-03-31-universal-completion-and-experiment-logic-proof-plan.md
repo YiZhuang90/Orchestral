@@ -58,24 +58,27 @@ The remaining universal work is now mostly hardening and reusable composition wo
 
 The remaining universal units should be treated as:
 
-1. `Control-center capability decomposition`
-   - still reusable device/runtime modeling work
-   - not tied to one experiment's scientific meaning
-
-2. `Cross-session validation`
+1. `Cross-session validation`
    - reusable validation over interacting sessions and experiment bindings
    - should follow control-center capability decomposition because the validation model needs the cleaned-up session topology and capability boundaries
 
-3. `Experiment-definition linting`
+2. `Experiment-definition linting`
    - reusable static checking before a run starts
 
-4. `Replay / simulator harness`
+3. `Replay / simulator harness`
    - reusable hardening and offline-test infrastructure
    - V1 scope should stay narrow:
      - single-session recorded-stream playback first
      - not full time-travel or broad multi-device simulation on the first pass
 
 These should be completed before the first deliberate code-level proof of the experiment-logic layer.
+
+`Control-center capability decomposition` is now complete in branch code with:
+
+- explicit `LaserControl`, `PuffActuation`, and `FlowTelemetry` runtime capability surfaces,
+- capability-oriented control-center command helpers above the shared serial protocol,
+- panel and artifact semantics that no longer record the control center as one undifferentiated command surface,
+- and downstream Reynolds wiring through the explicit flow-telemetry capability seam.
 
 ## Units Considered Closed Enough
 
@@ -94,10 +97,9 @@ These universal units are not perfect, but they are complete enough that they sh
 
 ## Recommended Universal Completion Order
 
-1. `Control-center capability decomposition`
-2. `Cross-session validation`
-3. `Experiment-definition linting`
-4. `Replay / simulator harness`
+1. `Cross-session validation`
+2. `Experiment-definition linting`
+3. `Replay / simulator harness`
 
 ## Done Criteria For The Remaining Universal Units
 

@@ -63,10 +63,10 @@ public sealed class ControlCenterSessionTests
         };
         var session = new ControlCenterSession(service, TestDevice);
         var received = new List<ControlCenterPulseReadback>();
-        session.PulseReads.Produced += received.Add;
+        session.FlowTelemetryReads.Produced += received.Add;
 
         await session.ConnectAsync();
-        await session.ReadPulseCountAsync();
+        await session.ReadFlowTelemetryAsync();
 
         var latest = Assert.IsType<ControlCenterPulseReadback>(session.LatestPulse.Current);
         Assert.Equal(96, latest.PulseCount);
@@ -76,6 +76,75 @@ public sealed class ControlCenterSessionTests
         Assert.NotNull(currentState.LastControllerTimestampSeconds);
         Assert.Equal(2.5, currentState.LastControllerTimestampSeconds!.Value, 3);
         Assert.Equal(1, currentState.PulseSequence);
+    }
+
+    [Fact]
+    public async Task ApplyLaserControlAsync_PublishesLaserCapability_AndPreservesPuffActuationState()
+    {
+        var service = new FakeControlCenterService();
+        var session = new ControlCenterSession(service, TestDevice);
+
+        await session.ConnectAsync();
+        await session.ApplyCommandAsync(new ControlCenterCommand(PuffEnabled: true, LaserEnabled: false, StepCount: 42));
+        await session.ApplyLaserControlAsync(enabled: true);
+
+        Assert.Equal(new ControlCenterCommand(PuffEnabled: true, LaserEnabled: true, StepCount: 42), service.SentCommands[^1]);
+        var laser = Assert.IsType<ControlCenterLaserCapabilityState>(session.LaserControl.Current);
+        Assert.True(laser.LastCommandedEnabled);
+        Assert.Equal(2, laser.CommandSequence);
+        var puff = Assert.IsType<ControlCenterPuffActuationCapabilityState>(session.PuffActuation.Current);
+        Assert.True(puff.LastCommandedEnabled);
+        Assert.Equal(42, puff.LastStepCount);
+        Assert.Equal(2, puff.CommandSequence);
+        Assert.Equal(
+            "Capability command written; flow telemetry is awaiting refresh.",
+            session.FlowTelemetry.Current!.StatusMessage);
+    }
+
+    [Fact]
+    public async Task ReadFlowTelemetryAsync_PublishesExplicitFlowTelemetryCapabilityState_AndStream()
+    {
+        var service = new FakeControlCenterService
+        {
+            PulseReadbacks =
+            [
+                new ControlCenterPulseReadback(TestDevice.DeviceId, TestDevice.DisplayName, 2.5, 96, DateTimeOffset.UtcNow)
+            ]
+        };
+        var session = new ControlCenterSession(service, TestDevice);
+        var received = new List<ControlCenterPulseReadback>();
+        session.FlowTelemetryReads.Produced += received.Add;
+
+        await session.ConnectAsync();
+        await session.ReadFlowTelemetryAsync();
+
+        var flowTelemetry = Assert.IsType<ControlCenterFlowTelemetryState>(session.FlowTelemetry.Current);
+        Assert.Equal(96, flowTelemetry.LastPulseCount);
+        Assert.NotNull(flowTelemetry.LastControllerTimestampSeconds);
+        Assert.Equal(2.5, flowTelemetry.LastControllerTimestampSeconds!.Value, 3);
+        Assert.Equal(1, flowTelemetry.PulseSequence);
+        Assert.Single(received);
+        Assert.Equal(96, received[0].PulseCount);
+    }
+
+    [Fact]
+    public async Task ApplyPuffActuationAsync_PublishesPuffCapability_AndPreservesLaserControlState()
+    {
+        var service = new FakeControlCenterService();
+        var session = new ControlCenterSession(service, TestDevice);
+
+        await session.ConnectAsync();
+        await session.ApplyCommandAsync(new ControlCenterCommand(PuffEnabled: false, LaserEnabled: true, StepCount: 4));
+        await session.ApplyPuffActuationAsync(enabled: true, stepCount: 11);
+
+        Assert.Equal(new ControlCenterCommand(PuffEnabled: true, LaserEnabled: true, StepCount: 11), service.SentCommands[^1]);
+        var laser = Assert.IsType<ControlCenterLaserCapabilityState>(session.LaserControl.Current);
+        Assert.True(laser.LastCommandedEnabled);
+        Assert.Equal(2, laser.CommandSequence);
+        var puff = Assert.IsType<ControlCenterPuffActuationCapabilityState>(session.PuffActuation.Current);
+        Assert.True(puff.LastCommandedEnabled);
+        Assert.Equal(11, puff.LastStepCount);
+        Assert.Equal(2, puff.CommandSequence);
     }
 
     [Fact]

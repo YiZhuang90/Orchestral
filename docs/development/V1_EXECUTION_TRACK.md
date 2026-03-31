@@ -49,6 +49,10 @@ Status:
   - measured-value wiring into `ControllerUnitSession`,
   - monitor-side derived-state presentation and stale-state warnings,
   - and run-artifact persistence for derived-state snapshot/record outputs,
+- control-center capability decomposition now exists as:
+  - explicit `LaserControl`, `PuffActuation`, and `FlowTelemetry` runtime capability surfaces above the mixed serial protocol,
+  - capability-oriented command helpers that still preserve one truthful transport write path,
+  - and panel/applied-settings semantics that no longer record the control-center as one vague command lump,
 - universal runtime is now strong enough that the next missing work should not be framed as new first-generation runtime creation,
 - next shared guidance slice is formalizing the `Experiment Logic` layer that sits above runtime and below later AI orchestration.
 
@@ -97,15 +101,16 @@ Status:
 
 - the first-generation universal runtime foundation is built enough to stop adding new generic core slices by reflex,
 - the remaining universal work is now:
-  - `Control-center capability decomposition`
   - `Cross-session validation`
   - `Experiment-definition linting`
   - `Replay / simulator harness`,
+- `Control-center capability decomposition` is now complete and was the dependency-cleanup step before reusable cross-session validation,
 - after those are complete, the next step should be a minimum code-level proof of the experiment-logic layer rather than another broad runtime rewrite.
 
 Guiding plan:
 
 - [2026-03-31-universal-completion-and-experiment-logic-proof-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-31-universal-completion-and-experiment-logic-proof-plan.md)
+- [2026-03-31-control-center-capability-decomposition-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-31-control-center-capability-decomposition-plan.md)
 
 As each hardening unit lands, update both:
 

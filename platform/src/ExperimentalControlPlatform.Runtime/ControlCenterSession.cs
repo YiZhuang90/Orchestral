@@ -11,6 +11,15 @@ public sealed class ControlCenterSession : IDeviceSession
     private readonly IControlCenterService _service;
     private readonly ControlCenterDeviceInfo _device;
     private readonly object _syncRoot = new();
+    private readonly SnapshotOutputPort<ControlCenterSessionState> _state;
+    private readonly SnapshotOutputPort<ControlCenterAppliedState?> _appliedState;
+    private readonly SnapshotOutputPort<DeviceDiagnosticsSnapshot> _diagnostics;
+    private readonly SnapshotOutputPort<DeviceSessionEndSnapshot?> _sessionEnd;
+    private readonly SnapshotOutputPort<ControlCenterPulseReadback?> _latestPulse;
+    private readonly StreamOutputPort<ControlCenterPulseReadback> _flowTelemetryReads;
+    private readonly SnapshotOutputPort<ControlCenterLaserCapabilityState> _laserControl;
+    private readonly SnapshotOutputPort<ControlCenterPuffActuationCapabilityState> _puffActuation;
+    private readonly SnapshotOutputPort<ControlCenterFlowTelemetryState> _flowTelemetry;
     private IControlCenterConnection? _connection;
 
     public ControlCenterSession(IControlCenterService service, ControlCenterDeviceInfo device)
@@ -18,32 +27,44 @@ public sealed class ControlCenterSession : IDeviceSession
         _service = service ?? throw new ArgumentNullException(nameof(service));
         _device = device ?? throw new ArgumentNullException(nameof(device));
         SessionId = new DeviceSessionId("ControlCenter", device.DeviceId);
-        State = new SnapshotOutputPort<ControlCenterSessionState>(new ControlCenterSessionState
+        _state = new SnapshotOutputPort<ControlCenterSessionState>(new ControlCenterSessionState
         {
             DeviceId = device.DeviceId,
             DeviceName = device.DisplayName,
             StatusMessage = "Control center session ready."
         });
-        AppliedState = new SnapshotOutputPort<ControlCenterAppliedState?>();
-        Diagnostics = new SnapshotOutputPort<DeviceDiagnosticsSnapshot>(new DeviceDiagnosticsSnapshot());
-        SessionEnd = new SnapshotOutputPort<DeviceSessionEndSnapshot?>();
-        LatestPulse = new SnapshotOutputPort<ControlCenterPulseReadback?>();
-        PulseReads = new StreamOutputPort<ControlCenterPulseReadback>();
+        _appliedState = new SnapshotOutputPort<ControlCenterAppliedState?>();
+        _diagnostics = new SnapshotOutputPort<DeviceDiagnosticsSnapshot>(new DeviceDiagnosticsSnapshot());
+        _sessionEnd = new SnapshotOutputPort<DeviceSessionEndSnapshot?>();
+        _latestPulse = new SnapshotOutputPort<ControlCenterPulseReadback?>();
+        _flowTelemetryReads = new StreamOutputPort<ControlCenterPulseReadback>();
+        _laserControl = new SnapshotOutputPort<ControlCenterLaserCapabilityState>(new ControlCenterLaserCapabilityState());
+        _puffActuation = new SnapshotOutputPort<ControlCenterPuffActuationCapabilityState>(new ControlCenterPuffActuationCapabilityState());
+        _flowTelemetry = new SnapshotOutputPort<ControlCenterFlowTelemetryState>(new ControlCenterFlowTelemetryState());
     }
 
     public DeviceSessionId SessionId { get; }
 
-    public ISnapshotOutputPort<ControlCenterSessionState> State { get; }
+    public ISnapshotOutputPort<ControlCenterSessionState> State => _state;
 
-    public ISnapshotOutputPort<ControlCenterAppliedState?> AppliedState { get; }
+    public ISnapshotOutputPort<ControlCenterAppliedState?> AppliedState => _appliedState;
 
-    public ISnapshotOutputPort<DeviceDiagnosticsSnapshot> Diagnostics { get; }
+    public ISnapshotOutputPort<DeviceDiagnosticsSnapshot> Diagnostics => _diagnostics;
 
-    public ISnapshotOutputPort<DeviceSessionEndSnapshot?> SessionEnd { get; }
+    public ISnapshotOutputPort<DeviceSessionEndSnapshot?> SessionEnd => _sessionEnd;
 
-    public ISnapshotOutputPort<ControlCenterPulseReadback?> LatestPulse { get; }
+    public ISnapshotOutputPort<ControlCenterPulseReadback?> LatestPulse => _latestPulse;
 
-    public IStreamOutputPort<ControlCenterPulseReadback> PulseReads { get; }
+    [Obsolete("Use FlowTelemetryReads to consume the explicit flow-telemetry capability surface.")]
+    public IStreamOutputPort<ControlCenterPulseReadback> PulseReads => _flowTelemetryReads;
+
+    public ISnapshotOutputPort<ControlCenterLaserCapabilityState> LaserControl => _laserControl;
+
+    public ISnapshotOutputPort<ControlCenterPuffActuationCapabilityState> PuffActuation => _puffActuation;
+
+    public ISnapshotOutputPort<ControlCenterFlowTelemetryState> FlowTelemetry => _flowTelemetry;
+
+    public IStreamOutputPort<ControlCenterPulseReadback> FlowTelemetryReads => _flowTelemetryReads;
 
     public async Task ConnectAsync(CancellationToken cancellationToken = default)
     {
@@ -80,6 +101,18 @@ public sealed class ControlCenterSession : IDeviceSession
                 Busy = false,
                 StatusMessage = $"Connected to {_device.DisplayName}."
             });
+            PublishLaserControl(LaserControl.Current! with
+            {
+                StatusMessage = "Laser control connected and ready."
+            });
+            PublishPuffActuation(PuffActuation.Current! with
+            {
+                StatusMessage = "Puff actuation connected and ready."
+            });
+            PublishFlowTelemetry(FlowTelemetry.Current! with
+            {
+                StatusMessage = "Awaiting flow telemetry."
+            });
         }
         catch (Exception ex)
         {
@@ -97,101 +130,107 @@ public sealed class ControlCenterSession : IDeviceSession
         }
     }
 
-    public async Task ApplyCommandAsync(ControlCenterCommand command, CancellationToken cancellationToken = default)
+    public Task ApplyCommandAsync(ControlCenterCommand command, CancellationToken cancellationToken = default)
     {
-        var validation = ValidateCommand(command);
-        validation.ThrowIfInvalid();
         var connection = RequireConnection();
-
-        PublishDiagnostics(Diagnostics.Current! with
-        {
-            LastCommand = "Send control center command",
-            LastValidationResult = validation.Summary,
-            LastError = null
-        });
-        PublishState(State.Current! with
-        {
-            Busy = true,
-            StatusMessage = "Writing control center command..."
-        });
-
-        try
-        {
-            await Task.Run(() => _service.SendCommand(connection, command), cancellationToken).ConfigureAwait(false);
-            var appliedAt = DateTimeOffset.UtcNow;
-            AppliedStatePort.Publish(new ControlCenterAppliedState(
-                command.PuffEnabled,
-                command.LaserEnabled,
-                command.StepCount,
-                appliedAt,
-                "Serial transport write succeeded; hardware acknowledgement not available."));
-            PublishDiagnostics(Diagnostics.Current! with
-            {
-                LastHardwareResponse = "Control center command written to serial transport.",
-                LastStateTransition = "Sent control center command",
-                LastError = null
-            });
-
-            var currentState = State.Current!;
-            PublishState(currentState with
-            {
-                Busy = false,
-                LastCommandedPuffEnabled = command.PuffEnabled,
-                LastCommandedLaserEnabled = command.LaserEnabled,
-                LastStepCount = command.StepCount,
-                CommandSequence = currentState.CommandSequence + 1,
-                StatusMessage = "Control center command written to transport."
-            });
-        }
-        catch (Exception ex)
-        {
-            PublishDiagnostics(Diagnostics.Current! with
-            {
-                LastError = ex.Message
-            });
-            PublishState(State.Current! with
-            {
-                Busy = false,
-                StatusMessage = $"Control center command failed: {ex.Message}"
-            });
-            throw;
-        }
+        return WriteCommandAsync(
+            connection,
+            command,
+            "Send control center capability command",
+            "Control-center capability command written to serial transport.",
+            "Sent control-center capability command",
+            "Control-center capability command written to transport.",
+            "Serial transport write succeeded; hardware acknowledgement not available.",
+            cancellationToken);
     }
 
-    public async Task ReadPulseCountAsync(CancellationToken cancellationToken = default)
+    public Task ApplyLaserControlAsync(bool enabled, CancellationToken cancellationToken = default)
+    {
+        var currentState = State.Current!;
+        var command = new ControlCenterCommand(
+            PuffEnabled: currentState.LastCommandedPuffEnabled ?? false,
+            LaserEnabled: enabled,
+            StepCount: currentState.LastStepCount ?? 0);
+        var connection = RequireConnection();
+        return WriteCommandAsync(
+            connection,
+            command,
+            "Send laser control command",
+            "Laser control command written to serial transport.",
+            "Sent laser control command",
+            "Laser control command written to transport.",
+            "Laser control command written to serial transport; hardware acknowledgement not available.",
+            cancellationToken,
+            validationSummary: BuildScopedCommandValidationSummary("laser control", currentState));
+    }
+
+    public Task ApplyPuffActuationAsync(bool enabled, int stepCount, CancellationToken cancellationToken = default)
+    {
+        var currentState = State.Current!;
+        var command = new ControlCenterCommand(
+            PuffEnabled: enabled,
+            LaserEnabled: currentState.LastCommandedLaserEnabled ?? false,
+            StepCount: stepCount);
+        var connection = RequireConnection();
+        return WriteCommandAsync(
+            connection,
+            command,
+            "Send puff actuation command",
+            "Puff actuation command written to serial transport.",
+            "Sent puff actuation command",
+            "Puff actuation command written to transport.",
+            "Puff actuation command written to serial transport; hardware acknowledgement not available.",
+            cancellationToken,
+            validationSummary: BuildScopedCommandValidationSummary("puff actuation", currentState));
+    }
+
+    [Obsolete("Use ReadFlowTelemetryAsync to read the explicit flow-telemetry capability surface.")]
+    public Task ReadPulseCountAsync(CancellationToken cancellationToken = default) => ReadFlowTelemetryAsync(cancellationToken);
+
+    public async Task ReadFlowTelemetryAsync(CancellationToken cancellationToken = default)
     {
         var connection = RequireConnection();
         PublishDiagnostics(Diagnostics.Current! with
         {
-            LastCommand = "Read control center pulse count",
+            LastCommand = "Read flow telemetry",
             LastError = null
         });
         PublishState(State.Current! with
         {
             Busy = true,
-            StatusMessage = "Reading control center pulse count..."
+            StatusMessage = "Reading control-center flow telemetry..."
         });
 
         try
         {
             var readback = await Task.Run(() => _service.ReadPulseCount(connection), cancellationToken).ConfigureAwait(false);
-            LatestPulsePort.Publish(readback);
-            PulseReadsPort.Publish(readback);
+            _latestPulse.Publish(readback);
+            _flowTelemetryReads.Publish(readback);
             var currentState = State.Current!;
-            PublishDiagnostics(Diagnostics.Current! with
-            {
-                LastHardwareResponse = $"Pulse readback received: {readback.PulseCount}.",
-                LastStateTransition = "Captured control center pulse readback",
-                LastError = null
-            });
-            PublishState(currentState with
+            var updatedState = currentState with
             {
                 Busy = false,
                 LastPulseCount = readback.PulseCount,
                 LastControllerTimestampSeconds = readback.ControllerTimestampSeconds,
                 LastPulseCapturedAt = readback.ReceivedAt,
                 PulseSequence = currentState.PulseSequence + 1,
-                StatusMessage = "Control center pulse count captured."
+                StatusMessage = "Control-center flow telemetry captured."
+            };
+
+            PublishDiagnostics(Diagnostics.Current! with
+            {
+                LastHardwareResponse = $"Flow telemetry pulse readback received: {readback.PulseCount}.",
+                LastStateTransition = "Captured control-center flow telemetry",
+                LastError = null
+            });
+            PublishState(updatedState);
+            PublishFlowTelemetry(new ControlCenterFlowTelemetryState
+            {
+                LastPulseCount = readback.PulseCount,
+                LastControllerTimestampSeconds = readback.ControllerTimestampSeconds,
+                LastObservedAtUtc = readback.ReceivedAt,
+                PulseSequence = updatedState.PulseSequence,
+                StatusMessage = "Flow telemetry pulse readback captured."
             });
         }
         catch (Exception ex)
@@ -203,13 +242,13 @@ public sealed class ControlCenterSession : IDeviceSession
             PublishState(State.Current! with
             {
                 Busy = false,
-                StatusMessage = $"Pulse readback failed: {ex.Message}"
+                StatusMessage = $"Flow telemetry read failed: {ex.Message}"
             });
             throw;
         }
     }
 
-    public async Task EmergencyStopAsync(CancellationToken cancellationToken = default)
+    public Task EmergencyStopAsync(CancellationToken cancellationToken = default)
     {
         IControlCenterConnection? connection;
         lock (_syncRoot)
@@ -230,64 +269,20 @@ public sealed class ControlCenterSession : IDeviceSession
                 Busy = false,
                 StatusMessage = "Emergency stop ignored because the control center is disconnected."
             });
-            return;
+            return Task.CompletedTask;
         }
 
         var safeCommand = new ControlCenterCommand(PuffEnabled: false, LaserEnabled: false, StepCount: 0);
-
-        PublishDiagnostics(Diagnostics.Current! with
-        {
-            LastCommand = "Emergency stop control center",
-            LastValidationResult = "Validated emergency-stop safe command.",
-            LastError = null
-        });
-        PublishState(State.Current! with
-        {
-            Busy = true,
-            StatusMessage = "Applying emergency-stop safe command..."
-        });
-
-        try
-        {
-            await Task.Run(() => _service.SendCommand(connection, safeCommand), cancellationToken).ConfigureAwait(false);
-            var appliedAt = DateTimeOffset.UtcNow;
-            AppliedStatePort.Publish(new ControlCenterAppliedState(
-                safeCommand.PuffEnabled,
-                safeCommand.LaserEnabled,
-                safeCommand.StepCount,
-                appliedAt,
-                "Emergency-stop safe command written to serial transport."));
-            PublishDiagnostics(Diagnostics.Current! with
-            {
-                LastHardwareResponse = "Emergency-stop safe command written to serial transport.",
-                LastStateTransition = "Applied emergency-stop safe command",
-                LastError = null
-            });
-
-            var currentState = State.Current!;
-            PublishState(currentState with
-            {
-                Busy = false,
-                LastCommandedPuffEnabled = false,
-                LastCommandedLaserEnabled = false,
-                LastStepCount = 0,
-                CommandSequence = currentState.CommandSequence + 1,
-                StatusMessage = "Emergency stop applied; control center is idle."
-            });
-        }
-        catch (Exception ex)
-        {
-            PublishDiagnostics(Diagnostics.Current! with
-            {
-                LastError = ex.Message
-            });
-            PublishState(State.Current! with
-            {
-                Busy = false,
-                StatusMessage = $"Emergency stop failed: {ex.Message}"
-            });
-            throw;
-        }
+        return WriteCommandAsync(
+            connection,
+            safeCommand,
+            "Emergency stop control center",
+            "Emergency-stop safe command written to serial transport.",
+            "Applied emergency-stop safe command",
+            "Emergency stop applied; control center is idle.",
+            "Emergency-stop safe command written to serial transport.",
+            cancellationToken,
+            validationSummary: "Validated emergency-stop safe command.");
     }
 
     public async Task DisconnectAsync(StopReason? reason = null, CancellationToken cancellationToken = default)
@@ -315,6 +310,18 @@ public sealed class ControlCenterSession : IDeviceSession
             Connected = false,
             Busy = false,
             StatusMessage = "Disconnected."
+        });
+        PublishLaserControl(LaserControl.Current! with
+        {
+            StatusMessage = "Laser control disconnected."
+        });
+        PublishPuffActuation(PuffActuation.Current! with
+        {
+            StatusMessage = "Puff actuation disconnected."
+        });
+        PublishFlowTelemetry(FlowTelemetry.Current! with
+        {
+            StatusMessage = "Flow telemetry disconnected."
         });
         PublishSessionEnd(new DeviceSessionEndSnapshot
         {
@@ -344,31 +351,123 @@ public sealed class ControlCenterSession : IDeviceSession
         await DisconnectAsync(StopReason.UserRequested("Disposed control center session.")).ConfigureAwait(false);
     }
 
-    private SnapshotOutputPort<ControlCenterAppliedState?> AppliedStatePort => (SnapshotOutputPort<ControlCenterAppliedState?>)AppliedState;
+    private async Task WriteCommandAsync(
+        IControlCenterConnection connection,
+        ControlCenterCommand command,
+        string diagnosticsCommand,
+        string hardwareResponse,
+        string stateTransition,
+        string statusMessage,
+        string transportNote,
+        CancellationToken cancellationToken,
+        string? validationSummary = null)
+    {
+        var validation = ValidateCommand(command);
+        validation.ThrowIfInvalid();
 
-    private SnapshotOutputPort<DeviceDiagnosticsSnapshot> DiagnosticsPort => (SnapshotOutputPort<DeviceDiagnosticsSnapshot>)Diagnostics;
+        PublishDiagnostics(Diagnostics.Current! with
+        {
+            LastCommand = diagnosticsCommand,
+            LastValidationResult = validationSummary ?? validation.Summary,
+            LastError = null
+        });
+        PublishState(State.Current! with
+        {
+            Busy = true,
+            StatusMessage = "Writing control-center capability command..."
+        });
 
-    private SnapshotOutputPort<DeviceSessionEndSnapshot?> SessionEndPort => (SnapshotOutputPort<DeviceSessionEndSnapshot?>)SessionEnd;
+        try
+        {
+            await Task.Run(() => _service.SendCommand(connection, command), cancellationToken).ConfigureAwait(false);
+            var appliedAt = DateTimeOffset.UtcNow;
+            _appliedState.Publish(new ControlCenterAppliedState(
+                command.PuffEnabled,
+                command.LaserEnabled,
+                command.StepCount,
+                appliedAt,
+                transportNote));
+            var currentState = State.Current!;
+            var updatedState = currentState with
+            {
+                Busy = false,
+                LastCommandedPuffEnabled = command.PuffEnabled,
+                LastCommandedLaserEnabled = command.LaserEnabled,
+                LastStepCount = command.StepCount,
+                CommandSequence = currentState.CommandSequence + 1,
+                StatusMessage = statusMessage
+            };
 
-    private SnapshotOutputPort<ControlCenterSessionState> StatePort => (SnapshotOutputPort<ControlCenterSessionState>)State;
-
-    private SnapshotOutputPort<ControlCenterPulseReadback?> LatestPulsePort => (SnapshotOutputPort<ControlCenterPulseReadback?>)LatestPulse;
-
-    private StreamOutputPort<ControlCenterPulseReadback> PulseReadsPort => (StreamOutputPort<ControlCenterPulseReadback>)PulseReads;
+            PublishDiagnostics(Diagnostics.Current! with
+            {
+                LastHardwareResponse = hardwareResponse,
+                LastStateTransition = stateTransition,
+                LastError = null
+            });
+            PublishState(updatedState);
+            PublishLaserControl(new ControlCenterLaserCapabilityState
+            {
+                LastCommandedEnabled = command.LaserEnabled,
+                LastCommandedAtUtc = appliedAt,
+                CommandSequence = updatedState.CommandSequence,
+                StatusMessage = $"Laser control command {(command.LaserEnabled ? "enabled" : "disabled")}."
+            });
+            PublishPuffActuation(new ControlCenterPuffActuationCapabilityState
+            {
+                LastCommandedEnabled = command.PuffEnabled,
+                LastStepCount = command.StepCount,
+                LastCommandedAtUtc = appliedAt,
+                CommandSequence = updatedState.CommandSequence,
+                StatusMessage = $"Puff actuation command {(command.PuffEnabled ? "enabled" : "disabled")} with step count {command.StepCount}."
+            });
+            PublishFlowTelemetry(FlowTelemetry.Current! with
+            {
+                StatusMessage = "Capability command written; flow telemetry is awaiting refresh."
+            });
+        }
+        catch (Exception ex)
+        {
+            PublishDiagnostics(Diagnostics.Current! with
+            {
+                LastError = ex.Message
+            });
+            PublishState(State.Current! with
+            {
+                Busy = false,
+                StatusMessage = $"Control-center capability command failed: {ex.Message}"
+            });
+            throw;
+        }
+    }
 
     private void PublishDiagnostics(DeviceDiagnosticsSnapshot snapshot)
     {
-        DiagnosticsPort.Publish(snapshot);
+        _diagnostics.Publish(snapshot);
     }
 
     private void PublishSessionEnd(DeviceSessionEndSnapshot? snapshot)
     {
-        SessionEndPort.Publish(snapshot);
+        _sessionEnd.Publish(snapshot);
     }
 
     private void PublishState(ControlCenterSessionState state)
     {
-        StatePort.Publish(state);
+        _state.Publish(state);
+    }
+
+    private void PublishLaserControl(ControlCenterLaserCapabilityState state)
+    {
+        _laserControl.Publish(state);
+    }
+
+    private void PublishPuffActuation(ControlCenterPuffActuationCapabilityState state)
+    {
+        _puffActuation.Publish(state);
+    }
+
+    private void PublishFlowTelemetry(ControlCenterFlowTelemetryState state)
+    {
+        _flowTelemetry.Publish(state);
     }
 
     private IControlCenterConnection RequireConnection()
@@ -389,6 +488,16 @@ public sealed class ControlCenterSession : IDeviceSession
                 "Step count must be zero or greater."));
         }
 
-        return SessionValidationResult.FromIssues("Validated control center command.", issues);
+        return SessionValidationResult.FromIssues("Validated control center capability command.", issues);
+    }
+
+    private static string BuildScopedCommandValidationSummary(string capabilityName, ControlCenterSessionState state)
+    {
+        if (state.CommandSequence == 0)
+        {
+            return $"Validated {capabilityName} command; no prior session command exists, so unspecified capability fields defaulted to safe off/0 values.";
+        }
+
+        return $"Validated {capabilityName} command; unspecified capability fields were reconstructed from the last session command rather than hardware acknowledgement.";
     }
 }
