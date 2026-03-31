@@ -49,13 +49,15 @@ Status:
   - measured-value wiring into `ControllerUnitSession`,
   - monitor-side derived-state presentation and stale-state warnings,
   - and run-artifact persistence for derived-state snapshot/record outputs,
-- next universal slice is the camera-pair role unit.
+- universal runtime is now strong enough that the next missing work should not be framed as "one more universal runtime unit",
+- next shared guidance slice is formalizing the `Experiment Logic` layer that sits above runtime and below later AI orchestration.
 
 Required foundations:
 
 - [DEVICE_RUNTIME_IO_ARCHITECTURE.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/architecture/DEVICE_RUNTIME_IO_ARCHITECTURE.md)
 - [TIMING_AND_SYNCHRONIZATION_STRATEGY.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/architecture/TIMING_AND_SYNCHRONIZATION_STRATEGY.md)
 - [SYSTEM_LANGUAGE_SPEC.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/architecture/SYSTEM_LANGUAGE_SPEC.md)
+- [EXPERIMENT_LOGIC_LAYER.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/architecture/EXPERIMENT_LOGIC_LAYER.md)
 
 Active slice plans:
 
@@ -68,17 +70,37 @@ Active slice plans:
 - [2026-03-30-controller-unit-session-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-30-controller-unit-session-plan.md)
 - [2026-03-31-run-monitor-and-alarm-surface-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-31-run-monitor-and-alarm-surface-plan.md)
 - [2026-03-31-flow-reynolds-derived-state-and-measured-stream-wiring-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-31-flow-reynolds-derived-state-and-measured-stream-wiring-plan.md)
+- [2026-03-31-experiment-logic-layer-plan.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/development/2026-03-31-experiment-logic-layer-plan.md)
 
-### 2. First Reference Experiment
+### 2. Experiment Logic Layer
+
+Status:
+
+- now formalized as the layer above universal runtime and below later AI orchestration,
+- intended for experiment-specific units such as:
+  - camera-pair semantics,
+  - Reynolds derivation,
+  - image-to-signal transforms,
+  - detection/classification,
+  - experiment-specific control and monitor logic,
+- next implementation slices for the first reference experiment should route through this layer instead of being misclassified as universal runtime work.
+
+Required foundations:
+
+- [DEVICE_RUNTIME_IO_ARCHITECTURE.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/architecture/DEVICE_RUNTIME_IO_ARCHITECTURE.md)
+- [SYSTEM_LANGUAGE_SPEC.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/architecture/SYSTEM_LANGUAGE_SPEC.md)
+- [EXPERIMENT_LOGIC_LAYER.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/architecture/EXPERIMENT_LOGIC_LAYER.md)
+
+### 3. First Reference Experiment
 
 Status:
 
 - partially unblocked,
 - still waiting on:
-  - camera-pair role semantics and experiment-specific processing units,
+  - experiment-logic units such as camera-pair semantics and experiment-specific processing,
   - experiment-specific controller sessions as required by the chosen reference experiment.
 
-### 3. AI Brain Integration
+### 4. AI Brain Integration
 
 Status:
 
