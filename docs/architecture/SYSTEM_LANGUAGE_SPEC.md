@@ -262,6 +262,43 @@ It records:
 
 The run manifest is not a full data lake. It is the compact, structured summary that ties the experiment definition to the actual execution.
 
+### 3.15 Experiment Logic
+
+Experiment logic is the experiment-specific runtime meaning layered on top of the universal runtime foundation.
+
+It is where the platform expresses things such as:
+
+- composite role meaning,
+- derived scientific state,
+- experiment-specific transforms,
+- experiment-specific detectors,
+- experiment-specific control policies,
+- experiment-specific monitor rules.
+
+Examples:
+
+- an upstream/downstream camera pair,
+- Reynolds-number derivation from pulse and temperature telemetry,
+- turbulence-signal extraction from image streams,
+- puff-event classification and trigger conversion.
+
+Experiment logic is not the same thing as raw runtime infrastructure.
+
+The runtime foundation answers questions like:
+
+- how are sessions owned?
+- how are streams published?
+- how is a run started, stopped, and recorded?
+
+Experiment logic answers questions like:
+
+- what do these device streams mean for this experiment?
+- which devices together form one experiment role composite?
+- what derived state matters scientifically?
+- what experiment-specific monitor or control behavior should exist?
+
+If a unit depends on one experiment's scientific meaning rather than remaining reusable across many experiments, it should be classified as experiment logic rather than universal runtime.
+
 ## 4. Semantics and Relationships
 
 The language should be read as a graph of constrained relationships:
@@ -274,6 +311,7 @@ The language should be read as a graph of constrained relationships:
 - control targets define how measured experiment state should drive commands,
 - streams carry data through the runtime,
 - transforms derive new streams from existing streams,
+- experiment logic composes streams, transforms, monitors, and control targets into experiment-specific meaning,
 - monitors report important runtime values,
 - stop conditions observe monitors and streams,
 - outputs capture the resulting artifacts,

@@ -18,6 +18,7 @@ Read this together with:
 - [INTEGRATION_PANEL_IO_CONTRACT.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/INTEGRATION_PANEL_IO_CONTRACT.md)
 - [DEVICE_ARCHETYPE_MAPPING.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/DEVICE_ARCHETYPE_MAPPING.md)
 - [TIMING_AND_SYNCHRONIZATION_STRATEGY.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/architecture/TIMING_AND_SYNCHRONIZATION_STRATEGY.md)
+- [EXPERIMENT_LOGIC_LAYER.md](C:/Users/Yi%20Zhuang/.config/superpowers/worktrees/Orchestral/runtime-io-microphone/docs/architecture/EXPERIMENT_LOGIC_LAYER.md)
 
 ## Why
 
@@ -122,6 +123,12 @@ The current branch also already reflects these architectural consequences:
 - controlled-device sessions can define device-level `EmergencyStop`,
 - acquisition-style panels can expose a small operator-facing output-settings surface,
 - and `ApplyAndExit` is treated as a session-lifecycle action rather than only a UI close action.
+
+This branch now also makes one architectural boundary explicit:
+
+- `FlowReynoldsDerivedStateSession` runs on top of the runtime foundation,
+- but it is better classified as `experiment logic` than as universal runtime infrastructure,
+- so future comparable units should be planned through the experiment-logic layer instead of expanding the universal runtime bucket indefinitely.
 
 The current coordinator status is still only foundational:
 
@@ -279,6 +286,11 @@ The experiment plane now has two real runtime-owned units above individual devic
 - `ExperimentMonitorSession`
 - `ControllerUnitSession`
 
+These two units should be read as reusable runtime infrastructure for the experiment plane.
+
+They are not, by themselves, the full experiment-logic layer.
+Experiment-specific policies, derived-state semantics, composite-role meaning, and monitor rules sit on top of these reusable slots.
+
 `ExperimentMonitorSession` is now the background runtime consumer for the first-generation experiment monitor surface.
 
 Current responsibilities:
@@ -362,6 +374,45 @@ What remains ahead:
 - richer alarm rules and automatic stop-condition linkage,
 - dedicated stream projection for additional derived quantities where needed,
 - and experiment-specific controller-session projection where required.
+
+### How experiment logic should relate to runtime
+
+The runtime foundation is not the same thing as experiment logic.
+
+The runtime foundation should stay reusable across many experiments.
+
+Examples:
+
+- device sessions
+- stream ports
+- registry
+- coordinator
+- generic controller and monitor infrastructure
+- recorder
+
+Experiment logic should sit above that reusable runtime.
+
+Examples:
+
+- camera-pair meaning such as `upstream` and `downstream`
+- Reynolds-number derivation
+- image-to-signal transforms
+- event detection and classification
+- experiment-specific control policies
+- experiment-specific monitor rules
+
+So the architectural rule is:
+
+- runtime owns reusable device/run infrastructure
+- experiment logic owns experiment-specific scientific meaning
+
+This distinction now matters because the current branch already has one bridge unit:
+
+- `FlowReynoldsDerivedStateSession`
+
+That unit runs on runtime streams and snapshots, but the logic itself is experiment-specific rather than universal.
+
+Future units of that kind should be planned and named through the experiment-logic layer, not added as if they were generic runtime primitives.
 
 ## What
 
