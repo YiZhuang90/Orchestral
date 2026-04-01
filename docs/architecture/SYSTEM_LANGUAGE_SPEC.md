@@ -90,11 +90,42 @@ Not every experiment must contain all four classes.
 
 These classes are block-level classifications.
 They are not experiment roles, device types, or source modes.
+They are primarily a design/build organization for the canvas rather than a required runtime execution partition.
 
 Monitor surfaces and runtime lifecycle concerns should not be classified as top-level experiment-function classes.
 
 Calibration or reference logic should usually be nested under one of these top-level classes rather than promoted to top level by default.
 Promotion should happen only when that calibration/reference work has its own independent schedule, outputs, or operator-visible identity in the experiment design.
+
+### 3.2.2 Typed Canvas Block Kind
+
+Typed canvas block kind is the lower-level composition classification used inside or below an experiment function block.
+
+The first canonical lower-level kinds should be:
+
+- `FunctionBlock`
+- `PipelineBlock`
+- `ComputeBlock`
+- `ControlBlock`
+- `BindingBlock`
+
+These kinds mean:
+
+- `FunctionBlock`
+  - a meaningful subsystem with a clear responsibility, inputs, and outputs
+- `PipelineBlock`
+  - an ordered processing path where stage order is semantically important
+- `ComputeBlock`
+  - a derivation or calculation block that transforms inputs into outputs without directly owning hardware actuation
+- `ControlBlock`
+  - a decision or command block that turns targets, measurements, rules, or events into commands or gated decisions
+- `BindingBlock`
+  - a leaf block that connects an abstract role, port, or edge to a concrete implementation, often in `Real`, `Virtual`, `Replay`, or `Synthetic` mode
+
+These lower-level kinds are composition vocabulary for design-time structure.
+They should not be read as a promise that the runtime will instantiate one hard execution container per canvas block.
+
+Top-level experiment-function blocks should be treated as `FunctionBlock` instances with an added `Experiment Function Class`.
 
 ### 3.3 Experiment Role
 

@@ -12,6 +12,7 @@ It defines what one block means and what one block is allowed to contain.
 Read this together with:
 
 - [EXPERIMENT_CANVAS_ARCHITECTURE.md](./EXPERIMENT_CANVAS_ARCHITECTURE.md)
+- [EXPERIMENT_CANVAS_TYPED_BLOCK_KINDS.md](./EXPERIMENT_CANVAS_TYPED_BLOCK_KINDS.md)
 - [SYSTEM_LANGUAGE_SPEC.md](./SYSTEM_LANGUAGE_SPEC.md)
 
 ## Core Rule
@@ -62,6 +63,7 @@ The summary should answer:
 `Function class` is a classification of the experiment function block itself.
 It is not a runtime role, not a device class, and not a source mode.
 Its canonical meanings are defined in [SYSTEM_LANGUAGE_SPEC.md](./SYSTEM_LANGUAGE_SPEC.md).
+It is primarily an authoring-time organizational cue, not a required runtime execution partition.
 
 ### 2. Function Contract
 
@@ -99,6 +101,7 @@ Example:
 This is required because many scientist-facing functions are wider than one role.
 
 The canvas should therefore stay high-level at the block boundary while still allowing internal structure below that boundary.
+That lower-level internal structure may be described with the typed block kinds defined in [EXPERIMENT_CANVAS_TYPED_BLOCK_KINDS.md](./EXPERIMENT_CANVAS_TYPED_BLOCK_KINDS.md).
 
 Support concerns such as calibration or reference generation should usually remain nested under one of the top-level function classes rather than becoming top-level blocks by default.
 Promotion should happen only when the calibration/reference work has its own independent schedule, outputs, or operator-visible identity in the experiment design.
@@ -232,6 +235,9 @@ The block is therefore:
 - an authoring/building object,
 - not the runtime session itself,
 - and not the live monitor surface.
+
+The runtime does not need one hard execution container for every top-level canvas block.
+Coordinator start/stop flow, monitor subscriptions, and recorder inputs may still connect directly to runtime-owned sessions, streams, and summaries.
 
 It should also not be used as the top-level home for generic lifecycle concerns such as device initialization or termination.
 

@@ -11,6 +11,7 @@ The canvas should therefore use high-level blocks, not vendor-first device block
 Read this together with:
 
 - [EXPERIMENT_CANVAS_BLOCK_CONTRACT.md](./EXPERIMENT_CANVAS_BLOCK_CONTRACT.md)
+- [EXPERIMENT_CANVAS_TYPED_BLOCK_KINDS.md](./EXPERIMENT_CANVAS_TYPED_BLOCK_KINDS.md)
 
 ## Core Principle
 
@@ -47,6 +48,12 @@ The general top-level pattern should use four experiment-function classes:
 In V1, this should be treated as a closed set of canonical top-level function classes.
 
 Not every experiment must use all four.
+
+These four classes are a top-level authoring scaffold.
+They exist to help the user and the AI think systemically about the experiment before diving into lower-level bindings or device details.
+
+They should not be read as required runtime execution partitions.
+The runtime may still start directly through the coordinator, and monitor or recorder surfaces may still subscribe directly to runtime-published values, images, and events.
 
 Their canonical meanings are defined in:
 
@@ -85,6 +92,7 @@ The canvas should be understood as three connected layers:
 The V1 block-level rules for how those layers appear inside one block are defined in:
 
 - [EXPERIMENT_CANVAS_BLOCK_CONTRACT.md](./EXPERIMENT_CANVAS_BLOCK_CONTRACT.md)
+- [EXPERIMENT_CANVAS_TYPED_BLOCK_KINDS.md](./EXPERIMENT_CANVAS_TYPED_BLOCK_KINDS.md)
 
 ### 1. Experiment Function
 
@@ -157,6 +165,25 @@ At run time, the resolved run manifest is the source of truth for what was actua
 
 At the highest level, these blocks should still be scientist-facing experiment functions rather than runtime concerns such as monitoring, lifecycle control, or generic orchestration.
 
+## Typed Internal Composition
+
+Top-level experiment-function blocks should be understood as the highest layer of canvas composition, not the only layer.
+
+Below that top level, a function may be decomposed through reusable typed block kinds such as:
+
+- `FunctionBlock`
+- `PipelineBlock`
+- `ComputeBlock`
+- `ControlBlock`
+- `BindingBlock`
+
+Those lower-level typed block kinds are defined in:
+
+- [EXPERIMENT_CANVAS_TYPED_BLOCK_KINDS.md](./EXPERIMENT_CANVAS_TYPED_BLOCK_KINDS.md)
+
+This decomposition vocabulary exists to make nested canvas structure legible.
+It does not require the runtime to instantiate one hard execution container for each canvas block.
+
 ## Why The Canvas Starts Above Roles
 
 An experiment role is already more abstract than a device, but it is still often too low-level for the first co-design phase.
@@ -213,6 +240,8 @@ Instead:
 - roles bind to concrete implementations,
 - concrete implementations attach to Orchestral runtime services and sessions,
 - runtime sessions then feed monitor, controller, recorder, and experiment-logic units.
+
+This means the canvas can stay high-level without forcing start/stop flow, monitor subscriptions, or recorder wiring to route through one top-level canvas block per function class.
 
 So the canvas remains high-level while the runtime remains truthful.
 
