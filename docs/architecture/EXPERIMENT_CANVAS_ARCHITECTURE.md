@@ -8,6 +8,10 @@ The canvas exists to help a user and the embedded AI co-build the system at a hi
 
 The canvas should therefore use high-level blocks, not vendor-first device blocks.
 
+Read this together with:
+
+- [EXPERIMENT_CANVAS_BLOCK_CONTRACT.md](./EXPERIMENT_CANVAS_BLOCK_CONTRACT.md)
+
 ## Core Principle
 
 Top-level canvas blocks should represent `Experiment Functions`.
@@ -36,6 +40,10 @@ The canvas should be understood as three connected layers:
 1. `Experiment Function`
 2. `Experiment Role`
 3. `Concrete Implementation`
+
+The V1 block-level rules for how those layers appear inside one block are defined in:
+
+- [EXPERIMENT_CANVAS_BLOCK_CONTRACT.md](./EXPERIMENT_CANVAS_BLOCK_CONTRACT.md)
 
 ### 1. Experiment Function
 
@@ -101,6 +109,11 @@ One function may require multiple roles.
 One role may be fulfilled by different concrete implementations.
 One concrete implementation may serve different roles in different experiments.
 
+In V1, one function block may contain multiple internal roles, but each role should bind to exactly one active concrete implementation.
+
+At design time, the canvas block is the source of truth for the intended role-to-implementation bindings inside that function.
+At run time, the resolved run manifest is the source of truth for what was actually executed.
+
 ## Why The Canvas Starts Above Roles
 
 An experiment role is already more abstract than a device, but it is still often too low-level for the first co-design phase.
@@ -134,6 +147,18 @@ In the earliest design phase, a function block may have:
 This is acceptable and expected.
 
 The canvas is therefore an authoring and planning surface first, not only a hardware inventory surface.
+
+Its readiness indicators should therefore express:
+
+- structural readiness,
+- binding completeness,
+- and source-mode trust level,
+
+not live run control state.
+
+The exact V1 readiness semantics are defined in:
+
+- [EXPERIMENT_CANVAS_BLOCK_CONTRACT.md](./EXPERIMENT_CANVAS_BLOCK_CONTRACT.md)
 
 ## Binding To Runtime
 
