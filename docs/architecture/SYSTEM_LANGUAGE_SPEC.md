@@ -62,6 +62,40 @@ In V1 canvas terms, one experiment function block may contain multiple internal 
 
 In the future experiment canvas, top-level blocks should map to experiment functions rather than to vendor devices.
 
+### 3.2.1 Experiment Function Class
+
+Experiment function class is the top-level classification of an experiment function block in the canvas.
+
+The first canonical function classes should be:
+
+- `condition_control`
+- `core_experiment_function`
+- `order_parameter`
+- `data_recording`
+
+In V1, this should be treated as a closed set of canonical top-level function classes.
+
+These classes mean:
+
+- `condition_control`
+  - controls the environment or operating condition of the experiment
+- `core_experiment_function`
+  - performs the main active scientific function of the experiment
+- `order_parameter`
+  - measures or derives the main scientific outcome of the experiment
+- `data_recording`
+  - preserves raw and derived evidence for the run
+
+Not every experiment must contain all four classes.
+
+These classes are block-level classifications.
+They are not experiment roles, device types, or source modes.
+
+Monitor surfaces and runtime lifecycle concerns should not be classified as top-level experiment-function classes.
+
+Calibration or reference logic should usually be nested under one of these top-level classes rather than promoted to top level by default.
+Promotion should happen only when that calibration/reference work has its own independent schedule, outputs, or operator-visible identity in the experiment design.
+
 ### 3.3 Experiment Role
 
 An experiment role is a functional requirement inside an experiment.
@@ -395,6 +429,7 @@ The intended source mode should be recorded by the experiment-building surface s
 The language should be read as a graph of constrained relationships:
 
 - an experiment may be described in terms of one or more experiment functions,
+- each experiment function may be classified as a top-level function class for canvas organization,
 - an experiment function expands into one or more experiment roles and logic responsibilities,
 - an experiment requires one or more experiment roles,
 - a role requires one or more capabilities,
