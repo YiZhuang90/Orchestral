@@ -58,6 +58,8 @@ Examples:
 An experiment function is broader than one experiment role.
 It may include acquisition, processing, detection, control, and output responsibilities together.
 
+In V1 canvas terms, one experiment function block may contain multiple internal experiment roles.
+
 In the future experiment canvas, top-level blocks should map to experiment functions rather than to vendor devices.
 
 ### 3.3 Experiment Role
@@ -135,6 +137,11 @@ Role binding is the bridge between the abstract experiment and the concrete exec
 - and which implementation and role parameters are active for the run.
 
 A binding is specific to one run context. It is part of the resolved runtime state and part of the run manifest.
+
+In V1 canvas authoring, one experiment role should bind to exactly one active concrete implementation at a time.
+
+At design time, that intended binding may be authored through a canvas block or other experiment-building surface.
+At run time, the resolved run manifest is the authoritative record of the actual binding used for execution.
 
 ### 3.8 Protocol
 
@@ -353,6 +360,35 @@ Experiment logic answers questions like:
 - what experiment-specific monitor or control behavior should exist?
 
 If a unit depends on one experiment's scientific meaning rather than remaining reusable across many experiments, it should be classified as experiment logic rather than universal runtime.
+
+### 3.19 Function Readiness
+
+Function readiness is the coarse canvas-level readiness state of one experiment function block.
+
+It is not the same thing as live runtime health.
+
+The first canonical readiness states should be:
+
+- `Ready`
+- `Caution`
+- `Blocked`
+
+The intended visual encoding is:
+
+- `Green` for `Ready`
+- `Yellow` for `Caution`
+- `Red` for `Blocked`
+
+Examples:
+
+- `Ready`
+  - all required roles are bound and valid for intended execution
+- `Caution`
+  - runnable only through virtual, replay, or synthetic source modes
+- `Blocked`
+  - required role or implementation missing, or blocking validation still present
+
+The intended source mode should be recorded by the experiment-building surface so this comparison is explicit rather than guessed at run time.
 
 ## 4. Semantics and Relationships
 
