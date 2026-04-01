@@ -33,6 +33,47 @@ This is because the user usually thinks in terms such as:
 
 Those are broader than one device and often include processing, control, and derived-state logic as well as hardware.
 
+## General Top-Level Experiment Pattern
+
+At the highest level, the canvas should stay sparse.
+
+The general top-level pattern should use four experiment-function classes:
+
+1. `condition_control`
+2. `core_experiment_function`
+3. `order_parameter`
+4. `data_recording`
+
+In V1, this should be treated as a closed set of canonical top-level function classes.
+
+Not every experiment must use all four.
+
+Their canonical meanings are defined in:
+
+- [SYSTEM_LANGUAGE_SPEC.md](./SYSTEM_LANGUAGE_SPEC.md)
+
+The following should normally **not** be top-level experiment-function blocks:
+
+- monitor or dashboard surfaces
+- device init or terminate lifecycle behavior
+- generic runtime orchestration
+- calibration or reference logic that only supports a parent block
+
+Calibration or reference work may still exist as nested support blocks, but it should not be promoted to top level merely because it is scientifically important.
+Promotion should happen only when that calibration/reference work has its own independent schedule, outputs, or operator-visible identity in the experiment design.
+
+### Turbulence Example Mapping
+
+For the turbulence experiment, the same general classes can be mapped as:
+
+- `Re Control Unit` -> `condition_control`
+- `Puff Control Unit` -> `core_experiment_function`
+- `TF Unit` -> `order_parameter`
+- `Data Recording Unit` -> `data_recording`
+
+This example is only a mapping example.
+It should not be read as a requirement to rebuild the turbulence experiment literally.
+
 ## Three-Layer Canvas Model
 
 The canvas should be understood as three connected layers:
@@ -113,6 +154,8 @@ In V1, one function block may contain multiple internal roles, but each role sho
 
 At design time, the canvas block is the source of truth for the intended role-to-implementation bindings inside that function.
 At run time, the resolved run manifest is the source of truth for what was actually executed.
+
+At the highest level, these blocks should still be scientist-facing experiment functions rather than runtime concerns such as monitoring, lifecycle control, or generic orchestration.
 
 ## Why The Canvas Starts Above Roles
 

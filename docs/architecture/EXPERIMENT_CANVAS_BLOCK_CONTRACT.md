@@ -42,12 +42,26 @@ Each block should contain these conceptual parts:
 Each block should have:
 
 - function id
+- function class
 - function name
 - short purpose summary
+
+For V1, `function class` should be one of:
+
+- `condition_control`
+- `core_experiment_function`
+- `order_parameter`
+- `data_recording`
+
+In V1, this should be treated as a closed set of canonical top-level function classes.
 
 The summary should answer:
 
 - what does this function do for the experiment?
+
+`Function class` is a classification of the experiment function block itself.
+It is not a runtime role, not a device class, and not a source mode.
+Its canonical meanings are defined in [SYSTEM_LANGUAGE_SPEC.md](./SYSTEM_LANGUAGE_SPEC.md).
 
 ### 2. Function Contract
 
@@ -85,6 +99,9 @@ Example:
 This is required because many scientist-facing functions are wider than one role.
 
 The canvas should therefore stay high-level at the block boundary while still allowing internal structure below that boundary.
+
+Support concerns such as calibration or reference generation should usually remain nested under one of the top-level function classes rather than becoming top-level blocks by default.
+Promotion should happen only when the calibration/reference work has its own independent schedule, outputs, or operator-visible identity in the experiment design.
 
 ### 4. Bound Concrete Implementations
 
@@ -216,13 +233,16 @@ The block is therefore:
 - not the runtime session itself,
 - and not the live monitor surface.
 
+It should also not be used as the top-level home for generic lifecycle concerns such as device initialization or termination.
+
 ## V1 Summary
 
 The V1 rules are:
 
 1. one block = one experiment function
-2. one block may contain multiple experiment roles
-3. one role = exactly one active concrete implementation (`V1` constraint)
-4. one implementation = exactly one source mode
-5. block shows readiness, not runtime controls
-6. traffic light must be paired with concise readiness reasons
+2. one block has one `function_class`
+3. one block may contain multiple experiment roles
+4. one role = exactly one active concrete implementation (`V1` constraint)
+5. one implementation = exactly one source mode
+6. block shows readiness, not runtime controls
+7. traffic light must be paired with concise readiness reasons
