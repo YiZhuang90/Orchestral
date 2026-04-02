@@ -114,6 +114,13 @@ The first universal harness should support:
 V1 does not require full virtual device services for every device family.
 Those remain desirable closure paths when the service/session boundary is ready for them.
 
+The first concrete proof target should stay narrow:
+
+- PT-104 scalar temperature data as the first replay/synthetic source,
+- a runtime-source broadcaster rather than a full virtual PT-104 device,
+- internal/test-only use before any app-shell source-mode selection,
+- and downstream experiment-plane consumers such as derived-state logic as the first proof path.
+
 This is enough to validate:
 
 - controller logic

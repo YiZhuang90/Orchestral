@@ -63,6 +63,11 @@ Status:
   - first reusable static rules for duplicate definitions and broken stream, role, and parameter references,
   - initialize-time enforcement before cross-session validation or hardware start,
   - and experiment monitor surfacing so authored-package blockers are visible as pre-flight alarms,
+- the first virtual device and replay/simulation harness proof now exists as:
+  - a narrow `IPt104RuntimeSource` contract at the PT-104 runtime-source seam,
+  - internal/test-only `Pt104ReplaySource` and `Pt104SyntheticSource` broadcasters,
+  - hardware-free PT-104 temperature playback into `FlowReynoldsDerivedStateSession`,
+  - and a first proof that experiment-plane scalar consumers can run without the real PT-104 session or Pico driver,
 - universal runtime is now strong enough that the next missing work should not be framed as new first-generation runtime creation,
 - next shared guidance slice is formalizing the `Experiment Logic` layer that sits above runtime and below later AI orchestration.
 
@@ -89,6 +94,7 @@ Active slice plans:
 - [2026-03-31-experiment-logic-layer-plan.md](./2026-03-31-experiment-logic-layer-plan.md)
 - [2026-03-31-cross-session-validation-plan.md](./2026-03-31-cross-session-validation-plan.md)
 - [2026-03-31-experiment-definition-linting-plan.md](./2026-03-31-experiment-definition-linting-plan.md)
+- [2026-04-02-pt104-runtime-source-harness-plan.md](./2026-04-02-pt104-runtime-source-harness-plan.md)
 
 ### 2. Experiment Logic Layer
 
@@ -125,10 +131,13 @@ Required foundations:
 Status:
 
 - the first-generation universal runtime foundation is built enough to stop adding new generic core slices by reflex,
-- the remaining universal work is now:
-  - `Virtual device and replay/simulation harness`,
-- `Control-center capability decomposition`, `Cross-session validation`, and `Experiment-definition linting` are now complete,
-- after those are complete, the next step should be a minimum code-level proof of the experiment-logic layer rather than another broad runtime rewrite.
+- `Control-center capability decomposition`, `Cross-session validation`, `Experiment-definition linting`, and the first `Virtual device and replay/simulation harness` proof are now complete,
+- the first replay/simulation proof stays intentionally narrow:
+  - PT-104 scalar runtime-source broadcasters,
+  - test/internal use only,
+  - no app-shell source selection,
+  - no full virtual PT-104 device behavior,
+- the next step should now be a minimum code-level proof of the experiment-logic layer rather than another broad runtime rewrite.
 
 Guiding plan:
 

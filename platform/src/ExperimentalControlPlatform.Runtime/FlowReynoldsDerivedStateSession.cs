@@ -34,7 +34,7 @@ public sealed class FlowReynoldsDerivedStateSession : IAsyncDisposable
     private CancellationTokenSource? _pulsePollingCancellation;
     private Task? _pulsePollingTask;
     private ControlCenterSession? _controlCenterSession;
-    private Pt104Session? _pt104Session;
+    private IPt104RuntimeSource? _pt104Source;
     private bool _disposed;
 
     public FlowReynoldsDerivedStateSession(
@@ -197,23 +197,23 @@ public sealed class FlowReynoldsDerivedStateSession : IAsyncDisposable
 
     public async Task AttachRuntimeSourcesAsync(
         ControlCenterSession? controlCenterSession,
-        Pt104Session? pt104Session,
+        IPt104RuntimeSource? pt104Source,
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
 
-        if (ReferenceEquals(_controlCenterSession, controlCenterSession) && ReferenceEquals(_pt104Session, pt104Session))
+        if (ReferenceEquals(_controlCenterSession, controlCenterSession) && ReferenceEquals(_pt104Source, pt104Source))
         {
             return;
         }
 
         await DetachRuntimeSourcesAsync().ConfigureAwait(false);
 
-        if (pt104Session is not null)
+        if (pt104Source is not null)
         {
-            _pt104Session = pt104Session;
-            _pt104Session.Readings.Produced += HandlePt104ReadingProduced;
-            SeedTemperatureChannels(pt104Session.State.Current?.Channels);
+            _pt104Source = pt104Source;
+            _pt104Source.Readings.Produced += HandlePt104ReadingProduced;
+            SeedTemperatureChannels(pt104Source.State.Current?.Channels);
         }
 
         if (controlCenterSession is not null)
@@ -254,18 +254,18 @@ public sealed class FlowReynoldsDerivedStateSession : IAsyncDisposable
     private async Task DetachRuntimeSourcesAsync(CancellationToken cancellationToken = default)
     {
         ControlCenterSession? controlCenterSession;
-        Pt104Session? pt104Session;
+        IPt104RuntimeSource? pt104Source;
         CancellationTokenSource? pulsePollingCancellation;
         Task? pulsePollingTask;
 
         lock (_syncRoot)
         {
             controlCenterSession = _controlCenterSession;
-            pt104Session = _pt104Session;
+            pt104Source = _pt104Source;
             pulsePollingCancellation = _pulsePollingCancellation;
             pulsePollingTask = _pulsePollingTask;
             _controlCenterSession = null;
-            _pt104Session = null;
+            _pt104Source = null;
             _pulsePollingCancellation = null;
             _pulsePollingTask = null;
         }
@@ -275,9 +275,9 @@ public sealed class FlowReynoldsDerivedStateSession : IAsyncDisposable
             controlCenterSession.FlowTelemetryReads.Produced -= HandleFlowTelemetryProduced;
         }
 
-        if (pt104Session is not null)
+        if (pt104Source is not null)
         {
-            pt104Session.Readings.Produced -= HandlePt104ReadingProduced;
+            pt104Source.Readings.Produced -= HandlePt104ReadingProduced;
         }
 
         if (pulsePollingCancellation is not null)
