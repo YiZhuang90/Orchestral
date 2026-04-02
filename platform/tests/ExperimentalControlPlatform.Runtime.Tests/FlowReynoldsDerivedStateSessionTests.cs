@@ -105,7 +105,7 @@ public sealed class FlowReynoldsDerivedStateSessionTests
         await using var derivedState = new FlowReynoldsDerivedStateSession(CreateResolvedExperimentDefinition());
 
         await controlCenterSession.ConnectAsync();
-        await derivedState.AttachRuntimeSourcesAsync(controlCenterSession, pt104Session: null);
+        await derivedState.AttachRuntimeSourcesAsync(controlCenterSession, pt104Source: null);
         await controlCenterSession.ReadFlowTelemetryAsync();
         await controlCenterSession.ReadFlowTelemetryAsync();
 
@@ -113,6 +113,68 @@ public sealed class FlowReynoldsDerivedStateSessionTests
         Assert.Equal(14, flowTelemetry.LastPulseCount);
         var state = Assert.IsType<FlowReynoldsDerivedStateSnapshot>(derivedState.State.Current);
         Assert.Equal(14, state.LatestPulseCount);
+        Assert.NotNull(state.ReynoldsNumber);
+    }
+
+    [Fact]
+    public async Task AttachRuntimeSourcesAsync_Consumes_Replayed_Pt104_Source_Without_Hardware()
+    {
+        var service = new FakeControlCenterService(
+            [
+                new ControlCenterPulseReadback("control_center_01", "Control Center", 1.0, 10, RunStartedAt.AddSeconds(1)),
+                new ControlCenterPulseReadback("control_center_01", "Control Center", 2.0, 14, RunStartedAt.AddSeconds(2))
+            ]);
+        await using var controlCenterSession = new ControlCenterSession(service, ControlCenterDeviceInfo.FromPortName("COM5"));
+        await using var derivedState = new FlowReynoldsDerivedStateSession(CreateResolvedExperimentDefinition());
+        using var pt104Source = new Pt104ReplaySource(
+            "pt104_replay_01",
+            "PT-104 Replay",
+            [
+                new Pt104Reading("pt104_replay_01", 2, 20.8, RunStartedAt.AddSeconds(1), "Replay"),
+                new Pt104Reading("pt104_replay_01", 4, 21.2, RunStartedAt.AddSeconds(1), "Replay")
+            ]);
+
+        await controlCenterSession.ConnectAsync();
+        await derivedState.AttachRuntimeSourcesAsync(controlCenterSession, pt104Source);
+        await pt104Source.ReplayAsync();
+        await controlCenterSession.ReadFlowTelemetryAsync();
+        await controlCenterSession.ReadFlowTelemetryAsync();
+
+        var state = Assert.IsType<FlowReynoldsDerivedStateSnapshot>(derivedState.State.Current);
+        Assert.False(state.UsesFallbackTemperature);
+        Assert.Equal(21.0, state.MeanTemperatureC!.Value, 6);
+        Assert.Equal(0.4, state.TemperatureDeltaC!.Value, 6);
+        Assert.NotNull(state.ReynoldsNumber);
+    }
+
+    [Fact]
+    public async Task AttachRuntimeSourcesAsync_Consumes_Synthetic_Pt104_Source_Without_Hardware()
+    {
+        var service = new FakeControlCenterService(
+            [
+                new ControlCenterPulseReadback("control_center_01", "Control Center", 1.0, 10, RunStartedAt.AddSeconds(1)),
+                new ControlCenterPulseReadback("control_center_01", "Control Center", 2.0, 14, RunStartedAt.AddSeconds(2))
+            ]);
+        await using var controlCenterSession = new ControlCenterSession(service, ControlCenterDeviceInfo.FromPortName("COM5"));
+        await using var derivedState = new FlowReynoldsDerivedStateSession(CreateResolvedExperimentDefinition());
+        using var pt104Source = new Pt104SyntheticSource(
+            "pt104_synthetic_01",
+            "PT-104 Synthetic",
+            [2, 4],
+            meanTemperatureC: 21.0,
+            noiseAmplitudeC: 0.2,
+            randomSeed: 1234);
+
+        await controlCenterSession.ConnectAsync();
+        await derivedState.AttachRuntimeSourcesAsync(controlCenterSession, pt104Source);
+        pt104Source.PublishSampleSet(RunStartedAt.AddSeconds(1));
+        await controlCenterSession.ReadFlowTelemetryAsync();
+        await controlCenterSession.ReadFlowTelemetryAsync();
+
+        var state = Assert.IsType<FlowReynoldsDerivedStateSnapshot>(derivedState.State.Current);
+        Assert.False(state.UsesFallbackTemperature);
+        Assert.InRange(state.MeanTemperatureC!.Value, 20.8, 21.2);
+        Assert.InRange(state.TemperatureDeltaC!.Value, 0.0, 0.4);
         Assert.NotNull(state.ReynoldsNumber);
     }
 

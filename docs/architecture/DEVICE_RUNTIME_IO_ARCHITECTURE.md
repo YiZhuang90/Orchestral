@@ -124,6 +124,7 @@ The current branch also already reflects these architectural consequences:
 - experiment definitions now carry first-generation `ControlTargetDefinition` artifacts with constant or scheduled setpoint profiles and open-loop or closed-loop regulation modes,
 - `ControllerUnitSession` now exists as the first experiment-plane runtime unit above controlled-device sessions,
 - `FlowReynoldsDerivedStateSession` now exists as the first measured-state runtime unit that derives experiment-plane flow/Reynolds/temperature truth from device-session telemetry,
+- PT-104 replay/synthetic runtime broadcasters can now satisfy a narrow `IPt104RuntimeSource` seam for test/internal use, so scalar experiment-plane consumers can run without the real PT-104 hardware path,
 - `ControlCenterSession` now exposes explicit capability surfaces for:
   - `LaserControl`
   - `PuffActuation`
@@ -224,6 +225,9 @@ flowchart LR
     C["Virtual Service / Replay / Synthetic"] --> B
     B --> D["Runtime Consumers"]
 ```
+
+For scalar-source first passes, the virtualized input may stop at a runtime-source seam rather than a full device-session replacement.
+That is still valid as long as the same downstream runtime consumers receive the same structured outputs.
 
 ### How state ownership maps into runtime IO
 
@@ -330,6 +334,9 @@ The preferred architecture is:
 - virtual device service for an offline twin,
 - replay source for recorded data,
 - synthetic source for generated signals.
+
+For the first PT-104 proof, Orchestral now uses the replay/synthetic path at the runtime-source seam rather than implementing a full virtual PT-104 session.
+That keeps the first harness aligned with the narrow V1 goal: let experiment-plane consumers run without real hardware, not simulate every device behavior up front.
 
 The choice between those source modes should belong to experiment building or canvas-level system design rather than to panel-local lifecycle buttons.
 Once that choice is made, it becomes part of the resolved concrete implementation for the run.
