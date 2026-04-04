@@ -1,0 +1,3 @@
+# Mark legacy reference notebooks as vendored so GitHub Linguist
+# does not count them toward the project's language stats.
+legacy/** linguist-vendored

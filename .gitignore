@@ -42,6 +42,13 @@ env/
 *.tmp
 *.temp
 
+# Obsidian editor state
+.obsidian/
+
+# Build artifacts and test harnesses
+platform/artifacts/
+temp/
+
 # OS / sync artifacts
 ~$*
 
