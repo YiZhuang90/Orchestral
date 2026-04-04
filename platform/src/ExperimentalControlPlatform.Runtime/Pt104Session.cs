@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ExperimentalControlPlatform.Runtime;
 
-public sealed class Pt104Session : IDeviceSession
+public sealed class Pt104Session : IDeviceSession, IPt104RuntimeSource
 {
     private static readonly int[] ChannelNumbers = [1, 2, 3, 4];
     private readonly IPt104RuntimeDriver _driver;
