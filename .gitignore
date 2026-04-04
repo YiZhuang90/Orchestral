@@ -49,6 +49,9 @@ env/
 platform/artifacts/
 temp/
 
+# Legacy experiment code (private, not shared)
+legacy/
+
 # OS / sync artifacts
 ~$*
 
