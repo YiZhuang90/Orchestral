@@ -69,28 +69,28 @@ PL-001 and PL-002 are completed and moved to Landed.
   - thread type: `coding`
   - priority: `P1`
   - layer: `experiment logic (L3)`
-  - depends on: `LD-001 landed`
+  - depends on: `LD-001 landed` *(satisfied 2026-04-04)*
   - governing docs:
     - [ROADMAP_V2.md](./ROADMAP_V2.md)
     - [EXPERIMENT_LOGIC_LAYER.md](../architecture/EXPERIMENT_LOGIC_LAYER.md)
   - handoff / plan: `none yet — needs a planning follow-up to produce a slice plan`
   - branch / worktree: `not started`
-  - current truth: `confirmed as EF-03 by ROADMAP_V2. Depends on EF-01 (LD-001) landing first.`
-  - next action: `land LD-001, then open a planning follow-up to reduce this to a ready coding slice`
+  - current truth: `confirmed as EF-03 by ROADMAP_V2. LD-001 dependency satisfied.`
+  - next action: `open a planning session to reduce this to a ready coding slice`
 
 - `SL-002`
   - title: `Define the experiment data skeleton (EF-02)`
   - thread type: `coding`
   - priority: `P1`
   - layer: `data and artifact foundation (cross-cutting)`
-  - depends on: `LD-001 landed`
+  - depends on: `LD-001 landed` *(satisfied 2026-04-04)*
   - governing docs:
     - [ROADMAP_V2.md](./ROADMAP_V2.md)
     - [TECH_STACK_DECISIONS.md](./TECH_STACK_DECISIONS.md)
   - handoff / plan: `none yet — needs a planning follow-up to produce a slice plan`
   - branch / worktree: `not started`
-  - current truth: `confirmed as EF-02 by ROADMAP_V2. Independent of SL-001. Both depend on LD-001.`
-  - next action: `land LD-001, then open a planning follow-up to produce a data-skeleton spec`
+  - current truth: `confirmed as EF-02 by ROADMAP_V2. Independent of SL-001. LD-001 dependency satisfied.`
+  - next action: `open a planning session to produce a data-skeleton spec`
 
 ---
 
@@ -98,7 +98,7 @@ PL-001 and PL-002 are completed and moved to Landed.
 
 No items currently ready.
 
-That is intentional and truthful. ROADMAP_V2 has landed, but LD-001 (PT-104 harness) must be landed first before SL-001 or SL-002 can become ready. After LD-001 lands, a short planning follow-up should move one or both of SL-001/SL-002 to Ready For Coding.
+LD-001 has landed (2026-04-04). SL-001 and SL-002 are now unblocked but still need a planning follow-up to produce slice plans before they can move here.
 
 ---
 
@@ -122,28 +122,27 @@ No items currently in review.
 
 ## Ready To Land
 
+No items currently ready to land.
+
+---
+
+## Landed
+
 - `LD-001`
   - title: `PT-104 runtime-source harness`
-  - thread type: `landing`
-  - priority: `P1`
+  - thread type: `landed`
+  - priority: `P1 — completed`
   - layer: `universal runtime foundation`
   - depends on: `none`
   - governing docs:
     - [MODULE_DEVELOPMENT_WORKFLOW.md](./MODULE_DEVELOPMENT_WORKFLOW.md)
   - handoff / plan:
-    - `plan: C:\Users\Yi Zhuang\.config\superpowers\worktrees\Orchestral\runtime-io-microphone\docs\development\2026-04-02-pt104-runtime-source-harness-plan.md`
-    - `review: C:\Users\Yi Zhuang\.config\superpowers\worktrees\Orchestral\runtime-io-microphone\docs\collaboration\reviews\2026-04-02-pt104-runtime-source-harness-review-claude-opus-4-6.md`
-    - `response: C:\Users\Yi Zhuang\.config\superpowers\worktrees\Orchestral\runtime-io-microphone\docs\collaboration\reviews\2026-04-02-pt104-runtime-source-harness-response.md`
-  - branch / worktree:
-    - branch: `codex/pt104-runtime-source-harness`
-    - worktree: `C:\Users\Yi Zhuang\.config\superpowers\worktrees\Orchestral\runtime-io-microphone`
-    - commit: `7465325`
-  - current truth: `slice is implemented, verified, reviewed, and pushed; it still needs an explicit landing decision`
-  - next action: `run the landing step when ready`
-
----
-
-## Landed
+    - `plan: docs/development/2026-04-02-pt104-runtime-source-harness-plan.md`
+    - `review: docs/collaboration/reviews/2026-04-02-pt104-runtime-source-harness-review-claude-opus-4-6.md`
+    - `response: docs/collaboration/reviews/2026-04-02-pt104-runtime-source-harness-response.md`
+  - branch / worktree: `branch deleted, worktree removed`
+  - current truth: `landed 2026-04-04. Merged to main as 75a1df2 (merge commit). 13 files, +418/-18. Build clean, 177 tests pass (85 runtime, 52 core, 26 app, 14 devices). SL-001 and SL-002 are now unblocked.`
+  - next action: `none — completed`
 
 - `LD-002`
   - title: `Sync local main, commit and push PL-001 docs`
@@ -217,6 +216,7 @@ Old branches whose work is already incorporated into `origin/main` or that carry
 - `codex/runtime-io-microphone` — fully merged to origin/main
 - `claude/cool-almeida` — no unique work
 - `codex/panel-contract-enforcement` — no unique work
+- `codex/pt104-runtime-source-harness` — landed as LD-001 (merge commit `75a1df2`), branch deleted
 
 Corresponding worktrees for several of these branches still exist on disk. They can be cleaned up whenever convenient but are not blocking anything.
 
@@ -232,7 +232,7 @@ As of 2026-04-04, local main is synced with origin/main at `04af9ab` (30 commits
 
 ### Worktree inventory
 
-6 worktrees exist. Only the `runtime-io-microphone` worktree (on branch `codex/pt104-runtime-source-harness`) is actively useful. The other 4 non-main worktrees are historical and can be cleaned up later.
+5 worktrees remain (main + 4 historical). The `runtime-io-microphone` worktree was removed during LD-001 landing. The 4 historical worktrees (design-v2-landing, orchestral-design-v2-migration, panel-contract-enforcement, runtime-io-doc-push) carry no unique work and can be cleaned up. Git worktree metadata pruning is blocked by Windows file locks; retry when no other process holds the `.git/worktrees/` directory.
 
 ---
 
