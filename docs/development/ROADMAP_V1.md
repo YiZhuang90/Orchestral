@@ -1,5 +1,11 @@
 # Roadmap V1
 
+## Superseded
+
+This document has been superseded by [ROADMAP_V2.md](../development_v2/ROADMAP_V2.md). Kept for historical reference only.
+
+---
+
 ## 1. Purpose
 
 This document defines the high-level development roadmap for V1.

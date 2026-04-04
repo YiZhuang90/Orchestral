@@ -10,8 +10,8 @@ The goal is not to refine the current turbulence codebase into a platform. The g
 
 Operational companions:
 
-- [V1_EXECUTION_TRACK.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/development/V1_EXECUTION_TRACK.md)
-- [MODULE_DEVELOPMENT_WORKFLOW.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/development/MODULE_DEVELOPMENT_WORKFLOW.md)
+- [V1_EXECUTION_TRACK.md](./V1_EXECUTION_TRACK.md)
+- [MODULE_DEVELOPMENT_WORKFLOW.md](./MODULE_DEVELOPMENT_WORKFLOW.md)
 
 ## 2. Strategic Position
 

@@ -6,7 +6,7 @@ This document defines how AI should be integrated into V1 of the platform.
 
 For evaluating candidate lead-agent frameworks for the long-term Orchestral brain role, use:
 
-- [BASE_AI_AGENT_SELECTION_TEMPLATE.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/development/BASE_AI_AGENT_SELECTION_TEMPLATE.md)
+- [BASE_AI_AGENT_SELECTION_TEMPLATE.md](./BASE_AI_AGENT_SELECTION_TEMPLATE.md)
 
 The goal is to add useful AI assistance early, while keeping live experiment control deterministic and safe.
 
