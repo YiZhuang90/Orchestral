@@ -122,25 +122,6 @@ No items currently in review.
 
 ## Ready To Land
 
-- `LD-002`
-  - title: `Sync local main, commit and push PL-001 docs`
-  - thread type: `landing`
-  - priority: `P0`
-  - layer: `project operations`
-  - depends on: `none`
-  - governing docs:
-    - [ROADMAP_V2.md](./ROADMAP_V2.md)
-    - [2026-04-03-landing-audit.md](./2026-04-03-landing-audit.md)
-  - handoff / plan: `none — self-contained landing task`
-  - branch / worktree: `local main checkout`
-  - current truth: |
-    Local main is at `af36d25` (8 commits), origin/main is at `be0529f` (29 commits). They diverged.
-    Local commit `af36d25` duplicates content already on origin/main as `01e4162`.
-    All PL-001 docs (development_v2/, superseded headers, etc.) are uncommitted in the local checkout.
-    Two stashes also exist from earlier work.
-    Steps needed: stash uncommitted work, reconcile the diverged local commit, pull origin/main, restore work, commit, push.
-  - next action: `open a landing thread to sync local main and push PL-001 docs`
-
 - `LD-001`
   - title: `PT-104 runtime-source harness`
   - thread type: `landing`
@@ -163,6 +144,20 @@ No items currently in review.
 ---
 
 ## Landed
+
+- `LD-002`
+  - title: `Sync local main, commit and push PL-001 docs`
+  - thread type: `landed`
+  - priority: `P0 — completed`
+  - layer: `project operations`
+  - depends on: `none`
+  - governing docs:
+    - [ROADMAP_V2.md](./ROADMAP_V2.md)
+    - [2026-04-03-landing-audit.md](./2026-04-03-landing-audit.md)
+  - handoff / plan: `none — self-contained landing task`
+  - branch / worktree: `local main checkout`
+  - current truth: `landed 2026-04-04. Local main synced to origin/main (be0529f), PL-001 docs committed as 04af9ab (51 files, 12929 insertions), pushed. Build and 175 tests pass.`
+  - next action: `none — completed`
 
 - `PL-001`
   - title: `Strategic roadmap re-baseline and ROADMAP_V2`
@@ -231,11 +226,9 @@ Audit reference: [2026-04-03-landing-audit.md](./2026-04-03-landing-audit.md)
 
 ## Operational Notes
 
-### Stale local main checkout
+### Local main checkout
 
-As of 2026-04-03, the local `main` checkout is at `af36d25` (8 commits) while `origin/main` is at `be0529f` (29 commits). Local main is missing ~21 commits of runtime work that was pushed through worktrees. It also has 1 commit (`af36d25`) that duplicates content already on `origin/main` as `01e4162`, and 2 stashes.
-
-This needs syncing before any new coding work in the main checkout folder. The worktrees are more current.
+As of 2026-04-04, local main is synced with origin/main at `04af9ab` (30 commits). The prior divergence (local `af36d25` vs origin `be0529f`) was resolved during LD-002 landing. Two historical stashes remain (`codex-temp-before-runtime-io-push` and a WIP on `779fa4d`).
 
 ### Worktree inventory
 
