@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using ExperimentalControlPlatform.Core.Artifacts;
 using ExperimentalControlPlatform.Devices.ControlCenter;
+using ExperimentalControlPlatform.ExperimentLogic;
+using ExperimentalControlPlatform.Runtime;
 using Xunit;
 
-namespace ExperimentalControlPlatform.Runtime.Tests;
+namespace ExperimentalControlPlatform.ExperimentLogic.Tests;
 
 public sealed class FlowReynoldsDerivedStateSessionTests
 {

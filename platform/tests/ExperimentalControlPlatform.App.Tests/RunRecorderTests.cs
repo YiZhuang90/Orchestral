@@ -7,6 +7,7 @@ using System.Windows.Input;
 using ExperimentalControlPlatform.App.DevicePanels;
 using ExperimentalControlPlatform.App.DevicePanels.Contracts;
 using ExperimentalControlPlatform.Core.Artifacts;
+using ExperimentalControlPlatform.ExperimentLogic;
 using ExperimentalControlPlatform.Runtime;
 
 namespace ExperimentalControlPlatform.App.Tests;

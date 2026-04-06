@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using ExperimentalControlPlatform.App.DevicePanels;
 using ExperimentalControlPlatform.App.ExperimentMonitor;
 using ExperimentalControlPlatform.Core.Artifacts;
+using ExperimentalControlPlatform.ExperimentLogic;
 using ExperimentalControlPlatform.Runtime;
 
 namespace ExperimentalControlPlatform.App;

@@ -5,6 +5,7 @@ using System.Linq;
 using ExperimentalControlPlatform.App.DevicePanels;
 using ExperimentalControlPlatform.App.DevicePanels.Contracts;
 using ExperimentalControlPlatform.Core.Artifacts;
+using ExperimentalControlPlatform.ExperimentLogic;
 using ExperimentalControlPlatform.Runtime;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
