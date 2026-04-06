@@ -94,20 +94,6 @@ No items currently in this state.
 
 ## Ready For Coding
 
-- `SL-001`
-  - title: `Establish the experiment-logic code boundary (EF-03)`
-  - thread type: `coding`
-  - priority: `P1`
-  - layer: `experiment logic (L3)`
-  - depends on: `LD-001 landed` *(satisfied 2026-04-04)*
-  - governing docs:
-    - [ROADMAP_V2.md](./ROADMAP_V2.md)
-    - [EXPERIMENT_LOGIC_LAYER.md](../architecture/EXPERIMENT_LOGIC_LAYER.md)
-  - handoff / plan: [2026-04-04-SL-001-experiment-logic-boundary-slice-plan.md](./2026-04-04-SL-001-experiment-logic-boundary-slice-plan.md)
-  - branch / worktree: `not started`
-  - current truth: `slice plan written 2026-04-04. Create new ExperimentalControlPlatform.ExperimentLogic project, relocate FlowReynoldsDerivedState*, prove L2/L3 boundary.`
-  - next action: `open a coding session with $orch-session-coding`
-
 - `SL-002`
   - title: `Define the experiment data skeleton (EF-02)`
   - thread type: `coding`
@@ -121,8 +107,6 @@ No items currently in this state.
   - branch / worktree: `not started`
   - current truth: `slice plan written 2026-04-04. Write EXPERIMENT_DATA_SKELETON.md spec + update RunArtifactWriter to follow it.`
   - next action: `open a coding session with $orch-session-coding`
-
-SL-001 and SL-002 are independent. Either can be picked up first.
 
 ---
 
@@ -151,6 +135,29 @@ No items currently ready to land.
 ---
 
 ## Landed
+
+- `SL-001`
+  - title: `Establish the experiment-logic code boundary (EF-03)`
+  - thread type: `landed`
+  - priority: `P1 — completed`
+  - layer: `experiment logic (L3)`
+  - depends on: `LD-001 landed` *(satisfied 2026-04-04)*
+  - governing docs:
+    - [ROADMAP_V2.md](./ROADMAP_V2.md)
+    - [EXPERIMENT_LOGIC_LAYER.md](../architecture/EXPERIMENT_LOGIC_LAYER.md)
+  - handoff / plan: [2026-04-04-SL-001-experiment-logic-boundary-slice-plan.md](./2026-04-04-SL-001-experiment-logic-boundary-slice-plan.md)
+  - branch / worktree: `branch deleted, worktree pending cleanup (Windows file lock)`
+  - current truth: |
+    Landed 2026-04-06. Merged to main as e852d95 (merge commit). 19 files changed, +376/-36.
+    Build clean, 182 tests pass (52 Core, 79 Runtime, 14 Devices, 11 ExperimentLogic, 26 App).
+    Key changes:
+    - New project: ExperimentalControlPlatform.ExperimentLogic (L3)
+    - New test project: ExperimentalControlPlatform.ExperimentLogic.Tests
+    - New interfaces in Runtime: IDerivedStateSession, IDerivedStateSnapshot
+    - FlowReynoldsDerivedState* relocated from Runtime to ExperimentLogic
+    - ExperimentMonitorSession uses interfaces (Runtime has zero ExperimentLogic refs)
+    - Review: pass with 2 non-blocking P2 findings (Devices dependency, interface generality)
+  - next action: `none — completed`
 
 - `LD-003`
   - title: `Commit and push planning session docs (Deliverables 11-17, workflows, blueprint updates)`
