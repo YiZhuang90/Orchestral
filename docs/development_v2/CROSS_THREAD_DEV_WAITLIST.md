@@ -146,10 +146,16 @@ No items currently in review.
 
 ## Ready To Land
 
+No items currently ready to land.
+
+---
+
+## Landed
+
 - `LD-003`
   - title: `Commit and push planning session docs (Deliverables 11-17, workflows, blueprint updates)`
-  - thread type: `landing`
-  - priority: `P0`
+  - thread type: `landed`
+  - priority: `P0 — completed`
   - layer: `project operations`
   - depends on: `none`
   - governing docs:
@@ -157,17 +163,8 @@ No items currently in review.
     - [MODULE_LANDING_WORKFLOW.md](./MODULE_LANDING_WORKFLOW.md)
   - handoff / plan: `none — self-contained landing task`
   - branch / worktree: `local main checkout`
-  - current truth: |
-    All changes are uncommitted in the local main checkout. Includes:
-    - New: HEADLESS_SESSION_FITNESS.md, CROSS_SESSION_WORKFLOW.md, MODULE_PLANNING_WORKFLOW.md, MODULE_LANDING_WORKFLOW.md, MODULE_DEBUG_WORKFLOW.md, AGENT_SIDECAR_BLUEPRINT.md, 4 orch-session-* skills, SL-001/SL-002 slice plans
-    - Updated: CLAUDE.md, V1_ARCHITECTURE_BLUEPRINT.md, DEVELOPMENT_STRATEGY.md, TECH_STACK_DECISIONS.md, AI_INTEGRATION_PLAN.md, AI_GUIDED_HARDWARE_INTEGRATION_SPEC.md, ROADMAP_V2.md, AGENT_ARCHITECTURE_SKETCH.md, CROSS_THREAD_DEV_WAITLIST.md, MODULE_DEVELOPMENT_WORKFLOW.md, THREAD_CONTEXT_MANAGEMENT_CONTRACT.md
-    - Archived: CROSS_THREAD_CODING_WORKFLOW.md and 2026-04-03-coding-thread-guidance.md (superseded headers added)
-    Local main should be synced with origin/main before committing.
-  - next action: `open a landing session with $orch-session-landing`
-
----
-
-## Landed
+  - current truth: `landed 2026-04-06. Committed as c15602d (15 files, +1241/-77), pushed. Build clean, 177 tests pass.`
+  - next action: `none — completed`
 
 - `PL-003`
   - title: `Agent sidecar architecture design (EF-05)`
@@ -292,7 +289,7 @@ Audit reference: [2026-04-03-landing-audit.md](./2026-04-03-landing-audit.md)
 
 ### Local main checkout
 
-As of 2026-04-04, local main is synced with origin/main at `04af9ab` (30 commits). The prior divergence (local `af36d25` vs origin `be0529f`) was resolved during LD-002 landing. Two historical stashes remain (`codex-temp-before-runtime-io-push` and a WIP on `779fa4d`).
+As of 2026-04-06, local main is synced with origin/main at `c15602d`. History was rewritten via git-filter-repo on 2026-04-04 to purge legacy/ from all commits. Two historical stashes remain.
 
 ### Worktree inventory
 
