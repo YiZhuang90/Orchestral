@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ExperimentalControlPlatform.Core.Artifacts;
-using ExperimentalControlPlatform.Devices.ControlCenter;
 using Xunit;
 
 namespace ExperimentalControlPlatform.Runtime.Tests;
@@ -106,44 +105,60 @@ public sealed class ExperimentMonitorSessionTests
     }
 
     [Fact]
-    public async Task Snapshot_Includes_Derived_State_Summary_When_Attached()
+    public void Snapshot_Includes_Derived_State_Summary_When_Attached()
     {
         var coordinator = new RuntimeCoordinator(new FakeRegistry());
         coordinator.Start(CreateResolvedExperimentDefinition());
-        await using var derivedState = new FlowReynoldsDerivedStateSession(CreateResolvedExperimentDefinition());
-        derivedState.RecordTemperatureSample(new Pt104Reading("pt104_01", 2, 20.9, RunStartedAt.AddSeconds(1), "LiveRead"));
-        derivedState.RecordTemperatureSample(new Pt104Reading("pt104_01", 4, 21.1, RunStartedAt.AddSeconds(1), "LiveRead"));
-        derivedState.RecordPulseReadback(new ControlCenterPulseReadback("control_center_01", "Control Center", 1.0, 10, RunStartedAt.AddSeconds(1)));
-        derivedState.RecordPulseReadback(new ControlCenterPulseReadback("control_center_01", "Control Center", 2.0, 14, RunStartedAt.AddSeconds(2)));
-        await using var monitor = new ExperimentMonitorSession(
+        var stubSnapshot = new StubDerivedStateSnapshot
+        {
+            ObservedAtUtc = RunStartedAt.AddSeconds(2),
+            FilteredFlowRateLitersPerMinute = 3.0,
+            ReynoldsNumber = 1588.5,
+            MeanTemperatureC = 21.0,
+            UsesFallbackTemperature = false,
+            PulseTelemetryIsStale = false,
+            TemperatureIsStale = false
+        };
+        var stubSession = new StubDerivedStateSession { CurrentDerivedState = stubSnapshot };
+        var monitor = new ExperimentMonitorSession(
             coordinator,
-            [],
+            Array.Empty<IExperimentMonitorSource>(),
             clock: () => RunStartedAt.AddSeconds(3));
 
-        monitor.AttachDerivedState(derivedState);
+        monitor.AttachDerivedState(stubSession);
+        stubSession.NotifyChanged();
 
         var snapshot = Assert.IsType<ExperimentMonitorSnapshot>(monitor.Snapshot.Current);
-        Assert.NotNull(snapshot.DerivedReynoldsNumber);
-        Assert.NotNull(snapshot.DerivedFlowRateLitersPerMinute);
+        Assert.Equal(1588.5, snapshot.DerivedReynoldsNumber);
+        Assert.Equal(3.0, snapshot.DerivedFlowRateLitersPerMinute);
         Assert.Equal(21.0, snapshot.DerivedMeanTemperatureC!.Value, 6);
         Assert.Contains("Re", snapshot.DerivedStateSummary);
         Assert.Contains("L/min", snapshot.DerivedStateSummary);
     }
 
     [Fact]
-    public async Task Snapshot_Raises_Warning_When_Derived_State_Is_Stale()
+    public void Snapshot_Raises_Warning_When_Derived_State_Is_Stale()
     {
         var coordinator = new RuntimeCoordinator(new FakeRegistry());
         coordinator.Start(CreateResolvedExperimentDefinition());
-        await using var derivedState = new FlowReynoldsDerivedStateSession(CreateResolvedExperimentDefinition());
-        derivedState.RecordPulseReadback(new ControlCenterPulseReadback("control_center_01", "Control Center", 1.0, 10, RunStartedAt.AddSeconds(1)));
-        derivedState.RecordPulseReadback(new ControlCenterPulseReadback("control_center_01", "Control Center", 2.0, 11, RunStartedAt.AddSeconds(2)));
-        await using var monitor = new ExperimentMonitorSession(
+        var stubSnapshot = new StubDerivedStateSnapshot
+        {
+            ObservedAtUtc = RunStartedAt.AddSeconds(1),
+            FilteredFlowRateLitersPerMinute = 0.75,
+            ReynoldsNumber = 400.0,
+            MeanTemperatureC = 20.95,
+            UsesFallbackTemperature = true,
+            PulseTelemetryIsStale = false,
+            TemperatureIsStale = false
+        };
+        var stubSession = new StubDerivedStateSession { CurrentDerivedState = stubSnapshot };
+        var monitor = new ExperimentMonitorSession(
             coordinator,
-            [],
+            Array.Empty<IExperimentMonitorSource>(),
             clock: () => RunStartedAt.AddSeconds(10));
 
-        monitor.AttachDerivedState(derivedState);
+        monitor.AttachDerivedState(stubSession);
+        stubSession.NotifyChanged();
 
         var snapshot = Assert.IsType<ExperimentMonitorSnapshot>(monitor.Snapshot.Current);
         Assert.Equal(ExperimentMonitorSeverity.Warning, snapshot.HighestSeverity);
@@ -195,6 +210,29 @@ public sealed class ExperimentMonitorSessionTests
         public void Dispose()
         {
         }
+    }
+
+    private sealed class StubDerivedStateSession : IDerivedStateSession
+    {
+        public event Action? DerivedStateChanged;
+
+        public IDerivedStateSnapshot? CurrentDerivedState { get; set; }
+
+        public void NotifyChanged()
+        {
+            DerivedStateChanged?.Invoke();
+        }
+    }
+
+    private sealed class StubDerivedStateSnapshot : IDerivedStateSnapshot
+    {
+        public DateTimeOffset? ObservedAtUtc { get; set; }
+        public double? FilteredFlowRateLitersPerMinute { get; set; }
+        public double? ReynoldsNumber { get; set; }
+        public double? MeanTemperatureC { get; set; }
+        public bool UsesFallbackTemperature { get; set; }
+        public bool PulseTelemetryIsStale { get; set; }
+        public bool TemperatureIsStale { get; set; }
     }
 
     private static ResolvedExperimentDefinition CreateResolvedExperimentDefinition()

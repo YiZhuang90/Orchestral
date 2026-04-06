@@ -19,6 +19,7 @@
     <ProjectReference Include="..\..\src\ExperimentalControlPlatform.App\ExperimentalControlPlatform.App.csproj" />
     <ProjectReference Include="..\..\src\ExperimentalControlPlatform.Runtime\ExperimentalControlPlatform.Runtime.csproj" />
     <ProjectReference Include="..\..\src\ExperimentalControlPlatform.Devices\ExperimentalControlPlatform.Devices.csproj" />
+    <ProjectReference Include="..\..\src\ExperimentalControlPlatform.ExperimentLogic\ExperimentalControlPlatform.ExperimentLogic.csproj" />
   </ItemGroup>
 
   <ItemGroup>

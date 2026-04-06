@@ -1,6 +1,6 @@
 using System;
 
-namespace ExperimentalControlPlatform.Runtime;
+namespace ExperimentalControlPlatform.ExperimentLogic;
 
 public sealed record FlowReynoldsDerivedStateSample(
     DateTimeOffset ObservedAtUtc,

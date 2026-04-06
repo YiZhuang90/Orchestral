@@ -1,8 +1,9 @@
 using System;
+using ExperimentalControlPlatform.Runtime;
 
-namespace ExperimentalControlPlatform.Runtime;
+namespace ExperimentalControlPlatform.ExperimentLogic;
 
-public sealed record FlowReynoldsDerivedStateSnapshot
+public sealed record FlowReynoldsDerivedStateSnapshot : IDerivedStateSnapshot
 {
     public DateTimeOffset? ObservedAtUtc { get; init; }
 

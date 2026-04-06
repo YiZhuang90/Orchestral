@@ -6,10 +6,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using ExperimentalControlPlatform.Core.Artifacts;
 using ExperimentalControlPlatform.Devices.ControlCenter;
+using ExperimentalControlPlatform.Runtime;
 
-namespace ExperimentalControlPlatform.Runtime;
+namespace ExperimentalControlPlatform.ExperimentLogic;
 
-public sealed class FlowReynoldsDerivedStateSession : IAsyncDisposable
+public sealed class FlowReynoldsDerivedStateSession : IAsyncDisposable, IDerivedStateSession
 {
     private static readonly double[] DensityCoefficients = [-3.983035, 301.797, 522528.90, 69.34881, 999.97495];
     private static readonly double[] DynamicViscosityCoefficients = [-3.7188, 578.919, -137.546];
@@ -30,6 +31,7 @@ public sealed class FlowReynoldsDerivedStateSession : IAsyncDisposable
     private readonly List<FlowReynoldsDerivedStateSample> _recordedSamples = [];
     private readonly Queue<double> _recentRawFlowRates = [];
     private readonly Dictionary<int, Pt104Reading> _temperatureChannels = [];
+    private event Action? _derivedStateChangedEvent;
     private ControlCenterPulseReadback? _previousPulseReadback;
     private CancellationTokenSource? _pulsePollingCancellation;
     private Task? _pulsePollingTask;
@@ -64,6 +66,14 @@ public sealed class FlowReynoldsDerivedStateSession : IAsyncDisposable
             StatusMessage = "Awaiting pulse telemetry."
         });
     }
+
+    event Action? IDerivedStateSession.DerivedStateChanged
+    {
+        add => _derivedStateChangedEvent += value;
+        remove => _derivedStateChangedEvent -= value;
+    }
+
+    IDerivedStateSnapshot? IDerivedStateSession.CurrentDerivedState => _state.Current;
 
     public ISnapshotOutputPort<FlowReynoldsDerivedStateSnapshot> State => _state;
 
@@ -484,6 +494,7 @@ public sealed class FlowReynoldsDerivedStateSession : IAsyncDisposable
     private void PublishState(FlowReynoldsDerivedStateSnapshot snapshot)
     {
         StatePort.Publish(snapshot);
+        _derivedStateChangedEvent?.Invoke();
     }
 
     private void PublishDiagnostics(DeviceDiagnosticsSnapshot snapshot)

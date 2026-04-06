@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using ExperimentalControlPlatform.App.DevicePanels;
+using ExperimentalControlPlatform.ExperimentLogic;
 using ExperimentalControlPlatform.Runtime;
 
 namespace ExperimentalControlPlatform.App;

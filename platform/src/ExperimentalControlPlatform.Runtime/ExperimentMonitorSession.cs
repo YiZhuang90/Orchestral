@@ -15,7 +15,7 @@ public sealed class ExperimentMonitorSession : IAsyncDisposable
     private readonly SnapshotOutputPort<ExperimentMonitorSnapshot> _snapshot = new(new ExperimentMonitorSnapshot());
     private IReadOnlyList<IExperimentMonitorSource> _sources;
     private ControllerUnitSession? _controller;
-    private FlowReynoldsDerivedStateSession? _derivedState;
+    private IDerivedStateSession? _derivedState;
     private bool _disposed;
 
     public ExperimentMonitorSession(
@@ -74,7 +74,7 @@ public sealed class ExperimentMonitorSession : IAsyncDisposable
         RecomputeSnapshot();
     }
 
-    public void AttachDerivedState(FlowReynoldsDerivedStateSession? derivedState)
+    public void AttachDerivedState(IDerivedStateSession? derivedState)
     {
         lock (_syncRoot)
         {
@@ -85,13 +85,13 @@ public sealed class ExperimentMonitorSession : IAsyncDisposable
 
             if (_derivedState is not null)
             {
-                _derivedState.State.Changed -= HandleDerivedStateChanged;
+                _derivedState.DerivedStateChanged -= HandleDerivedStateChanged;
             }
 
             _derivedState = derivedState;
             if (_derivedState is not null)
             {
-                _derivedState.State.Changed += HandleDerivedStateChanged;
+                _derivedState.DerivedStateChanged += HandleDerivedStateChanged;
             }
         }
 
@@ -121,7 +121,7 @@ public sealed class ExperimentMonitorSession : IAsyncDisposable
 
             if (_derivedState is not null)
             {
-                _derivedState.State.Changed -= HandleDerivedStateChanged;
+                _derivedState.DerivedStateChanged -= HandleDerivedStateChanged;
             }
         }
 
@@ -150,7 +150,7 @@ public sealed class ExperimentMonitorSession : IAsyncDisposable
         RecomputeSnapshot();
     }
 
-    private void HandleDerivedStateChanged(FlowReynoldsDerivedStateSnapshot _)
+    private void HandleDerivedStateChanged()
     {
         RecomputeSnapshot();
     }
@@ -192,12 +192,12 @@ public sealed class ExperimentMonitorSession : IAsyncDisposable
         }
 
         ControllerUnitState? controllerState;
-        FlowReynoldsDerivedStateSnapshot? derivedStateSnapshot;
+        IDerivedStateSnapshot? derivedStateSnapshot;
         IReadOnlyList<IExperimentMonitorSource> sources;
         lock (_syncRoot)
         {
             controllerState = _controller?.State.Current;
-            derivedStateSnapshot = _derivedState?.State.Current;
+            derivedStateSnapshot = _derivedState?.CurrentDerivedState;
             sources = _sources;
         }
 
@@ -243,7 +243,7 @@ public sealed class ExperimentMonitorSession : IAsyncDisposable
     private IReadOnlyList<ExperimentMonitorItem> BuildItems(
         RuntimeRunContext runtimeSnapshot,
         ControllerUnitState? controllerState,
-        FlowReynoldsDerivedStateSnapshot? derivedStateSnapshot,
+        IDerivedStateSnapshot? derivedStateSnapshot,
         IReadOnlyList<ExperimentMonitorDeviceSnapshot> deviceSnapshots,
         DateTimeOffset observedAtUtc)
     {
@@ -375,7 +375,7 @@ public sealed class ExperimentMonitorSession : IAsyncDisposable
             : $"{controllerState.ControlTargetName} {controllerState.TargetValue.Value:0.###} +/- {controllerState.ErrorValue:0.###}";
     }
 
-    private string BuildDerivedStateSummary(FlowReynoldsDerivedStateSnapshot? derivedStateSnapshot, DateTimeOffset observedAtUtc)
+    private string BuildDerivedStateSummary(IDerivedStateSnapshot? derivedStateSnapshot, DateTimeOffset observedAtUtc)
     {
         if (derivedStateSnapshot is null || !derivedStateSnapshot.ReynoldsNumber.HasValue)
         {
@@ -387,7 +387,7 @@ public sealed class ExperimentMonitorSession : IAsyncDisposable
         return $"Re {derivedStateSnapshot.ReynoldsNumber.Value:0.###}, {derivedStateSnapshot.FilteredFlowRateLitersPerMinute!.Value:0.###} L/min, {derivedStateSnapshot.MeanTemperatureC!.Value:0.###} C{temperatureSuffix}{staleSuffix}";
     }
 
-    private bool IsDerivedStateStale(FlowReynoldsDerivedStateSnapshot? derivedStateSnapshot, DateTimeOffset observedAtUtc)
+    private bool IsDerivedStateStale(IDerivedStateSnapshot? derivedStateSnapshot, DateTimeOffset observedAtUtc)
     {
         if (derivedStateSnapshot?.ObservedAtUtc is null)
         {
