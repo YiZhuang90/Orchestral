@@ -10,7 +10,7 @@ Codex is the primary developer for this project. Claude Code's role is to **revi
 
 When reviewing code changes, check for:
 
-- **Dependency flow violations** — `App → Runtime → Core ← Devices` must be respected, no circular or layer-skipping references
+- **Dependency flow violations** — `App → ExperimentLogic → Runtime → Core ← Devices` must be respected, no circular or layer-skipping references. ExperimentLogic may reference Runtime and Core. Runtime must NOT reference ExperimentLogic.
 - **Pattern adherence** — device integrations follow `Interface → Service → Client → PanelViewModel`; artifacts are sealed record classes with validation
 - **DataTemplate registration** — new device panels must have a DataTemplate entry in `App.xaml` and DI wiring in `App.xaml.cs`
 - **Nullable correctness** — nullable reference types are enabled; no unguarded null dereferences
@@ -19,6 +19,9 @@ When reviewing code changes, check for:
 - **Theme token usage** — colors, fonts, and radii reference `App/Theme/` resources, not hardcoded values
 - **Widget reuse** — check `App/Widgets/` before approving new UI components that duplicate existing functionality
 - **Test coverage** — new artifacts, runtime behavior, and device services have corresponding test classes
+- **L2/L3 boundary** — experiment-specific scientific logic (derived state, transforms, detectors, composite role meaning) belongs in ExperimentLogic (L3), not Runtime (L2). If a unit depends on one experiment's scientific meaning, it is L3.
+- **Canvas/runtime separation** — canvas is a design-time authoring scaffold, not a runtime execution container. No start/stop/monitor controls in canvas blocks.
+- **Turbulence as reference case** — architecture decisions must be justified by generality, not turbulence-specific convenience. Turbulence is a validation target, not the architecture.
 
 ### Testing Workflow
 
@@ -74,19 +77,24 @@ dotnet test platform/ExperimentalControlPlatform.sln --filter "FullyQualifiedNam
 
 **Orchestral** is an AI-native experimental control platform replacing LabVIEW for custom research experiments with mixed hardware. Target framework: .NET 8 (net8.0-windows), WPF desktop app.
 
+### System Architecture — Two-Half Model
+
+Orchestral has two halves: a **Platform** (runs experiments) and an **Agent** (helps build, operate, and learn). See `docs/development_v2/ROADMAP_V2.md` for the full layering.
+
 ### Layered Project Structure
 
 ```
 platform/src/
-├── ExperimentalControlPlatform.Core        # Artifact models (ExperimentDefinition, DeviceDefinition, etc.)
-├── ExperimentalControlPlatform.Protocols   # Protocol enums & communication primitives
-├── ExperimentalControlPlatform.Runtime     # RuntimeCoordinator, run state machine, stop logic
-├── ExperimentalControlPlatform.Devices     # Device service abstractions + implementations
-├── ExperimentalControlPlatform.App         # WPF shell, ViewModels, device panels, widgets, theme
-└── ExperimentalControlPlatform.AI          # AI sidecar (placeholder)
+├── ExperimentalControlPlatform.Core            # L1-L2: Artifact models, schemas
+├── ExperimentalControlPlatform.Protocols       # L1: Protocol enums & communication primitives
+├── ExperimentalControlPlatform.Devices         # L1: Device service abstractions + implementations
+├── ExperimentalControlPlatform.Runtime         # L2: RuntimeCoordinator, sessions, streams, monitoring
+├── ExperimentalControlPlatform.ExperimentLogic # L3: Experiment-specific derived state, transforms (planned)
+├── ExperimentalControlPlatform.App             # L4: WPF shell, ViewModels, device panels, widgets, theme
+└── ExperimentalControlPlatform.AI              # Agent: Semantic Kernel sidecar (see AGENT_SIDECAR_BLUEPRINT.md)
 ```
 
-Dependency flow: App → Runtime → Core ← Devices; Devices → Core; App → Devices.
+Dependency flow: App → ExperimentLogic → Runtime → Core ← Devices; App → Devices.
 
 ### Core Design Principles
 
@@ -124,16 +132,17 @@ Reusable widgets in `App/Widgets/`: `CameraImageWindow`, `CameraDataPanel`, `Dev
 
 ## Key Documentation
 
-- `docs/architecture/V1_ARCHITECTURE_BLUEPRINT.md` — full system architecture
+- `docs/development_v2/ROADMAP_V2.md` — strategic roadmap (two-half model, execution frontier, guardrails)
+- `docs/development_v2/PROJECT_VISION.md` — why Orchestral exists, 12 core principles
+- `docs/development_v2/AGENT_SIDECAR_BLUEPRINT.md` — agent architecture (Semantic Kernel, knowledge wiki)
 - `docs/architecture/DESIGN_SYSTEM.md` — visual design language and standards
 - `docs/architecture/DEVICE_PANEL_CONTRACT.md` — how device panels integrate with the shell
-- `docs/development/TECH_STACK_DECISIONS.md` — rationale for C#, WPF, SQLite/Parquet/Zarr
-- `docs/development/ROADMAP_V1.md` — implementation stages
-- `docs/legacy-knowledge/` — extracted knowledge from the legacy LabVIEW system (device inventory, protocols, experiment flow, safety conditions)
+- `docs/development_v2/TECH_STACK_DECISIONS.md` — rationale for C#, WPF, SQLite/Parquet/Zarr
+- `docs/legacy-knowledge/` — extracted knowledge from the legacy LabVIEW system
 
 ## Domain Context
 
-The primary use case is **turbulence transition experiments** in pipe flow: cameras capture flow imagery, temperature sensors monitor conditions, serial devices control Reynolds number and laser triggers. The system orchestrates multi-device acquisition, real-time image-to-signal processing, and automatic stop conditions. The `devices/` directory at the repo root contains hardware integration specs for HuaTeng cameras and PT-104 temperature loggers.
+Orchestral is a **general experimental control platform**. The turbulence transition experiment (pipe flow, cameras, PT-104, Reynolds control) is the **reference case and validation target**, not the architecture. Architecture decisions should be judged by generality first. The `devices/` directory at the repo root contains hardware integration specs for HuaTeng cameras and PT-104 temperature loggers.
 
 ## Testing
 

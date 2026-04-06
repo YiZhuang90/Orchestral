@@ -1,5 +1,9 @@
 # Development Strategy
 
+## Updated for ROADMAP_V2
+
+This document was originally written for V1 and has been updated to align with the two-half model (Platform + Agent) defined in [ROADMAP_V2.md](./ROADMAP_V2.md).
+
 ## 1. Purpose
 
 This document defines the development strategy for V1 of the AI-native experimental operating system.
@@ -22,7 +26,8 @@ V1 should be developed as:
 - architected for future hardware growth,
 - architected for future experiment-domain changes,
 - AI-assisted from the beginning,
-- safety-aware from the runtime foundation.
+- safety-aware from the runtime foundation,
+- explicitly two-halved: Platform (L1-L4) runs experiments, Agent (A1-A3) helps build, operate, and learn.
 
 The existing pipe-flow control code should not be treated as the architecture base. It should be treated as:
 
@@ -30,7 +35,8 @@ The existing pipe-flow control code should not be treated as the architecture ba
 - a protocol knowledge source,
 - an algorithm reference,
 - an operations reference,
-- a first reference experiment.
+- a first reference experiment,
+- designed for generality first: the turbulence experiment is a reference case and validation target, not the architecture source of truth.
 
 ## 3. Core Development Direction
 
@@ -81,21 +87,19 @@ The runtime must own:
 - disconnect handling,
 - experiment-defined stop conditions.
 
-### 3.5 Build around AI as a controlled sidecar
+### 3.5 Build around AI as a structured Agent
 
-AI should begin as a light background assistant, not as the controller of live hardware.
+The agent is now designed as a full system half with three capability layers (A1 Observation, A2 Guidance, A3 Generation) implemented via Microsoft Semantic Kernel. See [AGENT_SIDECAR_BLUEPRINT.md](./AGENT_SIDECAR_BLUEPRINT.md) for the detailed design.
 
-In early V1, AI should help:
+The agent should help:
 
-- define and edit artifacts,
-- summarize legacy knowledge,
-- generate scaffolding,
-- generate docs,
-- generate test code,
-- propose configuration changes,
-- explain diffs and implications.
+- observe runtime state and experiment progress (A1),
+- guide device integration and experiment design (A2),
+- search for hardware docs, SDKs, and literature (A2R),
+- draft experiment definitions, reports, and analysis (A3),
+- capture decisions and maintain the lab knowledge wiki (A1/A3).
 
-AI should not initially be trusted to directly invent unsafe low-level control behavior during live runs.
+The core boundary remains: **AI proposes, human approves, runtime executes, safety stops.** All generative output is gated by a human review filter. The agent never directly controls hardware or bypasses validation.
 
 ## 4. Development Priorities
 
@@ -105,7 +109,8 @@ The order of priorities should be:
 2. artifact and schema foundation,
 3. protocol and device model,
 4. runtime supervision and stop logic,
-5. AI sidecar integration,
+4b. experiment-logic layer (L3) separation from universal runtime (L2),
+5. AI agent integration (see [AGENT_SIDECAR_BLUEPRINT.md](./AGENT_SIDECAR_BLUEPRINT.md)),
 6. first full turbulence experiment package,
 7. later UI refinement and broader generalization.
 

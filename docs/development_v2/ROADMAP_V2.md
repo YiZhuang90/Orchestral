@@ -114,12 +114,18 @@ For detailed landing evidence, see [2026-04-03-landing-audit.md](./2026-04-03-la
 - Depends on: EF-02 and EF-03.
 - Result: One real experiment can be authored, validated, run, and recorded with proper data structure.
 
-### Track EF-05: Agent Architecture Detailed Design
+### Track EF-05: Agent Architecture Detailed Design — COMPLETE
 
 - Domain: Agent Stack
-- What: Detailed agent architecture beyond the sketch. Decide: build custom agent, extend existing tooling, or hybrid. Define agent capability contracts, knowledge storage, observation model.
-- Depends on: EF-04 (agent needs a working platform to observe and assist).
-- Starting point: [AGENT_ARCHITECTURE_SKETCH.md](./AGENT_ARCHITECTURE_SKETCH.md).
+- Status: **Design complete** (2026-04-05).
+- Blueprint: [AGENT_SIDECAR_BLUEPRINT.md](./AGENT_SIDECAR_BLUEPRINT.md)
+- Key decisions:
+  - Framework: Microsoft Semantic Kernel (C#/.NET)
+  - 4 agent layers: A1 (Observation), A2 (Guidance), A2R (Research), A3 (Generation)
+  - Knowledge system: Karpathy LLM Wiki pattern — three layers (Raw -> Wiki -> Schema), 10 knowledge categories (K1-K10), anti-database for failures, provenance metadata
+  - 6 development phases (P0-P6) following "build, use, refine" strategy
+  - Turbulence experiment is the end-to-end acceptance test
+- Note: P0-P1 (Skeleton + Researcher) can start in parallel with platform EF-02/EF-03/EF-04. They have no platform dependency.
 - Result: Detailed agent design ready for implementation.
 
 ---
@@ -132,7 +138,7 @@ These should only be detailed when the execution frontier advances to them.
 |---------|--------|----------|
 | A: Experiment-Logic Expansion | Platform L3 | Camera-pair role, image-to-signal pipeline, detection/classification |
 | B: Canvas Code Implementation | Platform L4 | Canvas model in code, function block authoring, role binding UI, readiness indicators |
-| C: Agent Foundation Build | Agent A1-A3 | First agent implementation, observation pipeline, knowledge storage |
+| C: Agent Foundation Build | Agent A1-A3 | 6 phases from AGENT_SIDECAR_BLUEPRINT: P0 Skeleton (chat panel), P1 Researcher (web search), P2 Observer (device/run state), P3 Advisor (experiment design), P4 Knowledge Keeper (wiki system), P5 Drafter (artifact generation), P6 Hardening |
 | D: Data & Reporting Automation | Cross-cutting | Auto metadata logging, daily dream process, auto reports, calibration tracking |
 | E: Knowledge Hub Foundation | Cross-cutting | Protocol library, device experience capture, lab-wide deployment model |
 | F: Hardening & Generalization | Platform L2-L3 | Broader virtual twins, failure tests, multi-experiment, plugin boundaries |

@@ -128,15 +128,22 @@ The real language of the system is still the underlying schema and semantics, no
 
 ### Decision
 
-Start with an **AI sidecar model**, not AI embedded inside the runtime core.
+Start with a **structured AI Agent model** implemented via Microsoft Semantic Kernel, not AI embedded inside the runtime core.
 
-### Early implementation idea
+### Implementation
 
-- a background Codex-like session,
-- aware of project artifacts,
-- aware of generated docs,
-- able to inspect logs and schemas,
-- able to propose changes and generate scaffolds.
+The agent is implemented as a Semantic Kernel-based sidecar with four capability layers:
+
+- **A1 Observation**: read-only tools that query platform state (run status, device state, manifests, calibration)
+- **A2 Guidance**: suggestion tools for experiment design, device integration, troubleshooting
+- **A2R Research**: web search, vendor doc discovery, literature search (core capability, not optional)
+- **A3 Generation**: artifact drafting (experiment definitions, reports, device configs) — ALL gated by human approval
+
+Safety is enforced through SK filters: SafetyFilter (blocks inappropriate tool use during runs), ApprovalFilter (gates all generative output), AuditFilter (logs everything for compliance).
+
+Knowledge is managed through a Karpathy LLM Wiki pattern with three layers (Raw sources -> Evolving wiki -> Governance schema) and 10 knowledge categories (K1-K10).
+
+For the full detailed design, see [AGENT_SIDECAR_BLUEPRINT.md](./AGENT_SIDECAR_BLUEPRINT.md).
 
 ### Why
 
@@ -145,7 +152,30 @@ This is the lowest-risk useful integration path:
 - it adds value early,
 - it avoids unsafe direct hardware control,
 - it keeps the runtime deterministic,
-- it matches the current stage of the project.
+- native C#/.NET matches the platform stack,
+- SK's plugin/filter model maps cleanly to the A1-A3 capability layers.
+
+## 7.5 Agent Framework
+
+### Decision
+
+Use **Microsoft Semantic Kernel** (C#/.NET) as the agent framework.
+
+### Why
+
+- Native C#/.NET — matches the platform stack
+- Plugin/function model maps cleanly to agent capability layers (A1-A3)
+- Filter chain provides the "AI proposes, human approves" safety boundary
+- Provider abstraction allows switching between Claude, GPT, and local models
+- ChatHistory management handles session persistence
+
+### What Semantic Kernel should own
+
+- agent loop (receive -> prompt -> LLM -> parse -> tools -> loop),
+- plugin registration and tool dispatch,
+- filter chain for safety, approval, and audit,
+- provider abstraction for LLM calls,
+- chat history and session management.
 
 ## 8. Concurrency and Execution Model
 

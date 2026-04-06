@@ -47,6 +47,24 @@ The module workflows define the session-specific execution steps.
 
 ---
 
+## Pre-Dispatch: Headless Fitness Check
+
+Before starting any session, evaluate whether it can run headless (non-interactive) or must be interactive.
+
+See [HEADLESS_SESSION_FITNESS.md](./HEADLESS_SESSION_FITNESS.md) for the full criteria.
+
+Quick check:
+1. Does a complete slice plan exist with no open questions?
+2. Are success criteria machine-verifiable (tests, build)?
+3. Is Git state clean (no divergence, no stashes)?
+4. Has this pattern been done before (not a first-time workflow)?
+
+If ALL pass → headless is safe. If ANY fail → interactive required.
+
+Record the fitness decision in the handoff packet.
+
+---
+
 ## Universal Startup
 
 Every session starts the same way, regardless of type.

@@ -1,6 +1,8 @@
 # Agent Architecture Sketch
 
-Status: Sketch -- detailed design deferred to EF-05.
+Status: Sketch -- all open questions now answered in [AGENT_SIDECAR_BLUEPRINT.md](./AGENT_SIDECAR_BLUEPRINT.md).
+
+This document remains the "why" for the agent. The blueprint is the "how."
 
 ---
 
@@ -101,13 +103,13 @@ The agent interacts with the platform through four directional relationships:
 
 ---
 
-## Open Questions For EF-05 (Detailed Design)
+## Open Questions For EF-05 — ANSWERED
 
-These questions are explicitly deferred. They require implementation experience and architectural decisions that cannot be made at sketch level.
+All six open questions are now answered in [AGENT_SIDECAR_BLUEPRINT.md](./AGENT_SIDECAR_BLUEPRINT.md). Summary:
 
-- **Build vs. extend vs. hybrid.** Build a custom agent framework, extend Claude Code/Codex capabilities, or compose both approaches for different lifecycle phases?
-- **Agent persistence model.** How does knowledge survive sessions? File-based, database-backed, or a combination? How does the agent resume context after being inactive?
-- **Multi-user architecture.** How does the agent serve a lab with multiple researchers? Shared knowledge base with per-user interaction history? Role-based access to agent capabilities?
-- **Observation interface design.** What platform surfaces does the agent subscribe to? Push (event-driven) vs. pull (query-based)? What granularity of runtime events is useful vs. noisy?
-- **Artifact handoff format.** How does the agent hand off generated experiment definitions to the platform? Direct file write, staging area with diff review, or artifact proposal queue?
-- **Development-to-production agent relationship.** The development-time agent (Superpowers skills) and the production agent share principles but serve different lifecycles. Are they the same system with different skill sets, or separate systems with shared knowledge?
+- **Build vs. extend vs. hybrid** — Use Microsoft Semantic Kernel (C#/.NET). SK provides the plugin/function model, filter chain, provider abstraction, and ChatHistory. Orchestral adds domain plugins (A1/A2/A2R/A3) and the knowledge wiki.
+- **Agent persistence model** — Karpathy LLM Wiki pattern. Three layers: immutable raw sources (Layer 1), evolving knowledge wiki in Markdown (Layer 2), governance schema (Layer 3). File-based, version-controlled alongside the project. Chat history is ephemeral; knowledge is distilled before compaction.
+- **Multi-user agent architecture** — The knowledge wiki is shareable via standard file/version-control mechanisms. Lab-wide deployment uses the same wiki as a shared knowledge base. Detailed multi-user protocol deferred to P6 Hardening.
+- **Agent observation interface** — ObservationPlugin (A1) with read-only tools: `observe_run_status`, `observe_device_state`, `read_run_manifest`, `read_calibration_record`, `search_knowledge_base`. No direct runtime API access.
+- **Agent-to-platform artifact format** — GenerationPlugin (A3) produces YAML artifacts (experiment.yaml, device.yaml, reports). All gated by ApprovalFilter: Accept / Edit / Reject. Approved artifacts loaded by the platform runtime.
+- **Dev-time vs production agent** — Superpowers skills serve the development lifecycle. The SK-based ExperimentAssistant serves the experiment lifecycle. Both share the same "AI proposes, human approves" boundary rule.

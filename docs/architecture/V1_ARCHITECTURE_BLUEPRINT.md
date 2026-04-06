@@ -1,5 +1,37 @@
 # V1 Architecture Blueprint
 
+## Updated for ROADMAP_V2
+
+This document was the original V1 architecture blueprint. It has been updated to align with the two-half model (Platform + Agent) defined in [ROADMAP_V2.md](../development_v2/ROADMAP_V2.md). The canonical system layering is now:
+
+```
+ORCHESTRAL = PLATFORM + AGENT
+
+Platform Stack (what runs experiments):
+  L4  Experiment Canvas         (design-time authoring scaffold)
+  L3  Experiment Logic          (experiment-specific scientific meaning)
+  L2  Universal Runtime         (sessions, coordination, streams, monitoring)
+  L1  Hardware / Adapters       (SDK wrappers, protocol clients)
+
+Agent Stack (what helps build, operate, and learn):
+  A3  Generation                (experiment drafts, reports, analysis outputs)
+  A2  Guidance                  (device integration, experiment design, troubleshooting)
+  A1  Observation & Knowledge   (decision capture, metadata, lab knowledge, calibration)
+
+Cross-cutting Foundations:
+  Data & Artifact Foundation    (experiment skeleton, storage formats, AI data contract)
+  Knowledge & Reporting Foundation (decision logs, reports, lab knowledge hub, audit trail)
+```
+
+Key changes from the original blueprint:
+- The system is explicitly two-halved (Platform + Agent), not a single stack with an AI add-on
+- Canvas (L4) is a design-time scaffold, not a runtime execution layer
+- Experiment Logic (L3) is separated from Universal Runtime (L2)
+- The Agent is implemented via Microsoft Semantic Kernel (see [AGENT_SIDECAR_BLUEPRINT.md](../development_v2/AGENT_SIDECAR_BLUEPRINT.md))
+- Turbulence is a reference case and validation target, not the architecture
+
+---
+
 ## 1. Purpose of This Document
 
 This document defines the first concrete architecture for the project described in [HIGH_LEVEL_PROJECT_TECHNICAL_INTRODUCTION.md](C:/Users/Yi%20Zhuang/OneDrive/Codes/Projects/Orchestral/docs/northstar/HIGH_LEVEL_PROJECT_TECHNICAL_INTRODUCTION.md).

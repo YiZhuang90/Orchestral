@@ -56,13 +56,43 @@ Link to the handoff packet or plan for the detailed context.
 
 ## Needs Planning
 
-No items currently need planning.
+- `PL-004`
+  - title: `Agent P0 Skeleton slice planning`
+  - thread type: `planning`
+  - priority: `P2`
+  - layer: `agent stack (A1-A3)`
+  - depends on: `none (P0 has no platform dependency)`
+  - governing docs:
+    - [AGENT_SIDECAR_BLUEPRINT.md](./AGENT_SIDECAR_BLUEPRINT.md) — Phase 0 section
+  - handoff / plan: `none yet`
+  - branch / worktree: `not started`
+  - current truth: `blueprint defines P0 scope: ExperimentAssistant + AIChatPanel + basic system prompt. No plugins, no knowledge. Just prove the chat loop works inside the WPF app.`
+  - next action: `open a planning session to produce a detailed slice plan for P0`
 
-PL-001 and PL-002 are completed and moved to Landed.
+- `PL-005`
+  - title: `Agent P1 Researcher slice planning`
+  - thread type: `planning`
+  - priority: `P2`
+  - layer: `agent stack (A2R)`
+  - depends on: `PL-004 (P0 must be planned first)`
+  - governing docs:
+    - [AGENT_SIDECAR_BLUEPRINT.md](./AGENT_SIDECAR_BLUEPRINT.md) — Phase 1 section
+  - handoff / plan: `none yet`
+  - branch / worktree: `not started`
+  - current truth: `blueprint defines P1 scope: ResearchPlugin with search_web, fetch_page, search_vendor_docs. Agent can find hardware docs, SDKs, literature.`
+  - next action: `plan after P0 is planned`
+
+Note: Agent phases P2-P6 exist in the blueprint but are not added to the waitlist yet. They should be added as the frontier advances.
 
 ---
 
 ## Planned But Not Ready
+
+No items currently in this state.
+
+---
+
+## Ready For Coding
 
 - `SL-001`
   - title: `Establish the experiment-logic code boundary (EF-03)`
@@ -73,10 +103,10 @@ PL-001 and PL-002 are completed and moved to Landed.
   - governing docs:
     - [ROADMAP_V2.md](./ROADMAP_V2.md)
     - [EXPERIMENT_LOGIC_LAYER.md](../architecture/EXPERIMENT_LOGIC_LAYER.md)
-  - handoff / plan: `none yet — needs a planning follow-up to produce a slice plan`
+  - handoff / plan: [2026-04-04-SL-001-experiment-logic-boundary-slice-plan.md](./2026-04-04-SL-001-experiment-logic-boundary-slice-plan.md)
   - branch / worktree: `not started`
-  - current truth: `confirmed as EF-03 by ROADMAP_V2. LD-001 dependency satisfied.`
-  - next action: `open a planning session to reduce this to a ready coding slice`
+  - current truth: `slice plan written 2026-04-04. Create new ExperimentalControlPlatform.ExperimentLogic project, relocate FlowReynoldsDerivedState*, prove L2/L3 boundary.`
+  - next action: `open a coding session with $orch-session-coding`
 
 - `SL-002`
   - title: `Define the experiment data skeleton (EF-02)`
@@ -87,18 +117,12 @@ PL-001 and PL-002 are completed and moved to Landed.
   - governing docs:
     - [ROADMAP_V2.md](./ROADMAP_V2.md)
     - [TECH_STACK_DECISIONS.md](./TECH_STACK_DECISIONS.md)
-  - handoff / plan: `none yet — needs a planning follow-up to produce a slice plan`
+  - handoff / plan: [2026-04-04-SL-002-experiment-data-skeleton-slice-plan.md](./2026-04-04-SL-002-experiment-data-skeleton-slice-plan.md)
   - branch / worktree: `not started`
-  - current truth: `confirmed as EF-02 by ROADMAP_V2. Independent of SL-001. LD-001 dependency satisfied.`
-  - next action: `open a planning session to produce a data-skeleton spec`
+  - current truth: `slice plan written 2026-04-04. Write EXPERIMENT_DATA_SKELETON.md spec + update RunArtifactWriter to follow it.`
+  - next action: `open a coding session with $orch-session-coding`
 
----
-
-## Ready For Coding
-
-No items currently ready.
-
-LD-001 has landed (2026-04-04). SL-001 and SL-002 are now unblocked but still need a planning follow-up to produce slice plans before they can move here.
+SL-001 and SL-002 are independent. Either can be picked up first.
 
 ---
 
@@ -122,11 +146,51 @@ No items currently in review.
 
 ## Ready To Land
 
-No items currently ready to land.
+- `LD-003`
+  - title: `Commit and push planning session docs (Deliverables 11-17, workflows, blueprint updates)`
+  - thread type: `landing`
+  - priority: `P0`
+  - layer: `project operations`
+  - depends on: `none`
+  - governing docs:
+    - [ROADMAP_V2.md](./ROADMAP_V2.md)
+    - [MODULE_LANDING_WORKFLOW.md](./MODULE_LANDING_WORKFLOW.md)
+  - handoff / plan: `none — self-contained landing task`
+  - branch / worktree: `local main checkout`
+  - current truth: |
+    All changes are uncommitted in the local main checkout. Includes:
+    - New: HEADLESS_SESSION_FITNESS.md, CROSS_SESSION_WORKFLOW.md, MODULE_PLANNING_WORKFLOW.md, MODULE_LANDING_WORKFLOW.md, MODULE_DEBUG_WORKFLOW.md, AGENT_SIDECAR_BLUEPRINT.md, 4 orch-session-* skills, SL-001/SL-002 slice plans
+    - Updated: CLAUDE.md, V1_ARCHITECTURE_BLUEPRINT.md, DEVELOPMENT_STRATEGY.md, TECH_STACK_DECISIONS.md, AI_INTEGRATION_PLAN.md, AI_GUIDED_HARDWARE_INTEGRATION_SPEC.md, ROADMAP_V2.md, AGENT_ARCHITECTURE_SKETCH.md, CROSS_THREAD_DEV_WAITLIST.md, MODULE_DEVELOPMENT_WORKFLOW.md, THREAD_CONTEXT_MANAGEMENT_CONTRACT.md
+    - Archived: CROSS_THREAD_CODING_WORKFLOW.md and 2026-04-03-coding-thread-guidance.md (superseded headers added)
+    Local main should be synced with origin/main before committing.
+  - next action: `open a landing session with $orch-session-landing`
 
 ---
 
 ## Landed
+
+- `PL-003`
+  - title: `Agent sidecar architecture design (EF-05)`
+  - thread type: `landed`
+  - priority: `P1 — completed`
+  - layer: `agent stack (A1-A3)`
+  - depends on: `none`
+  - governing docs:
+    - [ROADMAP_V2.md](./ROADMAP_V2.md)
+    - [AGENT_ARCHITECTURE_SKETCH.md](./AGENT_ARCHITECTURE_SKETCH.md)
+    - [AI_INTEGRATION_PLAN.md](./AI_INTEGRATION_PLAN.md)
+  - handoff / plan: [AGENT_SIDECAR_BLUEPRINT.md](./AGENT_SIDECAR_BLUEPRINT.md)
+  - branch / worktree: `n/a — planning-only, design doc`
+  - current truth: |
+    Completed 2026-04-05. Full agent sidecar blueprint written. Key decisions:
+    - Framework: Microsoft Semantic Kernel (C#/.NET)
+    - 4 agent layers: A1 (Observation), A2 (Guidance), A2R (Research), A3 (Generation)
+    - Knowledge: Karpathy LLM Wiki pattern, 3-layer (Raw/Wiki/Schema), 10 categories (K1-K10)
+    - Anti-database for failures and lessons learned
+    - 6 build-use-refine phases (P0-P6)
+    - P0-P1 can start immediately (no platform dependency)
+    - Turbulence experiment as end-to-end acceptance test
+  - next action: `none — design complete. Implementation phases (P0-P6) are future coding slices.`
 
 - `LD-001`
   - title: `PT-104 runtime-source harness`

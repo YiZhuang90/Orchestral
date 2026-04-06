@@ -1,5 +1,11 @@
 # AI-Guided Hardware Integration Spec
 
+## Layer Ownership
+
+This spec defines **A2 Guidance** behavior — the Agent helps humans integrate devices. The actual SDK wrappers, protocol clients, and driver implementations are **Platform L1** (Hardware/Adapters). The Agent guides the process; it does not own the hardware layer.
+
+For the full agent architecture, see [AGENT_SIDECAR_BLUEPRINT.md](../development_v2/AGENT_SIDECAR_BLUEPRINT.md).
+
 ## 1. Purpose
 
 This document defines the `AI-guided hardware integration` workflow for Orchestral.

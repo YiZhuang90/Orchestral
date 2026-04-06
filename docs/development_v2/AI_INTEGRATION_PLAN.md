@@ -4,7 +4,11 @@
 
 This document defines how AI should be integrated into V1 of the platform.
 
-For evaluating candidate lead-agent frameworks for the long-term Orchestral brain role, use:
+The principles and boundaries defined here are now operationalized in the detailed agent blueprint:
+
+- [AGENT_SIDECAR_BLUEPRINT.md](./AGENT_SIDECAR_BLUEPRINT.md) — concrete implementation using Microsoft Semantic Kernel, with SK plugins mapping to each AI capability layer (A1/A2/A2R/A3), and SK filters enforcing the "AI proposes, human approves" boundary.
+
+For evaluating candidate lead-agent frameworks, use:
 
 - [BASE_AI_AGENT_SELECTION_TEMPLATE.md](./BASE_AI_AGENT_SELECTION_TEMPLATE.md)
 
@@ -29,20 +33,17 @@ It should not initially sit inside the hard real-time or safety-critical executi
 
 ## 3. Initial AI Form
 
-The preferred initial form is a **background Codex-like session** attached to the project context.
+The preferred initial form is a **Semantic Kernel-based ExperimentAssistant** integrated into the WPF application. This is now fully designed in [AGENT_SIDECAR_BLUEPRINT.md](./AGENT_SIDECAR_BLUEPRINT.md) with a 6-phase build-use-refine strategy (P0 Skeleton through P6 Hardening).
 
-This assistant should be able to:
+This assistant is able to:
 
-- inspect project artifacts,
-- inspect generated docs,
-- inspect logs and manifests,
-- propose edits,
-- generate code scaffolds,
-- generate documentation,
-- summarize legacy code knowledge,
-- help the operator prepare or modify an experiment.
+- observe runtime state and device status (A1),
+- search for hardware docs, SDKs, and literature (A2R),
+- guide experiment design and device integration (A2),
+- draft experiment definitions, reports, and analysis (A3),
+- capture decisions and maintain the lab knowledge wiki (A1/A3).
 
-This matches the goal of beginning light.
+The build-use-refine strategy starts light (P0: just a chat panel) and adds capabilities through real use.
 
 ## 4. What AI Should Do in V1
 
@@ -107,6 +108,8 @@ The operating rule should be:
 - **safety layer can stop**
 
 This boundary should remain strict until the platform has much stronger validation and operational maturity.
+
+This boundary is enforced architecturally through three SK filters: SafetyFilter (blocks inappropriate tool use during active runs), ApprovalFilter (gates all generative output for human review), and AuditFilter (logs all tool calls for compliance traceability). See [AGENT_SIDECAR_BLUEPRINT.md](./AGENT_SIDECAR_BLUEPRINT.md) for details.
 
 ## 7. AI Interaction Model
 
