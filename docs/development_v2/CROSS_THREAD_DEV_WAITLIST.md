@@ -94,18 +94,19 @@ No items currently in this state.
 
 ## Ready For Coding
 
-- `SL-002`
-  - title: `Define the experiment data skeleton (EF-02)`
+- `SL-003`
+  - title: `Define the standard Orchestral project skeleton`
   - thread type: `coding`
   - priority: `P1`
   - layer: `data and artifact foundation (cross-cutting)`
-  - depends on: `LD-001 landed` *(satisfied 2026-04-04)*
+  - depends on: `none`
   - governing docs:
     - [ROADMAP_V2.md](./ROADMAP_V2.md)
-    - [TECH_STACK_DECISIONS.md](./TECH_STACK_DECISIONS.md)
-  - handoff / plan: [2026-04-04-SL-002-experiment-data-skeleton-slice-plan.md](./2026-04-04-SL-002-experiment-data-skeleton-slice-plan.md)
+    - [PROJECT_VISION.md](./PROJECT_VISION.md) — Principle 3: structured data from initial skeleton
+    - [AGENT_SIDECAR_BLUEPRINT.md](./AGENT_SIDECAR_BLUEPRINT.md) — knowledge wiki structure (K1-K10)
+  - handoff / plan: [2026-04-09-SL-003-project-skeleton-slice-plan.md](./2026-04-09-SL-003-project-skeleton-slice-plan.md)
   - branch / worktree: `not started`
-  - current truth: `slice plan written 2026-04-04. Write EXPERIMENT_DATA_SKELETON.md spec + update RunArtifactWriter to follow it.`
+  - current truth: `defines the standard folder/file structure for a new Orchestral project from creation. Covers: project manifest, experiment definitions, device library, knowledge wiki layout, reports, calibration, config. Parallel with SL-002.`
   - next action: `open a coding session with $orch-session-coding`
 
 ---
@@ -130,7 +131,32 @@ No items currently in review.
 
 ## Ready To Land
 
-No items currently ready to land.
+- `SL-002`
+  - title: `Define the experiment data skeleton (EF-02)`
+  - thread type: `landing`
+  - priority: `P1`
+  - layer: `data and artifact foundation (cross-cutting)`
+  - depends on: `LD-001 landed` *(satisfied 2026-04-04)*
+  - governing docs:
+    - [ROADMAP_V2.md](./ROADMAP_V2.md) — EF-02
+    - [TECH_STACK_DECISIONS.md](./TECH_STACK_DECISIONS.md) — Section 5
+    - [PROJECT_VISION.md](./PROJECT_VISION.md) — Principles 3, 4, 8
+    - New spec: `docs/architecture/EXPERIMENT_DATA_SKELETON.md`
+  - handoff / plan:
+    - slice plan: [2026-04-04-SL-002-experiment-data-skeleton-slice-plan.md](./2026-04-04-SL-002-experiment-data-skeleton-slice-plan.md)
+    - handoff: [handoffs/2026-04-09-SL-002-handoff.md](./handoffs/2026-04-09-SL-002-handoff.md)
+    - review: [2026-04-09-SL-002-experiment-data-skeleton-review.md](../collaboration/reviews/2026-04-09-SL-002-experiment-data-skeleton-review.md) *(on sl-002 branch)*
+  - branch / worktree: `sl-002/experiment-data-skeleton @ baa2b56 (worktree: Orchestral-sl-002)`
+  - current truth: |
+    Coding complete 2026-04-09. Branch `sl-002/experiment-data-skeleton` committed at `baa2b56` (4 files, +791/-6).
+    - New spec: `docs/architecture/EXPERIMENT_DATA_SKELETON.md` (245 lines, 9 sections, includes consumer contract)
+    - `RunArtifactWriter` reorganized into `events/`, `snapshots/`, `metadata/`, `data/derived/` subdirectories
+    - New `metadata/applied-parameters.yaml` written for every run
+    - 5 new structure-verification tests added
+    - Build clean (0 warnings, 0 errors), 187 tests pass (52 Core + 79 Runtime + 14 Devices + 11 ExperimentLogic + 31 App)
+    - Review: pass with 3 non-blocking P3 findings (CC-SL002-001 addressed in same commit; CC-SL002-002 and CC-SL002-003 deferred as non-blocking cleanup)
+    - Branch not yet merged into main, not yet pushed
+  - next action: `open a landing session to merge sl-002/experiment-data-skeleton into main, verify, push, and cleanup the worktree`
 
 ---
 
