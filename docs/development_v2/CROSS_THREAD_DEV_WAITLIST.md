@@ -131,36 +131,38 @@ No items currently in review.
 
 ## Ready To Land
 
+No items currently in this state.
+
+---
+
+## Landed
+
 - `SL-002`
   - title: `Define the experiment data skeleton (EF-02)`
-  - thread type: `landing`
-  - priority: `P1`
+  - thread type: `landed`
+  - priority: `P1 — completed`
   - layer: `data and artifact foundation (cross-cutting)`
   - depends on: `LD-001 landed` *(satisfied 2026-04-04)*
   - governing docs:
     - [ROADMAP_V2.md](./ROADMAP_V2.md) — EF-02
     - [TECH_STACK_DECISIONS.md](./TECH_STACK_DECISIONS.md) — Section 5
     - [PROJECT_VISION.md](./PROJECT_VISION.md) — Principles 3, 4, 8
-    - New spec: `docs/architecture/EXPERIMENT_DATA_SKELETON.md`
+    - New spec: [EXPERIMENT_DATA_SKELETON.md](../architecture/EXPERIMENT_DATA_SKELETON.md)
   - handoff / plan:
     - slice plan: [2026-04-04-SL-002-experiment-data-skeleton-slice-plan.md](./2026-04-04-SL-002-experiment-data-skeleton-slice-plan.md)
     - handoff: [handoffs/2026-04-09-SL-002-handoff.md](./handoffs/2026-04-09-SL-002-handoff.md)
-    - review: [2026-04-09-SL-002-experiment-data-skeleton-review.md](../collaboration/reviews/2026-04-09-SL-002-experiment-data-skeleton-review.md) *(on sl-002 branch)*
-  - branch / worktree: `sl-002/experiment-data-skeleton @ baa2b56 (worktree: Orchestral-sl-002)`
+    - review: [2026-04-09-SL-002-experiment-data-skeleton-review.md](../collaboration/reviews/2026-04-09-SL-002-experiment-data-skeleton-review.md)
+  - branch / worktree: `branch deleted, worktree directory removed (git metadata pruning blocked by Windows file lock — cosmetic)`
   - current truth: |
-    Coding complete 2026-04-09. Branch `sl-002/experiment-data-skeleton` committed at `baa2b56` (4 files, +791/-6).
+    Landed 2026-04-09. Merged to main as `ac24f18` (merge commit). 4 files changed, +791/-6.
+    Build clean (0 warnings, 0 errors). 187 tests pass on merged main (52 Core + 79 Runtime + 14 Devices + 11 ExperimentLogic + 31 App).
+    Key changes:
     - New spec: `docs/architecture/EXPERIMENT_DATA_SKELETON.md` (245 lines, 9 sections, includes consumer contract)
     - `RunArtifactWriter` reorganized into `events/`, `snapshots/`, `metadata/`, `data/derived/` subdirectories
     - New `metadata/applied-parameters.yaml` written for every run
-    - 5 new structure-verification tests added
-    - Build clean (0 warnings, 0 errors), 187 tests pass (52 Core + 79 Runtime + 14 Devices + 11 ExperimentLogic + 31 App)
+    - 5 new structure-verification tests added to `RunRecorderTests`
     - Review: pass with 3 non-blocking P3 findings (CC-SL002-001 addressed in same commit; CC-SL002-002 and CC-SL002-003 deferred as non-blocking cleanup)
-    - Branch not yet merged into main, not yet pushed
-  - next action: `open a landing session to merge sl-002/experiment-data-skeleton into main, verify, push, and cleanup the worktree`
-
----
-
-## Landed
+  - next action: `none — completed`
 
 - `SL-001`
   - title: `Establish the experiment-logic code boundary (EF-03)`
@@ -322,11 +324,11 @@ Audit reference: [2026-04-03-landing-audit.md](./2026-04-03-landing-audit.md)
 
 ### Local main checkout
 
-As of 2026-04-06, local main is synced with origin/main at `c15602d`. History was rewritten via git-filter-repo on 2026-04-04 to purge legacy/ from all commits. Two historical stashes remain.
+As of 2026-04-09, local main is synced with origin/main at `ac24f18` (SL-002 merge commit). History was rewritten via git-filter-repo on 2026-04-04 to purge legacy/ from all commits. Two historical stashes remain.
 
 ### Worktree inventory
 
-5 worktrees remain (main + 4 historical). The `runtime-io-microphone` worktree was removed during LD-001 landing. The 4 historical worktrees (design-v2-landing, orchestral-design-v2-migration, panel-contract-enforcement, runtime-io-doc-push) carry no unique work and can be cleaned up. Git worktree metadata pruning is blocked by Windows file locks; retry when no other process holds the `.git/worktrees/` directory.
+5 worktrees remain (main + 4 historical). The `runtime-io-microphone` (LD-001) and `Orchestral-sl-002` (SL-002) worktrees were removed during their respective landing sessions. The 4 historical worktrees (design-v2-landing, orchestral-design-v2-migration, panel-contract-enforcement, runtime-io-doc-push) carry no unique work and can be cleaned up. Git worktree metadata pruning under `.git/worktrees/` is blocked by Windows file locks; retry when no other process holds those directories. Pruning is cosmetic — removed worktrees already no longer appear in `git worktree list`.
 
 ---
 
