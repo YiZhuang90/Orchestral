@@ -50,7 +50,7 @@ public sealed class RunArtifactWriter
             ?? snapshot.Experiment
             ?? _adHocRunDefinitionFactory.Create(panels);
         var runDirectoryPath = BuildRunDirectoryPath(snapshot);
-        var panelsDirectoryPath = Path.Combine(runDirectoryPath, "panels");
+        var panelsDirectoryPath = Path.Combine(runDirectoryPath, "snapshots", "panels");
         Directory.CreateDirectory(runDirectoryPath);
         Directory.CreateDirectory(panelsDirectoryPath);
 
@@ -68,7 +68,7 @@ public sealed class RunArtifactWriter
         var outputArtifactIds = new List<ArtifactId>();
 
         var runtimeEventsId = new ArtifactId($"artifact.runtime_events.{runKey}");
-        var runtimeEventsPath = Path.Combine(runDirectoryPath, "runtime-events.yaml");
+        var runtimeEventsPath = Path.Combine(runDirectoryPath, "events", "runtime-events.yaml");
         WriteYaml(
             runtimeEventsPath,
             new Dictionary<string, object?>
@@ -86,7 +86,7 @@ public sealed class RunArtifactWriter
         outputArtifactIds.Add(runtimeEventsId);
 
         var warningsId = new ArtifactId($"artifact.warnings_or_faults.{runKey}");
-        var warningsPath = Path.Combine(runDirectoryPath, "warnings-or-faults.yaml");
+        var warningsPath = Path.Combine(runDirectoryPath, "events", "warnings-or-faults.yaml");
         WriteYaml(
             warningsPath,
             new Dictionary<string, object?>
@@ -101,7 +101,7 @@ public sealed class RunArtifactWriter
         if (monitorSnapshot is not null)
         {
             var monitorSnapshotId = new ArtifactId($"artifact.monitor_snapshot.{runKey}");
-            var monitorSnapshotPath = Path.Combine(runDirectoryPath, "monitor-snapshot.yaml");
+            var monitorSnapshotPath = Path.Combine(runDirectoryPath, "snapshots", "monitor-snapshot.yaml");
             WriteYaml(
                 monitorSnapshotPath,
                 new Dictionary<string, object?>
@@ -152,7 +152,7 @@ public sealed class RunArtifactWriter
         if (derivedStateSnapshot is not null)
         {
             var derivedSnapshotId = new ArtifactId($"artifact.flow_reynolds_snapshot.{runKey}");
-            var derivedSnapshotPath = Path.Combine(runDirectoryPath, "flow-reynolds-snapshot.yaml");
+            var derivedSnapshotPath = Path.Combine(runDirectoryPath, "data", "derived", "flow-reynolds-snapshot.yaml");
             WriteYaml(
                 derivedSnapshotPath,
                 new Dictionary<string, object?>
@@ -183,7 +183,7 @@ public sealed class RunArtifactWriter
         if (derivedStateSamples is not null && derivedStateSamples.Count > 0)
         {
             var derivedRecordId = new ArtifactId($"artifact.flow_reynolds_record.{runKey}");
-            var derivedRecordPath = Path.Combine(runDirectoryPath, "flow-reynolds-record.yaml");
+            var derivedRecordPath = Path.Combine(runDirectoryPath, "data", "derived", "flow-reynolds-record.yaml");
             WriteYaml(
                 derivedRecordPath,
                 new Dictionary<string, object?>
@@ -219,6 +219,28 @@ public sealed class RunArtifactWriter
             artifactPaths[artifactId] = path;
             outputArtifactIds.Add(artifactId);
         }
+
+        var appliedParametersId = new ArtifactId($"artifact.applied_parameters.{runKey}");
+        var appliedParametersPath = Path.Combine(runDirectoryPath, "metadata", "applied-parameters.yaml");
+        WriteYaml(
+            appliedParametersPath,
+            new Dictionary<string, object?>
+            {
+                ["kind"] = "applied_parameters",
+                ["runId"] = snapshot.RunId.ToString(),
+                ["experimentId"] = resolvedExperiment.Experiment.Id.Value,
+                ["experimentVersion"] = resolvedExperiment.Version,
+                ["parameterValues"] = resolvedExperiment.ParameterValues.ToDictionary(
+                    entry => entry.Key.Value, entry => entry.Value),
+                ["roleBindingParameterValues"] = resolvedExperiment.RoleBindings
+                    .Where(static binding => binding.ParameterValues.Count > 0)
+                    .ToDictionary(
+                        static binding => binding.RoleId.Value,
+                        static binding => (object?)binding.ParameterValues.ToDictionary(
+                            static p => p.Key.Value, static p => p.Value))
+            });
+        artifactPaths[appliedParametersId] = appliedParametersPath;
+        outputArtifactIds.Add(appliedParametersId);
 
         var manifestId = new ArtifactId($"artifact.run_manifest.{runKey}");
         var manifestPath = Path.Combine(runDirectoryPath, "manifest.yaml");

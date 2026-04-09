@@ -333,6 +333,284 @@ public sealed class RunRecorderTests
         }
     }
 
+    [Fact]
+    public void RunArtifactWriter_Creates_Organized_Directory_Structure()
+    {
+        var rootDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(rootDirectory);
+
+        try
+        {
+            var writer = new RunArtifactWriter(rootDirectory);
+            var runSnapshot = new RuntimeRunContext(
+                Guid.Parse("22222222-2222-2222-2222-222222222222"),
+                RunState.Idle,
+                startedAtUtc: DateTimeOffset.Parse("2026-04-09T10:00:00+02:00"),
+                stoppedAtUtc: DateTimeOffset.Parse("2026-04-09T10:05:00+02:00"),
+                stopReason: StopReason.UserRequested("Operator stopped the run."));
+            var panels = new[]
+            {
+                new FakeIntegrationPanel(
+                    "Integrated Camera",
+                    new IntegrationPanelDataOutput
+                    {
+                        Timestamp = DateTimeOffset.Parse("2026-04-09T10:04:58+02:00"),
+                        DeviceId = "camera_01",
+                        PayloadType = IntegrationPanelOutputPayloadType.Image.ToString(),
+                        PayloadValue = "640x480"
+                    })
+            };
+
+            var result = writer.Write(
+                runSnapshot,
+                panels,
+                ["Run started.", "Run stopped."]);
+
+            // Organized subdirectories exist
+            Assert.True(Directory.Exists(Path.Combine(result.RunDirectoryPath, "events")));
+            Assert.True(Directory.Exists(Path.Combine(result.RunDirectoryPath, "snapshots", "panels")));
+            Assert.True(Directory.Exists(Path.Combine(result.RunDirectoryPath, "metadata")));
+
+            // Files are placed in organized locations
+            Assert.True(File.Exists(Path.Combine(result.RunDirectoryPath, "events", "runtime-events.yaml")));
+            Assert.True(File.Exists(Path.Combine(result.RunDirectoryPath, "events", "warnings-or-faults.yaml")));
+            Assert.True(File.Exists(Path.Combine(result.RunDirectoryPath, "snapshots", "panels", "integrated_camera.yaml")));
+            Assert.True(File.Exists(Path.Combine(result.RunDirectoryPath, "metadata", "applied-parameters.yaml")));
+
+            // Manifest stays at root
+            Assert.True(File.Exists(Path.Combine(result.RunDirectoryPath, "manifest.yaml")));
+
+            // applied-parameters.yaml has correct content structure
+            var appliedParamsYaml = File.ReadAllText(Path.Combine(result.RunDirectoryPath, "metadata", "applied-parameters.yaml"));
+            Assert.Contains("kind: applied_parameters", appliedParamsYaml);
+            Assert.Contains("experimentId: exp.ad_hoc_runtime_run", appliedParamsYaml);
+
+            // data/ directory does NOT exist (no derived data provided)
+            Assert.False(Directory.Exists(Path.Combine(result.RunDirectoryPath, "data")));
+
+            // OLD flat paths must NOT exist
+            Assert.False(File.Exists(Path.Combine(result.RunDirectoryPath, "runtime-events.yaml")));
+            Assert.False(File.Exists(Path.Combine(result.RunDirectoryPath, "warnings-or-faults.yaml")));
+            Assert.False(Directory.Exists(Path.Combine(result.RunDirectoryPath, "panels")));
+        }
+        finally
+        {
+            if (Directory.Exists(rootDirectory))
+            {
+                Directory.Delete(rootDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void RunArtifactWriter_Manifest_Contains_Organized_Relative_Paths()
+    {
+        var rootDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(rootDirectory);
+
+        try
+        {
+            var writer = new RunArtifactWriter(rootDirectory);
+            var runSnapshot = new RuntimeRunContext(
+                Guid.Parse("33333333-3333-3333-3333-333333333333"),
+                RunState.Idle,
+                startedAtUtc: DateTimeOffset.Parse("2026-04-09T11:00:00+02:00"),
+                stoppedAtUtc: DateTimeOffset.Parse("2026-04-09T11:05:00+02:00"),
+                stopReason: StopReason.UserRequested("Operator stopped the run."));
+            var panels = new[]
+            {
+                new FakeIntegrationPanel(
+                    "Integrated Camera",
+                    new IntegrationPanelDataOutput
+                    {
+                        Timestamp = DateTimeOffset.Parse("2026-04-09T11:04:58+02:00"),
+                        DeviceId = "camera_01",
+                        PayloadType = IntegrationPanelOutputPayloadType.Image.ToString(),
+                        PayloadValue = "640x480"
+                    })
+            };
+
+            var result = writer.Write(
+                runSnapshot,
+                panels,
+                ["Run started.", "Run stopped."]);
+
+            var manifestYaml = File.ReadAllText(result.ManifestPath);
+
+            // Manifest references organized relative paths (not flat)
+            Assert.Contains("events/runtime-events.yaml", manifestYaml);
+            Assert.Contains("snapshots/panels/", manifestYaml);
+            Assert.Contains("metadata/applied-parameters.yaml", manifestYaml);
+        }
+        finally
+        {
+            if (Directory.Exists(rootDirectory))
+            {
+                Directory.Delete(rootDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void RunArtifactWriter_Places_Derived_State_In_Data_Directory()
+    {
+        var rootDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(rootDirectory);
+
+        try
+        {
+            var writer = new RunArtifactWriter(rootDirectory);
+            var runSnapshot = new RuntimeRunContext(
+                Guid.Parse("44444444-4444-4444-4444-444444444444"),
+                RunState.Idle,
+                startedAtUtc: DateTimeOffset.Parse("2026-04-09T12:00:00+02:00"),
+                stoppedAtUtc: DateTimeOffset.Parse("2026-04-09T12:05:00+02:00"),
+                stopReason: StopReason.UserRequested("Operator stopped the run."));
+            var derivedSnapshot = new FlowReynoldsDerivedStateSnapshot
+            {
+                ObservedAtUtc = DateTimeOffset.Parse("2026-04-09T12:04:59+02:00"),
+                RawFlowRateLitersPerMinute = 1.24,
+                FilteredFlowRateLitersPerMinute = 1.22,
+                MeanTemperatureC = 20.95,
+                TemperatureDeltaC = 0.12,
+                BulkVelocityMetersPerSecond = 1.59,
+                ReynoldsNumber = 2310.5,
+                StatusMessage = "Derived Reynolds state ready."
+            };
+            var derivedSamples = new[]
+            {
+                new FlowReynoldsDerivedStateSample(
+                    DateTimeOffset.Parse("2026-04-09T12:04:58+02:00"),
+                    RawFlowRateLitersPerMinute: 1.23,
+                    FilteredFlowRateLitersPerMinute: 1.21,
+                    MeanTemperatureC: 20.94,
+                    TemperatureDeltaC: 0.10,
+                    BulkVelocityMetersPerSecond: 1.58,
+                    ReynoldsNumber: 2308.4,
+                    UsesFallbackTemperature: false,
+                    PulseTelemetryIsStale: false,
+                    TemperatureIsStale: false),
+                new FlowReynoldsDerivedStateSample(
+                    DateTimeOffset.Parse("2026-04-09T12:04:59+02:00"),
+                    RawFlowRateLitersPerMinute: 1.24,
+                    FilteredFlowRateLitersPerMinute: 1.22,
+                    MeanTemperatureC: 20.95,
+                    TemperatureDeltaC: 0.12,
+                    BulkVelocityMetersPerSecond: 1.59,
+                    ReynoldsNumber: 2310.5,
+                    UsesFallbackTemperature: false,
+                    PulseTelemetryIsStale: false,
+                    TemperatureIsStale: false)
+            };
+
+            var result = writer.Write(
+                runSnapshot,
+                [],
+                ["Run started.", "Run stopped."],
+                derivedStateSnapshot: derivedSnapshot,
+                derivedStateSamples: derivedSamples,
+                monitorSnapshot: null);
+
+            // Derived state files are placed in data/derived/
+            Assert.True(File.Exists(Path.Combine(result.RunDirectoryPath, "data", "derived", "flow-reynolds-snapshot.yaml")));
+            Assert.True(File.Exists(Path.Combine(result.RunDirectoryPath, "data", "derived", "flow-reynolds-record.yaml")));
+
+            // OLD flat paths must NOT exist
+            Assert.False(File.Exists(Path.Combine(result.RunDirectoryPath, "flow-reynolds-snapshot.yaml")));
+            Assert.False(File.Exists(Path.Combine(result.RunDirectoryPath, "flow-reynolds-record.yaml")));
+        }
+        finally
+        {
+            if (Directory.Exists(rootDirectory))
+            {
+                Directory.Delete(rootDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void RunArtifactWriter_Places_Monitor_Snapshot_In_Snapshots_Directory()
+    {
+        var rootDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(rootDirectory);
+
+        try
+        {
+            var writer = new RunArtifactWriter(rootDirectory);
+            var runSnapshot = new RuntimeRunContext(
+                Guid.Parse("55555555-5555-5555-5555-555555555555"),
+                RunState.Idle,
+                startedAtUtc: DateTimeOffset.Parse("2026-04-09T13:00:00+02:00"),
+                stoppedAtUtc: DateTimeOffset.Parse("2026-04-09T13:05:00+02:00"),
+                stopReason: StopReason.UserRequested("Operator stopped the run."));
+            var monitorSnapshot = new ExperimentMonitorSnapshot
+            {
+                RunId = runSnapshot.RunId,
+                RunState = RunState.Idle,
+                RunDisplayName = "transition-demo-002",
+                HighestSeverity = ExperimentMonitorSeverity.Warning,
+                WarningCount = 1,
+                Items =
+                [
+                    new ExperimentMonitorItem(
+                        "warn.controller_stale",
+                        ExperimentMonitorSeverity.Warning,
+                        "controller.re_primary",
+                        "Measured value is stale.",
+                        DateTimeOffset.Parse("2026-04-09T13:04:59+02:00"))
+                ]
+            };
+
+            var result = writer.Write(runSnapshot, [], ["Run started.", "Run stopped."], monitorSnapshot);
+
+            // Monitor snapshot is placed in snapshots/
+            Assert.True(File.Exists(Path.Combine(result.RunDirectoryPath, "snapshots", "monitor-snapshot.yaml")));
+
+            // OLD flat path must NOT exist
+            Assert.False(File.Exists(Path.Combine(result.RunDirectoryPath, "monitor-snapshot.yaml")));
+        }
+        finally
+        {
+            if (Directory.Exists(rootDirectory))
+            {
+                Directory.Delete(rootDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void RunArtifactWriter_Does_Not_Create_Data_Directory_When_No_Data_Artifacts()
+    {
+        var rootDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(rootDirectory);
+
+        try
+        {
+            var writer = new RunArtifactWriter(rootDirectory);
+            var runSnapshot = new RuntimeRunContext(
+                Guid.Parse("66666666-6666-6666-6666-666666666666"),
+                RunState.Idle,
+                startedAtUtc: DateTimeOffset.Parse("2026-04-09T14:00:00+02:00"),
+                stoppedAtUtc: DateTimeOffset.Parse("2026-04-09T14:05:00+02:00"),
+                stopReason: StopReason.UserRequested("Operator stopped the run."));
+
+            var result = writer.Write(
+                runSnapshot,
+                [],
+                ["Run started.", "Run stopped."]);
+
+            // data/ directory must NOT exist when no derived data is provided
+            Assert.False(Directory.Exists(Path.Combine(result.RunDirectoryPath, "data")));
+        }
+        finally
+        {
+            if (Directory.Exists(rootDirectory))
+            {
+                Directory.Delete(rootDirectory, recursive: true);
+            }
+        }
+    }
+
     private sealed class FakeIntegrationPanel : IDeviceTestPanelViewModel, IIntegrationPanelViewModel
     {
         public FakeIntegrationPanel(
